@@ -26,34 +26,34 @@ export interface ThemeColors {
 }
 
 export const lightTheme: ThemeColors = {
-  primary: '#1D4ED8', // Deep Vibrant Blue
-  primaryDark: '#1E40AF',
+  primary: '#2563EB', // Modern Indigo Blue
+  primaryDark: '#1D4ED8',
   primaryLight: '#EFF6FF',
-  accent: '#2563EB',
-  background: '#F1F5F9', // Crisp slate background
+  accent: '#3B82F6',
+  background: '#F8FAFC', // Soft slate background
   card: '#FFFFFF',
-  cardSecondary: '#F8FAFC',
+  cardSecondary: '#F1F5F9',
   text: '#0F172A',
   textSecondary: '#475569',
   textMuted: '#94A3B8',
   border: '#E2E8F0',
   divider: '#F1F5F9',
-  success: '#10B981', // Emerald Profit Green
-  successLight: '#ECFDF5',
-  danger: '#EF4444', // Red Expense
-  dangerLight: '#FEF2F2',
-  warning: '#F59E0B',
+  success: '#059669', // Soft rich emerald for crisp clear text
+  successLight: '#ECFDF5', // Gentle pastel mint background
+  danger: '#E11D48', // Soft rose-coral red for comfortable contrast
+  dangerLight: '#FFF1F2', // Gentle pastel rose background
+  warning: '#D97706', // Soft amber for high legibility
   warningLight: '#FFFBEB',
   inputBg: '#F8FAFC',
   tabBarBg: '#FFFFFF',
-  tabBarActive: '#1D4ED8',
+  tabBarActive: '#2563EB',
   tabBarInactive: '#94A3B8',
   progressBarBg: '#E2E8F0',
   statusBar: 'dark',
 };
 
 export const darkTheme: ThemeColors = {
-  primary: '#3B82F6', // Electric Indigo Blue
+  primary: '#3B82F6', // Electric Blue
   primaryDark: '#1D4ED8',
   primaryLight: '#1E293B',
   accent: '#60A5FA',
@@ -65,12 +65,12 @@ export const darkTheme: ThemeColors = {
   textMuted: '#64748B',
   border: '#2A364F',
   divider: '#1E293B',
-  success: '#34D399',
-  successLight: '#064E3B',
-  danger: '#F87171',
-  dangerLight: '#7F1D1D',
-  warning: '#FBBF24',
-  warningLight: '#78350F',
+  success: '#34D399', // Soft bright mint for high dark-mode contrast
+  successLight: 'rgba(16, 185, 129, 0.15)',
+  danger: '#FB7185', // Soft coral rose for clear dark-mode readability
+  dangerLight: 'rgba(225, 29, 72, 0.15)',
+  warning: '#FBBF24', // Soft warm amber
+  warningLight: 'rgba(217, 119, 6, 0.15)',
   inputBg: '#111827',
   tabBarBg: '#131A2A',
   tabBarActive: '#60A5FA',

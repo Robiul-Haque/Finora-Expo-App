@@ -128,7 +128,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View
           style={[
             styles.profitBanner,
-            { backgroundColor: isDarkMode ? '#064E3B' : '#ECFDF5', borderColor: theme.success },
+            {
+              backgroundColor: theme.successLight,
+              borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.25)' : 'rgba(5, 150, 105, 0.2)',
+            },
           ]}
         >
           <View style={styles.profitBannerLeft}>
@@ -136,7 +139,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Ionicons name="sparkles" size={18} color="#FFFFFF" />
             </View>
             <View>
-              <Text style={[styles.profitBannerTitle, { color: isDarkMode ? '#A7F3D0' : '#065F46' }]}>
+              <Text style={[styles.profitBannerTitle, { color: isDarkMode ? '#6EE7B7' : '#065F46' }]}>
                 Today's Net Profit
               </Text>
               <Text style={[styles.profitBannerAmount, { color: theme.success }]}>
