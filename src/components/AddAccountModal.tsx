@@ -11,7 +11,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { AccountType } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
@@ -26,7 +26,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
   const { addAccount } = useLedger();
 
   const [name, setName] = useState('');
-  const [accountType, setAccountType] = useState<AccountType>('bkash');
+  const [accountType, setAccountType] = useState<AccountType>('agent');
   const [accountNumber, setAccountNumber] = useState('');
   const [initialBalance, setInitialBalance] = useState('');
   const [dailyLimit, setDailyLimit] = useState('300000');
@@ -34,10 +34,10 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const accountTypes: { type: AccountType; label: string; icon: string; color: string }[] = [
-    { type: 'bkash', label: 'bKash', icon: 'cellphone-wireless', color: '#E2136E' },
-    { type: 'nagad', label: 'Nagad', icon: 'wallet', color: '#F7941D' },
-    { type: 'rocket', label: 'Rocket', icon: 'rocket-launch', color: '#8C3494' },
-    { type: 'bank', label: 'Bank Account', icon: 'bank', color: '#0284C7' },
+    { type: 'agent', label: 'Agent SIM', icon: 'phone-portrait-outline', color: '#E2136E' },
+    { type: 'merchant', label: 'Merchant QR', icon: 'qr-code-outline', color: '#BE123C' },
+    { type: 'personal', label: 'Personal', icon: 'person-circle-outline', color: '#9D174D' },
+    { type: 'corporate', label: 'Corporate B2B', icon: 'business-outline', color: '#831843' },
   ];
 
   const handleSave = async () => {
@@ -46,7 +46,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
       return;
     }
     if (!accountNumber.trim()) {
-      Alert.alert('Validation Error', 'Please enter a phone or account number.');
+      Alert.alert('Validation Error', 'Please enter a bKash phone or SIM number.');
       return;
     }
 
@@ -72,7 +72,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
       onClose();
     } catch (e) {
       console.error('Error adding account:', e);
-      Alert.alert('Error', 'Failed to add account.');
+      Alert.alert('Error', 'Failed to add bKash account.');
     } finally {
       setIsSubmitting(false);
     }
@@ -87,7 +87,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
         <View style={[styles.modalContent, { backgroundColor: theme.card, borderColor: theme.border }]}>
           {/* Header */}
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Add New Account</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Add bKash Line</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Ionicons name="close" size={22} color={theme.textMuted} />
             </TouchableOpacity>
@@ -96,7 +96,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
           <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
             {/* Account Type Selector */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>ACCOUNT PROVIDER</Text>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>BKASH LINE TYPE</Text>
               <View style={styles.providerGrid}>
                 {accountTypes.map((item) => {
                   const isSelected = accountType === item.type;
@@ -112,9 +112,9 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
                       ]}
                       onPress={() => setAccountType(item.type)}
                     >
-                      <MaterialCommunityIcons
+                      <Ionicons
                         name={item.icon as any}
-                        size={22}
+                        size={20}
                         color={isSelected ? item.color : theme.textSecondary}
                       />
                       <Text
@@ -122,6 +122,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
                           styles.providerLabel,
                           { color: isSelected ? item.color : theme.text },
                         ]}
+                        numberOfLines={1}
                       >
                         {item.label}
                       </Text>
@@ -133,12 +134,12 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
 
             {/* Name Input */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>ACCOUNT LABEL / NAME</Text>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>LINE LABEL / NAME</Text>
               <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
                 <Ionicons name="bookmark-outline" size={18} color={theme.textMuted} />
                 <TextInput
                   style={[styles.inputField, { color: theme.text }]}
-                  placeholder="e.g. Primary Business bKash"
+                  placeholder="e.g. Counter 1 - Agent SIM"
                   placeholderTextColor={theme.textMuted}
                   value={name}
                   onChangeText={setName}
@@ -204,11 +205,12 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
             <TouchableOpacity
               style={[styles.activeToggleRow, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}
               onPress={() => setIsActive(!isActive)}
+              activeOpacity={0.7}
             >
-              <View>
+              <View style={{ flex: 1, marginRight: 8 }}>
                 <Text style={[styles.activeToggleTitle, { color: theme.text }]}>Active Status</Text>
                 <Text style={[styles.activeToggleSubtitle, { color: theme.textSecondary }]}>
-                  {isActive ? 'Account is active and included in totals' : 'Account is disabled'}
+                  {isActive ? 'Line is active and included in float & limit totals' : 'Line is currently disabled'}
                 </Text>
               </View>
               <Ionicons
@@ -225,6 +227,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
               style={[styles.cancelBtn, { borderColor: theme.border }]}
               onPress={onClose}
               disabled={isSubmitting}
+              activeOpacity={0.7}
             >
               <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
@@ -233,9 +236,10 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
               style={[styles.saveBtn, { backgroundColor: theme.primary }]}
               onPress={handleSave}
               disabled={isSubmitting}
+              activeOpacity={0.8}
             >
               <Text style={styles.saveBtnText}>
-                {isSubmitting ? 'Creating...' : 'Create Account'}
+                {isSubmitting ? 'Adding...' : 'Add bKash Line'}
               </Text>
             </TouchableOpacity>
           </View>

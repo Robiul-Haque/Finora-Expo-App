@@ -113,10 +113,10 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         let newTodayReceive = acc.todayReceive;
         let newTodayProfit = acc.todayProfit + (txData.profit || 0);
 
-        if (txData.type === 'send_money' || txData.type === 'cash_out') {
+        if (txData.type === 'send_money' || txData.type === 'cash_out' || txData.type === 'b2b') {
           newBalance -= txData.amount + (txData.cost || 0);
           newTodaySend += txData.amount;
-        } else if (txData.type === 'receive_money') {
+        } else if (txData.type === 'receive_money' || txData.type === 'cash_in') {
           newBalance += txData.amount;
           newTodayReceive += txData.amount;
         } else if (txData.type === 'adjustment') {
@@ -152,10 +152,10 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         let newTodayReceive = acc.todayReceive;
         let newTodayProfit = Math.max(0, acc.todayProfit - (txToDelete.profit || 0));
 
-        if (txToDelete.type === 'send_money' || txToDelete.type === 'cash_out') {
+        if (txToDelete.type === 'send_money' || txToDelete.type === 'cash_out' || txToDelete.type === 'b2b') {
           newBalance += txToDelete.amount + (txToDelete.cost || 0);
           newTodaySend = Math.max(0, newTodaySend - txToDelete.amount);
-        } else if (txToDelete.type === 'receive_money') {
+        } else if (txToDelete.type === 'receive_money' || txToDelete.type === 'cash_in') {
           newBalance -= txToDelete.amount;
           newTodayReceive = Math.max(0, newTodayReceive - txToDelete.amount);
         } else if (txToDelete.type === 'adjustment') {
@@ -228,9 +228,9 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     transactions.forEach((tx) => {
       const txTime = new Date(tx.date).getTime();
       if (txTime >= startOfMonth) {
-        if (tx.type === 'receive_money') {
+        if (tx.type === 'receive_money' || tx.type === 'cash_in') {
           monthlyIncome += tx.amount;
-        } else if (tx.type === 'send_money' || tx.type === 'cash_out') {
+        } else if (tx.type === 'send_money' || tx.type === 'cash_out' || tx.type === 'b2b') {
           monthlyExpense += tx.amount + (tx.cost || 0);
         }
       }

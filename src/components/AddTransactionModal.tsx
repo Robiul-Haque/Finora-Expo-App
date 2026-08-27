@@ -11,7 +11,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { TransactionType } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
@@ -75,8 +75,8 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         accountName: selectedAccount.name,
         type,
         amount: numAmount,
-        recipientNumber: type === 'send_money' || type === 'cash_out' ? targetNumber.trim() : undefined,
-        senderNumber: type === 'receive_money' ? targetNumber.trim() : undefined,
+        recipientNumber: (type === 'send_money' || type === 'cash_out' || type === 'b2b') ? targetNumber.trim() : undefined,
+        senderNumber: (type === 'receive_money' || type === 'cash_in') ? targetNumber.trim() : undefined,
         cost: numCost,
         profit: numProfit,
         note: note.trim() || undefined,
@@ -97,7 +97,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     }
   };
 
-  const isSend = type === 'send_money' || type === 'cash_out';
+  const isSend = type === 'send_money' || type === 'cash_out' || type === 'b2b';
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -112,7 +112,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               <TouchableOpacity onPress={onClose} style={styles.backBtn}>
                 <Ionicons name="arrow-back" size={22} color={theme.text} />
               </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Add Transaction</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Add bKash Entry</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Ionicons name="close" size={22} color={theme.textMuted} />
@@ -123,7 +123,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             {/* Account Selector */}
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                SOURCE ACCOUNT
+                SOURCE BKASH LINE / SIM
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accountSelectorRow}>
                 {accounts.map((acc) => {
@@ -140,8 +140,8 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                       ]}
                       onPress={() => setAccountId(acc.id)}
                     >
-                      <MaterialCommunityIcons
-                        name={acc.type === 'bkash' ? 'cellphone-wireless' : 'wallet'}
+                      <Ionicons
+                        name={acc.type === 'merchant' ? 'qr-code-outline' : 'phone-portrait-outline'}
                         size={16}
                         color={isSelected ? theme.primary : theme.textSecondary}
                       />
@@ -167,47 +167,64 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             {/* Transaction Type Segmented Toggle */}
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                TRANSACTION TYPE
+                BKASH TRANSACTION TYPE
               </Text>
               <View style={[styles.typeSegment, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}>
                 <TouchableOpacity
                   style={[
                     styles.typeOption,
-                    type === 'send_money' && { backgroundColor: theme.danger, borderRadius: 10 },
+                    (type === 'cash_out' || type === 'send_money') && { backgroundColor: theme.danger, borderRadius: 10 },
                   ]}
-                  onPress={() => setType('send_money')}
+                  onPress={() => setType('cash_out')}
                 >
                   <Text
                     style={[
                       styles.typeOptionText,
-                      { color: type === 'send_money' ? '#FFFFFF' : theme.textSecondary },
+                      { color: (type === 'cash_out' || type === 'send_money') ? '#FFFFFF' : theme.textSecondary },
                     ]}
                   >
-                    Send Money
+                    Cash Out
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[
                     styles.typeOption,
-                    type === 'receive_money' && { backgroundColor: theme.success, borderRadius: 10 },
+                    (type === 'receive_money' || type === 'cash_in') && { backgroundColor: theme.success, borderRadius: 10 },
                   ]}
                   onPress={() => setType('receive_money')}
                 >
                   <Text
                     style={[
                       styles.typeOptionText,
-                      { color: type === 'receive_money' ? '#FFFFFF' : theme.textSecondary },
+                      { color: (type === 'receive_money' || type === 'cash_in') ? '#FFFFFF' : theme.textSecondary },
                     ]}
                   >
-                    Receive Money
+                    Cash In
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[
                     styles.typeOption,
-                    type === 'adjustment' && { backgroundColor: theme.primary, borderRadius: 10 },
+                    type === 'b2b' && { backgroundColor: theme.primary, borderRadius: 10 },
+                  ]}
+                  onPress={() => setType('b2b')}
+                >
+                  <Text
+                    style={[
+                      styles.typeOptionText,
+                      { color: type === 'b2b' ? '#FFFFFF' : theme.textSecondary },
+                    ]}
+                  >
+                    B2B Float
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.typeOption,
+                    type === 'adjustment' && { backgroundColor: '#64748B', borderRadius: 10 },
                   ]}
                   onPress={() => setType('adjustment')}
                 >
@@ -217,7 +234,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                       { color: type === 'adjustment' ? '#FFFFFF' : theme.textSecondary },
                     ]}
                   >
-                    Adjustment
+                    Adjust
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -242,14 +259,15 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             {/* Recipient / Sender Number */}
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                {isSend ? 'RECIPIENT NUMBER / NAME' : 'SENDER NUMBER / NAME'}
+                {isSend ? 'RECIPIENT / CUSTOMER BKASH NUMBER' : 'SENDER / CUSTOMER BKASH NUMBER'}
               </Text>
               <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
                 <Ionicons name="call-outline" size={18} color={theme.textMuted} />
                 <TextInput
                   style={[styles.inputField, { color: theme.text }]}
-                  placeholder={isSend ? 'e.g. 01712 345 678 or Supplier' : 'e.g. 01888 111 222 or Customer'}
+                  placeholder={isSend ? 'e.g. 01712 345 678' : 'e.g. 01888 111 222'}
                   placeholderTextColor={theme.textMuted}
+                  keyboardType="phone-pad"
                   value={targetNumber}
                   onChangeText={setTargetNumber}
                 />
@@ -260,7 +278,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             <View style={styles.rowGrid}>
               <View style={[styles.inputGroup, { flex: 1 }]}>
                 <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                  {isSend ? 'SEND FEE / COST' : 'COST'} (৳)
+                  {isSend ? 'BKASH FEE / COST' : 'COST'} (৳)
                 </Text>
                 <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
                   <Text style={[styles.currencyPrefixSmall, { color: theme.danger }]}>৳</Text>
@@ -276,7 +294,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               </View>
 
               <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>PROFIT (৳)</Text>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>COMMISSION (৳)</Text>
                 <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
                   <Text style={[styles.currencyPrefixSmall, { color: theme.success }]}>৳</Text>
                   <TextInput
@@ -315,6 +333,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               style={[styles.cancelBtn, { borderColor: theme.border }]}
               onPress={onClose}
               disabled={isSubmitting}
+              activeOpacity={0.7}
             >
               <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
@@ -323,9 +342,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               style={[styles.saveBtn, { backgroundColor: theme.primary }]}
               onPress={handleSave}
               disabled={isSubmitting}
+              activeOpacity={0.8}
             >
               <Text style={styles.saveBtnText}>
-                {isSubmitting ? 'Saving...' : 'Save Transaction'}
+                {isSubmitting ? 'Recording...' : 'Record bKash Entry'}
               </Text>
             </TouchableOpacity>
           </View>

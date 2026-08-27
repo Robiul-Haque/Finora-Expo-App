@@ -1,6 +1,6 @@
-export type AccountType = 'bkash' | 'nagad' | 'rocket' | 'bank' | 'other';
+export type AccountType = 'agent' | 'merchant' | 'personal' | 'corporate' | 'bkash';
 
-export type TransactionType = 'send_money' | 'receive_money' | 'cash_out' | 'adjustment';
+export type TransactionType = 'cash_out' | 'cash_in' | 'send_money' | 'receive_money' | 'b2b' | 'adjustment';
 
 export interface Account {
   id: string;

@@ -17,8 +17,8 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
 }) => {
   const { theme } = useTheme();
 
-  const isSend = transaction.type === 'send_money' || transaction.type === 'cash_out';
-  const isReceive = transaction.type === 'receive_money';
+  const isSend = transaction.type === 'send_money' || transaction.type === 'cash_out' || transaction.type === 'b2b';
+  const isReceive = transaction.type === 'receive_money' || transaction.type === 'cash_in';
 
   const formatCurrency = (val: number) => {
     return '৳' + val.toLocaleString('en-US');
@@ -31,13 +31,6 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
 
   const getBadgeConfig = () => {
     switch (transaction.type) {
-      case 'send_money':
-        return {
-          label: 'SEND MONEY',
-          color: theme.danger,
-          bg: theme.dangerLight,
-          icon: 'arrow-up-circle-outline' as const,
-        };
       case 'cash_out':
         return {
           label: 'CASH OUT',
@@ -46,18 +39,33 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
           icon: 'arrow-up-circle-outline' as const,
         };
       case 'receive_money':
+      case 'cash_in':
         return {
-          label: 'RECEIVE MONEY',
+          label: 'CASH IN',
           color: theme.success,
           bg: theme.successLight,
           icon: 'arrow-down-circle-outline' as const,
+        };
+      case 'send_money':
+        return {
+          label: 'SEND MONEY',
+          color: theme.danger,
+          bg: theme.dangerLight,
+          icon: 'arrow-up-circle-outline' as const,
+        };
+      case 'b2b':
+        return {
+          label: 'B2B FLOAT',
+          color: theme.primary,
+          bg: theme.primaryLight,
+          icon: 'swap-horizontal-outline' as const,
         };
       case 'adjustment':
       default:
         return {
           label: 'ADJUSTMENT',
-          color: theme.primary,
-          bg: theme.primaryLight,
+          color: theme.textSecondary,
+          bg: theme.cardSecondary,
           icon: 'swap-horizontal-outline' as const,
         };
     }
@@ -112,19 +120,22 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
             styles.amountText,
             { color: isSend ? theme.text : theme.success },
           ]}
+          numberOfLines={1}
         >
           {isSend ? '-' : '+'}{formatCurrency(transaction.amount)}
         </Text>
 
         <View style={styles.subAmounts}>
-          {transaction.cost > 0 && (
-            <Text style={[styles.costText, { color: theme.danger }]}>
-              Cost {formatCurrency(transaction.cost)}
-            </Text>
-          )}
           {transaction.profit > 0 && (
-            <Text style={[styles.profitText, { color: theme.success }]}>
-              Profit {formatCurrency(transaction.profit)}
+            <View style={[styles.profitPill, { backgroundColor: theme.successLight }]}>
+              <Text style={[styles.profitText, { color: theme.success }]}>
+                +{formatCurrency(transaction.profit)} Com.
+              </Text>
+            </View>
+          )}
+          {transaction.cost > 0 && (
+            <Text style={[styles.costText, { color: theme.textMuted }]}>
+              Fee {formatCurrency(transaction.cost)}
             </Text>
           )}
         </View>
@@ -139,15 +150,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 14,
+    paddingHorizontal: 13,
+    borderRadius: 16,
     borderWidth: 1,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 11,
     flex: 1,
   },
   iconContainer: {
@@ -159,6 +170,7 @@ const styles = StyleSheet.create({
   },
   details: {
     flex: 1,
+    marginRight: 6,
   },
   topMeta: {
     flexDirection: 'row',
@@ -172,7 +184,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   typeBadgeText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
@@ -181,34 +193,40 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   targetNumber: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: 1,
   },
   accountMeta: {
     fontSize: 11,
-    marginTop: 2,
+    marginTop: 1,
   },
   rightSection: {
     alignItems: 'flex-end',
-    marginLeft: 8,
+    marginLeft: 6,
   },
   amountText: {
     fontSize: 15,
     fontWeight: '800',
+    letterSpacing: -0.3,
   },
   subAmounts: {
     flexDirection: 'column',
     alignItems: 'flex-end',
-    gap: 1,
+    gap: 2,
     marginTop: 3,
+  },
+  profitPill: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 5,
   },
   costText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   profitText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 });

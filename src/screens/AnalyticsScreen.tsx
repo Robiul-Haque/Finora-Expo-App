@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
@@ -22,7 +23,7 @@ export const AnalyticsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <Header title="Analytics & Profit" subtitle="Performance Breakdown" />
+      <Header title="bKash Analytics & Profit" subtitle="Agent Commission & Performance" />
 
       <ScrollView
         style={styles.container}
@@ -31,9 +32,9 @@ export const AnalyticsScreen: React.FC = () => {
       >
         {/* Net Profit Summary */}
         <StatCard
-          title="All-Time Recorded Profit"
+          title="All-Time Commission Earned"
           value={formatCurrency(totalProfitCalculated)}
-          subtitle="Net earnings from commission & fees"
+          subtitle="Total agent profit from Cash Out & transfers"
           badgeText="Verified"
           isPositive
           iconName="trending-up"
@@ -48,27 +49,27 @@ export const AnalyticsScreen: React.FC = () => {
               value={formatCurrency(totalFeesPaid)}
               iconName="card-outline"
               isPositive={false}
-              subtitle="Cash out / send costs"
+              subtitle="Cash out / B2B charges"
             />
           </View>
           <View style={styles.colItem}>
             <StatCard
-              title="Daily Profit"
+              title="Today's Profit"
               value={formatCurrency(metrics.todayProfit)}
               iconName="cash-outline"
               isPositive
-              subtitle="Earned today"
+              subtitle="Commission today"
             />
           </View>
         </View>
 
         {/* Volume Breakdown */}
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>Transaction Volume</Text>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>bKash Transaction Volume</Text>
           <View style={styles.metricRow}>
             <View style={styles.metricItem}>
               <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>
-                Send Transactions
+                Cash Out / Send
               </Text>
               <Text style={[styles.metricNumber, { color: theme.danger }]}>
                 {totalSendCount}
@@ -77,7 +78,7 @@ export const AnalyticsScreen: React.FC = () => {
             <View style={[styles.metricDivider, { backgroundColor: theme.border }]} />
             <View style={styles.metricItem}>
               <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>
-                Receive Transactions
+                Cash In / Receive
               </Text>
               <Text style={[styles.metricNumber, { color: theme.success }]}>
                 {totalReceiveCount}
@@ -88,7 +89,7 @@ export const AnalyticsScreen: React.FC = () => {
 
         {/* Channel Share */}
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>Channel Balance Share</Text>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>bKash SIM Balance Float Share</Text>
           {accounts.map((acc) => {
             const share =
               metrics.totalBalance > 0
@@ -112,10 +113,11 @@ export const AnalyticsScreen: React.FC = () => {
         <TouchableOpacity
           style={[styles.resetButton, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}
           onPress={resetToMockData}
+          activeOpacity={0.7}
         >
           <Ionicons name="refresh-outline" size={16} color={theme.textSecondary} />
           <Text style={[styles.resetButtonText, { color: theme.textSecondary }]}>
-            Reset to Sample Prototype Data
+            Reset to bKash Demo Data
           </Text>
         </TouchableOpacity>
 
@@ -134,51 +136,52 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 40,
+    paddingTop: 4,
+    paddingBottom: 30,
   },
   twoCol: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
+    marginBottom: 4,
   },
   colItem: {
     flex: 1,
   },
   card: {
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   metricRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   metricItem: {
     flex: 1,
     alignItems: 'center',
   },
   metricLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   metricNumber: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
-    marginTop: 4,
+    marginTop: 3,
   },
   metricDivider: {
     width: 1,
     height: '100%',
   },
   channelRow: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   channelHeader: {
     flexDirection: 'row',
@@ -192,16 +195,17 @@ const styles = StyleSheet.create({
   },
   channelAmount: {
     fontSize: 12,
+    fontWeight: '500',
   },
   resetButton: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 14,
+    paddingVertical: 13,
     borderRadius: 14,
     borderWidth: 1,
-    marginTop: 10,
+    marginTop: 8,
   },
   resetButtonText: {
     fontSize: 13,

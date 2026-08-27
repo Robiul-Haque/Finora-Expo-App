@@ -8,7 +8,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { Account } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
@@ -157,15 +157,16 @@ export const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                 onClose();
                 onAddTransaction(account.id);
               }}
+              activeOpacity={0.75}
             >
               <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.addTxButtonText}>Log Transaction on this Account</Text>
+              <Text style={styles.addTxButtonText}>Log bKash Entry on this Line</Text>
             </TouchableOpacity>
 
             {/* Account History */}
             <View style={styles.historySection}>
               <View style={styles.historyHeader}>
-                <Text style={[styles.historyTitle, { color: theme.text }]}>Transaction History</Text>
+                <Text style={[styles.historyTitle, { color: theme.text }]}>bKash Line Activity</Text>
                 <Text style={[styles.historyCount, { color: theme.textSecondary }]}>
                   {accountTransactions.length} records
                 </Text>
@@ -175,7 +176,7 @@ export const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                 <View style={[styles.emptyBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
                   <Ionicons name="receipt-outline" size={32} color={theme.textMuted} />
                   <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                    No transactions recorded for this account yet.
+                    No bKash transactions recorded for this line yet.
                   </Text>
                 </View>
               ) : (
@@ -243,7 +244,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   balanceCardAmount: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '900',
     marginVertical: 4,
     letterSpacing: -0.5,
@@ -255,7 +256,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   statBox: {
-    width: '48.5%',
+    flexBasis: '47%',
+    flexGrow: 1,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
@@ -271,7 +273,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   statBoxValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
   },
   addTxButton: {

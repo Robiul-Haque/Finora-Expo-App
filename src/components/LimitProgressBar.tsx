@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
 interface LimitProgressBarProps {
@@ -18,6 +18,16 @@ export const LimitProgressBar: React.FC<LimitProgressBarProps> = ({
   const { theme } = useTheme();
 
   const percentage = totalLimit > 0 ? Math.min(100, Math.round((usedAmount / totalLimit) * 100)) : 0;
+  const animatedWidth = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(animatedWidth, {
+      toValue: percentage,
+      friction: 8,
+      tension: 45,
+      useNativeDriver: false,
+    }).start();
+  }, [percentage]);
 
   // Determine color based on threshold
   let barColor = theme.primary;
@@ -26,8 +36,13 @@ export const LimitProgressBar: React.FC<LimitProgressBarProps> = ({
   } else if (percentage > 60) {
     barColor = theme.warning;
   } else {
-    barColor = '#3B82F6';
+    barColor = theme.primary;
   }
+
+  const widthInterpolation = animatedWidth.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
     <View style={styles.container}>
@@ -40,11 +55,11 @@ export const LimitProgressBar: React.FC<LimitProgressBarProps> = ({
         )}
       </View>
       <View style={[styles.track, { backgroundColor: theme.progressBarBg }]}>
-        <View
+        <Animated.View
           style={[
             styles.fill,
             {
-              width: `${percentage}%`,
+              width: widthInterpolation,
               backgroundColor: barColor,
             },
           ]}
@@ -66,14 +81,14 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   label: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   percentage: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
   },
   track: {
     height: 6,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { Account } from '../types/ledger';
 import { useTheme } from '../context/ThemeContext';
 import { LimitProgressBar } from './LimitProgressBar';
@@ -27,16 +27,17 @@ export const AccountCard: React.FC<AccountCardProps> = ({
 
   const getProviderIcon = (type: string) => {
     switch (type) {
+      case 'agent':
+        return { name: 'phone-portrait-outline', color: '#E2136E', label: 'bKash Agent' };
+      case 'merchant':
+        return { name: 'qr-code-outline', color: '#BE123C', label: 'Merchant QR' };
+      case 'personal':
+        return { name: 'person-circle-outline', color: '#9D174D', label: 'Personal bKash' };
+      case 'corporate':
+        return { name: 'business-outline', color: '#831843', label: 'Corporate B2B' };
       case 'bkash':
-        return { name: 'cellphone-wireless', color: '#E2136E', label: 'bKash' };
-      case 'nagad':
-        return { name: 'wallet', color: '#F7941D', label: 'Nagad' };
-      case 'rocket':
-        return { name: 'rocket-launch', color: '#8C3494', label: 'Rocket' };
-      case 'bank':
-        return { name: 'bank', color: '#0284C7', label: 'Bank' };
       default:
-        return { name: 'credit-card-outline', color: '#64748B', label: 'Other' };
+        return { name: 'phone-portrait-outline', color: '#E2136E', label: 'bKash Line' };
     }
   };
 
@@ -58,13 +59,13 @@ export const AccountCard: React.FC<AccountCardProps> = ({
       <View style={styles.header}>
         <View style={styles.accountInfo}>
           <View style={[styles.avatar, { backgroundColor: provider.color + '1A' }]}>
-            <MaterialCommunityIcons
+            <Ionicons
               name={provider.name as any}
               size={20}
               color={provider.color}
             />
           </View>
-          <View>
+          <View style={{ flex: 1, marginRight: 8 }}>
             <View style={styles.nameRow}>
               <Text style={[styles.accountName, { color: theme.text }]} numberOfLines={1}>
                 {account.name}
@@ -76,14 +77,14 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                 ]}
               />
             </View>
-            <Text style={[styles.accountNumber, { color: theme.textSecondary }]}>
+            <Text style={[styles.accountNumber, { color: theme.textSecondary }]} numberOfLines={1}>
               {account.accountNumber}
             </Text>
           </View>
         </View>
 
         <View style={styles.providerBadgeContainer}>
-          <View style={[styles.providerBadge, { backgroundColor: provider.color + '15' }]}>
+          <View style={[styles.providerBadge, { backgroundColor: provider.color + '18' }]}>
             <Text style={[styles.providerText, { color: provider.color }]}>
               {provider.label}
             </Text>
@@ -94,16 +95,20 @@ export const AccountCard: React.FC<AccountCardProps> = ({
       {/* Main Balance Display */}
       <View style={styles.balanceContainer}>
         <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>
-          CURRENT BALANCE
+          CURRENT FLOAT BALANCE
         </Text>
         <View style={styles.balanceRow}>
-          <Text style={[styles.balanceAmount, { color: theme.text }]}>
+          <Text
+            style={[styles.balanceAmount, { color: theme.text }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
             {formatCurrency(account.balance)}
           </Text>
           {account.todayProfit > 0 && (
             <View style={[styles.profitBadge, { backgroundColor: theme.successLight }]}>
               <Text style={[styles.profitText, { color: theme.success }]}>
-                +{formatCurrency(account.todayProfit)} Profit
+                +{formatCurrency(account.todayProfit)} Commission
               </Text>
             </View>
           )}
@@ -139,8 +144,9 @@ export const AccountCard: React.FC<AccountCardProps> = ({
         <TouchableOpacity
           style={[styles.actionBtn, { borderColor: theme.border }]}
           onPress={onPress}
+          activeOpacity={0.7}
         >
-          <Ionicons name="stats-chart" size={14} color={theme.textSecondary} />
+          <Ionicons name="stats-chart-outline" size={14} color={theme.textSecondary} />
           <Text style={[styles.actionBtnText, { color: theme.textSecondary }]}>Details</Text>
         </TouchableOpacity>
 
@@ -148,9 +154,10 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           <TouchableOpacity
             style={[styles.primaryActionBtn, { backgroundColor: theme.primary }]}
             onPress={onAddTransactionPress}
+            activeOpacity={0.75}
           >
             <Ionicons name="add" size={16} color="#FFFFFF" />
-            <Text style={styles.primaryActionBtnText}>Send / Receive</Text>
+            <Text style={styles.primaryActionBtnText}>Log bKash Entry</Text>
           </TouchableOpacity>
         )}
       </View>

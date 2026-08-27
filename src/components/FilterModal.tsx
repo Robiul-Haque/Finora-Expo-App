@@ -47,8 +47,10 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose }) =>
 
   const typeOptions: { label: string; value: string }[] = [
     { label: 'All Types', value: 'all' },
+    { label: 'Cash Out', value: 'cash_out' },
+    { label: 'Cash In', value: 'receive_money' },
     { label: 'Send Money', value: 'send_money' },
-    { label: 'Receive Money', value: 'receive_money' },
+    { label: 'B2B Float', value: 'b2b' },
     { label: 'Adjustment', value: 'adjustment' },
   ];
 
@@ -245,6 +247,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose }) =>
             <TouchableOpacity
               style={[styles.resetBtn, { borderColor: theme.border }]}
               onPress={handleReset}
+              activeOpacity={0.7}
             >
               <Text style={[styles.resetBtnText, { color: theme.textSecondary }]}>Reset All</Text>
             </TouchableOpacity>
@@ -252,6 +255,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose }) =>
             <TouchableOpacity
               style={[styles.applyBtn, { backgroundColor: theme.primary }]}
               onPress={handleApply}
+              activeOpacity={0.8}
             >
               <Text style={styles.applyBtnText}>Apply Filters</Text>
             </TouchableOpacity>

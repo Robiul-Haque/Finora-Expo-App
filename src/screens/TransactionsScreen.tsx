@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
@@ -38,9 +38,10 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
 
   const chips: { label: string; value: string }[] = [
     { label: 'All', value: 'all' },
+    { label: 'Cash Out', value: 'cash_out' },
+    { label: 'Cash In', value: 'receive_money' },
     { label: 'Send Money', value: 'send_money' },
-    { label: 'Receive Money', value: 'receive_money' },
-    { label: 'Adjustment', value: 'adjustment' },
+    { label: 'B2B Float', value: 'b2b' },
   ];
 
   // Group transactions by date
@@ -77,12 +78,12 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <Header
-        title="Transactions Ledger"
-        subtitle={`${filteredTransactions.length} records`}
+        title="bKash Ledger"
+        subtitle={`${filteredTransactions.length} recorded entries`}
         showSearch
         searchQuery={filters.searchQuery}
         onSearchChange={(q) => setFilters({ searchQuery: q })}
-        searchPlaceholder="Search phone, notes, amount..."
+        searchPlaceholder="Search bKash number, note, amount..."
         onFilterPress={() => setFilterModalVisible(true)}
       />
 
@@ -102,11 +103,12 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
                   },
                 ]}
                 onPress={() => setFilters({ type: chip.value })}
+                activeOpacity={0.7}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    { color: isSelected ? '#FFFFFF' : theme.text },
+                    { color: isSelected ? '#FFFFFF' : theme.text, fontWeight: isSelected ? '700' : '600' },
                   ]}
                 >
                   {chip.label}
@@ -124,6 +126,7 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
               },
             ]}
             onPress={() => setFilterModalVisible(true)}
+            activeOpacity={0.7}
           >
             <Ionicons
               name="options"
@@ -133,7 +136,7 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
             <Text
               style={[
                 styles.chipText,
-                { color: hasActiveFilters ? theme.primary : theme.textSecondary },
+                { color: hasActiveFilters ? theme.primary : theme.textSecondary, fontWeight: hasActiveFilters ? '700' : '600' },
               ]}
             >
               Filters {hasActiveFilters ? '●' : ''}

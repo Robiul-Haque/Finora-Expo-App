@@ -5,11 +5,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   RefreshControl,
   Alert,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
 import { Header } from '../components/Header';
@@ -75,12 +75,12 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <Header
-        title="Accounts & Lines"
-        subtitle={`${accounts.filter((a) => a.isActive).length} Active Channels`}
+        title="bKash Business Lines"
+        subtitle={`${accounts.filter((a) => a.isActive).length} Active bKash SIMs`}
         showSearch
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search accounts by name or number..."
+        searchPlaceholder="Search bKash accounts, SIM number..."
       />
 
       <ScrollView
@@ -101,7 +101,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
           <View style={styles.summaryTop}>
             <View>
               <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
-                TOTAL DAILY LIMIT ALLOCATION
+                TOTAL BKASH DAILY LIMIT ALLOCATION
               </Text>
               <Text style={[styles.summaryAmount, { color: theme.text }]}>
                 {formatCurrency(totalLimitAll)}
@@ -109,7 +109,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
             </View>
             <View style={[styles.summaryBadge, { backgroundColor: theme.primaryLight }]}>
               <Text style={[styles.summaryBadgeText, { color: theme.primary }]}>
-                {accounts.length} Accounts
+                {accounts.length} bKash Lines
               </Text>
             </View>
           </View>
@@ -123,8 +123,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
 
         {/* Accounts List */}
         <View style={styles.listHeader}>
-          <Text style={[styles.listTitle, { color: theme.text }]}>Business Lines</Text>
-          <TouchableOpacity onPress={onOpenAddAccount} style={styles.addTextBtn}>
+          <Text style={[styles.listTitle, { color: theme.text }]}>bKash SIMs & Counters</Text>
+          <TouchableOpacity onPress={onOpenAddAccount} style={styles.addTextBtn} activeOpacity={0.7}>
             <Ionicons name="add-circle" size={16} color={theme.primary} />
             <Text style={[styles.addTextBtnTitle, { color: theme.primary }]}>Add Line</Text>
           </TouchableOpacity>
@@ -136,7 +136,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
           return (
             <TouchableOpacity
               key={account.id}
-              activeOpacity={0.88}
+              activeOpacity={0.75}
               onPress={() => onOpenAccountDetails(account)}
               style={[
                 styles.accountRowCard,
@@ -154,36 +154,42 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
                       styles.avatarBox,
                       {
                         backgroundColor:
-                          account.type === 'bkash'
-                            ? '#E2136E15'
-                            : account.type === 'nagad'
-                            ? '#F7941D15'
-                            : '#2563EB15',
+                          account.type === 'agent'
+                            ? '#E2136E18'
+                            : account.type === 'merchant'
+                            ? '#BE123C18'
+                            : account.type === 'personal'
+                            ? '#9D174D18'
+                            : '#E2136E18',
                       },
                     ]}
                   >
-                    <MaterialCommunityIcons
+                    <Ionicons
                       name={
-                        account.type === 'bkash'
-                          ? 'cellphone-wireless'
-                          : account.type === 'nagad'
-                          ? 'wallet'
-                          : 'bank'
+                        account.type === 'agent'
+                          ? 'phone-portrait-outline'
+                          : account.type === 'merchant'
+                          ? 'qr-code-outline'
+                          : account.type === 'personal'
+                          ? 'person-circle-outline'
+                          : 'phone-portrait-outline'
                       }
                       size={22}
                       color={
-                        account.type === 'bkash'
+                        account.type === 'agent'
                           ? '#E2136E'
-                          : account.type === 'nagad'
-                          ? '#F7941D'
-                          : '#2563EB'
+                          : account.type === 'merchant'
+                          ? '#BE123C'
+                          : account.type === 'personal'
+                          ? '#9D174D'
+                          : '#E2136E'
                       }
                     />
                   </View>
 
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <View style={styles.nameRow}>
-                      <Text style={[styles.accountName, { color: theme.text }]}>
+                      <Text style={[styles.accountName, { color: theme.text }]} numberOfLines={1}>
                         {account.name}
                       </Text>
                       <TouchableOpacity
@@ -207,7 +213,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
                         </Text>
                       </TouchableOpacity>
                     </View>
-                    <Text style={[styles.accountNumber, { color: theme.textSecondary }]}>
+                    <Text style={[styles.accountNumber, { color: theme.textSecondary }]} numberOfLines={1}>
                       {account.accountNumber}
                     </Text>
                   </View>
@@ -374,6 +380,7 @@ const styles = StyleSheet.create({
   accountName: {
     fontSize: 15,
     fontWeight: '700',
+    flexShrink: 1,
   },
   activeBadge: {
     paddingHorizontal: 6,

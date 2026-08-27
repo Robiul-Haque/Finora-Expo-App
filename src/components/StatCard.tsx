@@ -27,14 +27,15 @@ export const StatCard: React.FC<StatCardProps> = ({
   const { theme, isDarkMode } = useTheme();
 
   const isPrimary = variant === 'primary';
-  const cardBg = isPrimary ? (isDarkMode ? '#1E3A8A' : '#1D4ED8') : theme.card;
+  const cardBg = isPrimary ? (isDarkMode ? '#9D174D' : '#E2136E') : theme.card;
   const textColor = isPrimary ? '#FFFFFF' : theme.text;
-  const subTextColor = isPrimary ? '#BFDBFE' : theme.textSecondary;
+  const subTextColor = isPrimary ? '#FCE7F3' : theme.textSecondary;
 
   return (
     <TouchableOpacity
-      activeOpacity={onPress ? 0.8 : 1}
+      activeOpacity={onPress ? 0.75 : 1}
       onPress={onPress}
+      disabled={!onPress}
       style={[
         styles.card,
         {
@@ -50,18 +51,20 @@ export const StatCard: React.FC<StatCardProps> = ({
               style={[
                 styles.iconBadge,
                 {
-                  backgroundColor: isPrimary ? 'rgba(255,255,255,0.2)' : theme.cardSecondary,
+                  backgroundColor: isPrimary ? 'rgba(255,255,255,0.22)' : theme.cardSecondary,
                 },
               ]}
             >
               <Ionicons
                 name={iconName}
-                size={16}
+                size={15}
                 color={isPrimary ? '#FFFFFF' : theme.primary}
               />
             </View>
           )}
-          <Text style={[styles.title, { color: subTextColor }]}>{title}</Text>
+          <Text style={[styles.title, { color: subTextColor }]} numberOfLines={1}>
+            {title}
+          </Text>
         </View>
         {badgeText && (
           <View
@@ -69,7 +72,7 @@ export const StatCard: React.FC<StatCardProps> = ({
               styles.badge,
               {
                 backgroundColor: isPrimary
-                  ? 'rgba(255,255,255,0.25)'
+                  ? 'rgba(255,255,255,0.22)'
                   : isPositive
                   ? theme.successLight
                   : theme.dangerLight,
@@ -78,7 +81,7 @@ export const StatCard: React.FC<StatCardProps> = ({
           >
             <Ionicons
               name={isPositive ? 'arrow-up' : 'arrow-down'}
-              size={12}
+              size={11}
               color={isPrimary ? '#FFFFFF' : isPositive ? theme.success : theme.danger}
             />
             <Text
@@ -88,6 +91,7 @@ export const StatCard: React.FC<StatCardProps> = ({
                   color: isPrimary ? '#FFFFFF' : isPositive ? theme.success : theme.danger,
                 },
               ]}
+              numberOfLines={1}
             >
               {badgeText}
             </Text>
@@ -95,10 +99,18 @@ export const StatCard: React.FC<StatCardProps> = ({
         )}
       </View>
 
-      <Text style={[styles.value, { color: textColor }]}>{value}</Text>
+      <Text
+        style={[styles.value, { color: textColor }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
+        {value}
+      </Text>
 
       {subtitle && (
-        <Text style={[styles.subtitle, { color: subTextColor }]}>{subtitle}</Text>
+        <Text style={[styles.subtitle, { color: subTextColor }]} numberOfLines={1}>
+          {subtitle}
+        </Text>
       )}
     </TouchableOpacity>
   );
@@ -106,61 +118,66 @@ export const StatCard: React.FC<StatCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    gap: 6,
   },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flex: 1,
   },
   iconBadge: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   title: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
+    flex: 1,
   },
   value: {
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '900',
     letterSpacing: -0.5,
     marginVertical: 2,
   },
   subtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+    letterSpacing: 0.1,
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 3,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 12,
-    gap: 4,
+    borderRadius: 8,
   },
   badgeText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
 });

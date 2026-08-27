@@ -5,9 +5,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { LedgerProvider } from './src/context/LedgerContext';
@@ -78,6 +78,7 @@ const MainApp: React.FC = () => {
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={theme.background}
+        animated={true}
       />
 
       {/* Main Content Area */}
@@ -109,7 +110,7 @@ const MainApp: React.FC = () => {
               styles.tabLabel,
               {
                 color: activeTab === 'home' ? theme.tabBarActive : theme.tabBarInactive,
-                fontWeight: activeTab === 'home' ? '700' : '500',
+                fontWeight: activeTab === 'home' ? '800' : '500',
               },
             ]}
           >
@@ -133,7 +134,7 @@ const MainApp: React.FC = () => {
               styles.tabLabel,
               {
                 color: activeTab === 'transactions' ? theme.tabBarActive : theme.tabBarInactive,
-                fontWeight: activeTab === 'transactions' ? '700' : '500',
+                fontWeight: activeTab === 'transactions' ? '800' : '500',
               },
             ]}
           >
@@ -166,7 +167,7 @@ const MainApp: React.FC = () => {
               styles.tabLabel,
               {
                 color: activeTab === 'accounts' ? theme.tabBarActive : theme.tabBarInactive,
-                fontWeight: activeTab === 'accounts' ? '700' : '500',
+                fontWeight: activeTab === 'accounts' ? '800' : '500',
               },
             ]}
           >
@@ -190,7 +191,7 @@ const MainApp: React.FC = () => {
               styles.tabLabel,
               {
                 color: activeTab === 'analytics' ? theme.tabBarActive : theme.tabBarInactive,
-                fontWeight: activeTab === 'analytics' ? '700' : '500',
+                fontWeight: activeTab === 'analytics' ? '800' : '500',
               },
             ]}
           >
@@ -223,11 +224,13 @@ const MainApp: React.FC = () => {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <LedgerProvider>
-        <MainApp />
-      </LedgerProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <LedgerProvider>
+          <MainApp />
+        </LedgerProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -242,14 +245,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingVertical: 8,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+    paddingVertical: 6,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
     borderTopWidth: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.06,
     shadowRadius: 8,
-    elevation: 8,
+    elevation: 10,
   },
   tabItem: {
     alignItems: 'center',
@@ -260,17 +263,18 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 11,
     marginTop: 3,
+    letterSpacing: 0.2,
   },
   centerAddButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#2563EB',
+    marginBottom: 18,
+    shadowColor: '#E2136E',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.38,
     shadowRadius: 8,
     elevation: 6,
   },

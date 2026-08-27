@@ -16,12 +16,12 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  title = 'Finora',
-  subtitle = 'Smart Business Ledger',
+  title = 'Finora bKash',
+  subtitle = 'bKash Business Ledger',
   showSearch = false,
   searchQuery = '',
   onSearchChange,
-  searchPlaceholder = 'Search phone number...',
+  searchPlaceholder = 'Search bKash number, note...',
   onMenuPress,
   onFilterPress,
   rightActions,
@@ -33,21 +33,28 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Top Bar */}
       <View style={styles.topRow}>
         <View style={styles.leftGroup}>
-          {onMenuPress && (
+          {onMenuPress ? (
             <TouchableOpacity
               style={[styles.iconButton, { backgroundColor: theme.card, borderColor: theme.border }]}
               onPress={onMenuPress}
+              activeOpacity={0.7}
             >
               <Ionicons name="menu-outline" size={20} color={theme.text} />
             </TouchableOpacity>
+          ) : (
+            <View style={[styles.brandIconBadge, { backgroundColor: theme.primaryLight }]}>
+              <Ionicons name="wallet" size={17} color={theme.primary} />
+            </View>
           )}
-          <View>
-            <Text style={[styles.brandTitle, { color: theme.text }]}>{title}</Text>
-            {subtitle && (
-              <Text style={[styles.brandSubtitle, { color: theme.textSecondary }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.brandTitle, { color: theme.text }]} numberOfLines={1}>
+              {title}
+            </Text>
+            {subtitle ? (
+              <Text style={[styles.brandSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
                 {subtitle}
               </Text>
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -55,6 +62,7 @@ export const Header: React.FC<HeaderProps> = ({
           <TouchableOpacity
             style={[styles.iconButton, { backgroundColor: theme.card, borderColor: theme.border }]}
             onPress={toggleTheme}
+            activeOpacity={0.7}
           >
             <Ionicons
               name={isDarkMode ? 'sunny-outline' : 'moon-outline'}
@@ -67,6 +75,7 @@ export const Header: React.FC<HeaderProps> = ({
             <TouchableOpacity
               style={[styles.iconButton, { backgroundColor: theme.card, borderColor: theme.border }]}
               onPress={onFilterPress}
+              activeOpacity={0.7}
             >
               <Ionicons name="options-outline" size={18} color={theme.primary} />
             </TouchableOpacity>
@@ -84,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
             { backgroundColor: theme.card, borderColor: theme.border },
           ]}
         >
-          <Ionicons name="search-outline" size={18} color={theme.textMuted} />
+          <Ionicons name="search-outline" size={17} color={theme.textMuted} />
           <TextInput
             style={[styles.searchInput, { color: theme.text }]}
             placeholder={searchPlaceholder}
@@ -94,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
             autoCapitalize="none"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => onSearchChange && onSearchChange('')}>
+            <TouchableOpacity onPress={() => onSearchChange && onSearchChange('')} activeOpacity={0.7}>
               <Ionicons name="close-circle" size={18} color={theme.textMuted} />
             </TouchableOpacity>
           )}
@@ -107,19 +116,28 @@ export const Header: React.FC<HeaderProps> = ({
 const styles = StyleSheet.create({
   headerContainer: {
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingTop: 6,
+    paddingBottom: 6,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   leftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  brandIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   brandTitle: {
     fontSize: 18,
@@ -130,6 +148,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.2,
+    marginTop: 1,
   },
   rightGroup: {
     flexDirection: 'row',
@@ -137,9 +156,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 11,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -148,15 +167,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: 13,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 7,
     gap: 8,
-    marginTop: 4,
+    marginTop: 2,
+    marginBottom: 4,
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     paddingVertical: 0,
   },
 });

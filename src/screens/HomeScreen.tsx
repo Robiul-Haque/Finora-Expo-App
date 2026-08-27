@@ -6,8 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
@@ -68,12 +68,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <Header
-        title="Finora"
-        subtitle="Smart Business Ledger"
+        title="Finora bKash"
+        subtitle="bKash Business Ledger"
         showSearch
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search phone number, account..."
+        searchPlaceholder="Search bKash number, line..."
       />
 
       <ScrollView
@@ -91,9 +91,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       >
         {/* Total Balance Card */}
         <StatCard
-          title="Total Balance"
+          title="Total bKash Float"
           value={formatCurrency(metrics.totalBalance)}
-          subtitle="Real-time MFS & Reserve Ledger"
+          subtitle="Real-time Balance Across All Lines"
           badgeText={`+${metrics.balanceGrowthPercentage}% vs last month`}
           isPositive
           iconName="wallet-outline"
@@ -151,6 +151,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <TouchableOpacity
             style={[styles.profitBannerBtn, { backgroundColor: theme.success }]}
             onPress={() => onOpenAddTransaction()}
+            activeOpacity={0.75}
           >
             <Ionicons name="add" size={16} color="#FFFFFF" />
             <Text style={styles.profitBannerBtnText}>New Record</Text>
@@ -160,9 +161,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Accounts Section Header */}
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>MFS & Bank Accounts</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>bKash Business Lines</Text>
             <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-              {filteredAccounts.length} active business lines
+              {filteredAccounts.length} active SIMs / counters
             </Text>
           </View>
 
@@ -173,6 +174,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 { backgroundColor: theme.card, borderColor: theme.border },
               ]}
               onPress={() => setSortHighToLow(!sortHighToLow)}
+              activeOpacity={0.7}
             >
               <Ionicons
                 name={sortHighToLow ? 'arrow-down' : 'arrow-up'}
@@ -187,6 +189,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <TouchableOpacity
               style={[styles.seeAllBtn, { backgroundColor: theme.primaryLight }]}
               onPress={onNavigateToAccounts}
+              activeOpacity={0.7}
             >
               <Text style={[styles.seeAllBtnText, { color: theme.primary }]}>Manage</Text>
             </TouchableOpacity>
@@ -197,9 +200,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {filteredAccounts.length === 0 ? (
           <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <Ionicons name="search-outline" size={32} color={theme.textMuted} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>No accounts found</Text>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>No bKash lines found</Text>
             <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-              Try a different search or add a new account.
+              Try a different search or add a new bKash line.
             </Text>
           </View>
         ) : (
@@ -251,12 +254,13 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 40,
+    paddingTop: 4,
+    paddingBottom: 30,
   },
   analyticsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
+    marginBottom: 4,
   },
   halfCol: {
     flex: 1,
@@ -265,15 +269,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 14,
+    padding: 13,
     borderRadius: 16,
     borderWidth: 1,
-    marginBottom: 20,
+    marginBottom: 14,
   },
   profitBannerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
   },
   profitIconBadge: {
     width: 36,
@@ -283,19 +289,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profitBannerTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   profitBannerAmount: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '900',
+    letterSpacing: -0.3,
   },
   profitBannerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
     paddingVertical: 8,
     borderRadius: 10,
   },
@@ -308,30 +316,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: 14,
+    marginVertical: 10,
+    gap: 8,
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     letterSpacing: -0.3,
   },
   sectionSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     marginTop: 1,
   },
   sortToggleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 9,
     borderWidth: 1,
   },
   sortButtonText: {
@@ -339,9 +348,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   seeAllBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 9,
   },
   seeAllBtnText: {
     fontSize: 11,
@@ -353,7 +362,7 @@ const styles = StyleSheet.create({
   },
   emptyCard: {
     borderRadius: 16,
-    padding: 30,
+    padding: 26,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

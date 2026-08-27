@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Animated, StatusBar } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 
 interface SplashScreenProps {
@@ -10,50 +10,52 @@ interface SplashScreenProps {
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const { theme, isDarkMode } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+  const bottomFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Fade and scale in
+    // Fast & smooth spring in (500ms)
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 800,
+        duration: 400,
         useNativeDriver: true,
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
-        friction: 6,
-        tension: 40,
+        friction: 7,
+        tension: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bottomFade, {
+        toValue: 1,
+        duration: 500,
+        delay: 150,
         useNativeDriver: true,
       }),
     ]).start();
 
-    // Pulsing loading indicator
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.2,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
+    // Fast exit after 750ms for instant app experience
     const timer = setTimeout(() => {
-      if (onFinish) onFinish();
-    }, 1800);
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        if (onFinish) onFinish();
+      });
+    }, 750);
 
     return () => clearTimeout(timer);
   }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: isDarkMode ? '#0B0F19' : '#FFFFFF' }]}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={isDarkMode ? '#0B0F19' : '#FFFFFF'}
+        animated={true}
+      />
       <Animated.View
         style={[
           styles.content,
@@ -63,33 +65,31 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           },
         ]}
       >
-        {/* Brand Icon */}
-        <View style={[styles.logoBadge, { backgroundColor: isDarkMode ? '#1E3A8A' : '#EFF6FF' }]}>
-          <MaterialCommunityIcons
-            name="chart-timeline-variant"
-            size={54}
+        {/* Brand Icon Badge */}
+        <View style={[styles.logoBadge, { backgroundColor: isDarkMode ? '#2A1320' : '#FDF2F8' }]}>
+          <Ionicons
+            name="wallet"
+            size={52}
             color={theme.primary}
           />
         </View>
 
         {/* Brand Titles */}
         <Text style={[styles.title, { color: isDarkMode ? '#FFFFFF' : '#0F172A' }]}>
-          Finora
+          Finora <Text style={{ color: theme.primary }}>bKash</Text>
         </Text>
         <Text style={[styles.subtitle, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>
-          Smart Business Ledger
+          Smart bKash Business Ledger
         </Text>
       </Animated.View>
 
       {/* Bottom Syncing Indicator */}
-      <View style={styles.bottomContainer}>
-        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-          <Ionicons name="sync" size={18} color={theme.primary} />
-        </Animated.View>
+      <Animated.View style={[styles.bottomContainer, { opacity: bottomFade }]}>
+        <Ionicons name="flash" size={16} color={theme.primary} />
         <Text style={[styles.syncText, { color: isDarkMode ? '#64748B' : '#94A3B8' }]}>
-          SYNCING DATA...
+          FINANCIAL OS
         </Text>
-      </View>
+      </Animated.View>
     </View>
   );
 };
@@ -104,17 +104,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoBadge: {
-    width: 96,
-    height: 96,
-    borderRadius: 28,
+    width: 90,
+    height: 90,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
     shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 16,
-    elevation: 6,
+    elevation: 8,
   },
   title: {
     fontSize: 34,
@@ -122,22 +122,22 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
     textTransform: 'uppercase',
     marginTop: 4,
   },
   bottomContainer: {
     position: 'absolute',
-    bottom: 50,
+    bottom: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   syncText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
 });
