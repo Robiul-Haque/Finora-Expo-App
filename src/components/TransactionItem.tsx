@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Transaction } from '../types/ledger';
 import { useTheme } from '../context/ThemeContext';
@@ -10,26 +10,18 @@ interface TransactionItemProps {
   onDelete?: () => void;
 }
 
-export const TransactionItem: React.FC<TransactionItemProps> = ({
+const TransactionItemComponent: React.FC<TransactionItemProps> = ({
   transaction,
   onPress,
   onDelete,
 }) => {
   const { theme } = useTheme();
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const isSend = transaction.type === 'send_money' || transaction.type === 'cash_out' || transaction.type === 'b2b';
   const isReceive = transaction.type === 'receive_money' || transaction.type === 'cash_in';
 
-  const formatCurrency = (val: number) => {
-    return '৳' + val.toLocaleString('en-US');
-  };
-
-  const formatDate = (isoString: string) => {
-    const d = new Date(isoString);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const getBadgeConfig = () => {
+  const badge = React.useMemo(() => {
     switch (transaction.type) {
       case 'cash_out':
         return {
@@ -69,80 +61,129 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
           icon: 'swap-horizontal-outline' as const,
         };
     }
+  }, [transaction.type, theme]);
+
+  const formattedAmount = React.useMemo(() => '৳' + transaction.amount.toLocaleString('en-US'), [transaction.amount]);
+  const formattedDate = React.useMemo(() => {
+    const d = new Date(transaction.date);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }, [transaction.date]);
+  const formattedProfit = React.useMemo(() => transaction.profit > 0 ? '৳' + transaction.profit.toLocaleString('en-US') : '', [transaction.profit]);
+  const formattedCost = React.useMemo(() => transaction.cost > 0 ? '৳' + transaction.cost.toLocaleString('en-US') : '', [transaction.cost]);
+
+  const handlePressIn = () => {
+    if (!onPress) return;
+    Animated.spring(scaleAnim, {
+      toValue: 0.98,
+      friction: 5,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const badge = getBadgeConfig();
+  const handlePressOut = () => {
+    if (!onPress) return;
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 4,
+      tension: 80,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
     <TouchableOpacity
-      activeOpacity={0.75}
+      activeOpacity={1}
       onPress={onPress}
-      style={[
-        styles.container,
-        {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        },
-      ]}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={!onPress}
     >
-      <View style={styles.leftSection}>
-        <View style={[styles.iconContainer, { backgroundColor: badge.bg }]}>
-          <Ionicons name={badge.icon} size={22} color={badge.color} />
-        </View>
-
-        <View style={styles.details}>
-          <View style={styles.topMeta}>
-            <View style={[styles.typeBadge, { backgroundColor: badge.bg }]}>
-              <Text style={[styles.typeBadgeText, { color: badge.color }]}>{badge.label}</Text>
-            </View>
-            <Text style={[styles.timeText, { color: theme.textMuted }]}>
-              {formatDate(transaction.date)}
-            </Text>
+      <Animated.View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+            transform: [{ scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.leftSection}>
+          <View style={[styles.iconContainer, { backgroundColor: badge.bg }]}>
+            <Ionicons name={badge.icon} size={22} color={badge.color} />
           </View>
 
-          <Text style={[styles.targetNumber, { color: theme.text }]} numberOfLines={1}>
-            {isSend && transaction.recipientNumber
-              ? `To: ${transaction.recipientNumber}`
-              : isReceive && transaction.senderNumber
-              ? `From: ${transaction.senderNumber}`
-              : transaction.note || transaction.accountName}
-          </Text>
-
-          <Text style={[styles.accountMeta, { color: theme.textSecondary }]}>
-            Via: {transaction.accountName} ({transaction.accountNumber})
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.rightSection}>
-        <Text
-          style={[
-            styles.amountText,
-            { color: isSend ? theme.text : theme.success },
-          ]}
-          numberOfLines={1}
-        >
-          {isSend ? '-' : '+'}{formatCurrency(transaction.amount)}
-        </Text>
-
-        <View style={styles.subAmounts}>
-          {transaction.profit > 0 && (
-            <View style={[styles.profitPill, { backgroundColor: theme.successLight }]}>
-              <Text style={[styles.profitText, { color: theme.success }]}>
-                +{formatCurrency(transaction.profit)} Com.
+          <View style={styles.details}>
+            <View style={styles.topMeta}>
+              <View style={[styles.typeBadge, { backgroundColor: badge.bg }]}>
+                <Text style={[styles.typeBadgeText, { color: badge.color }]}>{badge.label}</Text>
+              </View>
+              <Text style={[styles.timeText, { color: theme.textMuted }]}>
+                {formattedDate}
               </Text>
+              {transaction.syncStatus === 'pending' && (
+                <View style={[styles.syncBadge, { backgroundColor: '#FEF3C7' }]}>
+                  <Ionicons name="cloud-upload-outline" size={10} color="#D97706" />
+                  <Text style={[styles.syncBadgeText, { color: '#92400E' }]}>Offline</Text>
+                </View>
+              )}
+              {transaction.syncStatus === 'failed' && (
+                <View style={[styles.syncBadge, { backgroundColor: '#FEE2E2' }]}>
+                  <Ionicons name="alert-circle-outline" size={10} color="#DC2626" />
+                  <Text style={[styles.syncBadgeText, { color: '#991B1B' }]}>Failed</Text>
+                </View>
+              )}
             </View>
-          )}
-          {transaction.cost > 0 && (
-            <Text style={[styles.costText, { color: theme.textMuted }]}>
-              Fee {formatCurrency(transaction.cost)}
+
+            <Text style={[styles.targetNumber, { color: theme.text }]} numberOfLines={1}>
+              {isSend && transaction.recipientNumber
+                ? `To: ${transaction.recipientNumber}`
+                : isReceive && transaction.senderNumber
+                ? `From: ${transaction.senderNumber}`
+                : transaction.note || transaction.accountName}
             </Text>
-          )}
+
+            <Text style={[styles.accountMeta, { color: theme.textSecondary }]}>
+              Via: {transaction.accountName} ({transaction.accountNumber})
+            </Text>
+          </View>
         </View>
-      </View>
+
+        <View style={styles.rightSection}>
+          <Text
+            style={[
+              styles.amountText,
+              { color: isSend ? theme.text : theme.success },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            {isSend ? '-' : '+'}{formattedAmount}
+          </Text>
+
+          <View style={styles.subAmounts}>
+            {transaction.profit > 0 && (
+              <View style={[styles.profitPill, { backgroundColor: theme.successLight }]}>
+                <Text style={[styles.profitText, { color: theme.success }]}>
+                  +{formattedProfit} Profit
+                </Text>
+              </View>
+            )}
+            {transaction.cost > 0 && (
+              <Text style={[styles.costText, { color: theme.textMuted }]}>
+                Fee: {formattedCost}
+              </Text>
+            )}
+          </View>
+        </View>
+      </Animated.View>
     </TouchableOpacity>
   );
 };
+
+export const TransactionItem = React.memo(TransactionItemComponent);
 
 const styles = StyleSheet.create({
   container: {
@@ -227,6 +268,18 @@ const styles = StyleSheet.create({
   },
   profitText: {
     fontSize: 10,
+    fontWeight: '800',
+  },
+  syncBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 5,
+  },
+  syncBadgeText: {
+    fontSize: 9,
     fontWeight: '800',
   },
 });

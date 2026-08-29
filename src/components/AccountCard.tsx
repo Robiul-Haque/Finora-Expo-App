@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Account } from '../types/ledger';
 import { useTheme } from '../context/ThemeContext';
@@ -11,22 +11,25 @@ interface AccountCardProps {
   onAddTransactionPress?: () => void;
 }
 
-export const AccountCard: React.FC<AccountCardProps> = ({
+const formatCurrency = (val: number) => '৳' + val.toLocaleString('en-US');
+
+const AccountCardComponent: React.FC<AccountCardProps> = ({
   account,
   onPress,
   onAddTransactionPress,
 }) => {
   const { theme } = useTheme();
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const remainingLimit = Math.max(0, account.dailyLimit - account.todaySend);
 
-  // Format currency
-  const formatCurrency = (val: number) => {
-    return '৳' + val.toLocaleString('en-US');
-  };
+  const formattedBalance = React.useMemo(() => '৳' + account.balance.toLocaleString('en-US'), [account.balance]);
+  const formattedTodayProfit = React.useMemo(() => '৳' + (account.todayProfit || 0).toLocaleString('en-US'), [account.todayProfit]);
+  const formattedTodaySend = React.useMemo(() => '৳' + account.todaySend.toLocaleString('en-US'), [account.todaySend]);
+  const formattedTodayReceive = React.useMemo(() => '৳' + account.todayReceive.toLocaleString('en-US'), [account.todayReceive]);
 
-  const getProviderIcon = (type: string) => {
-    switch (type) {
+  const provider = React.useMemo(() => {
+    switch (account.type) {
       case 'agent':
         return { name: 'phone-portrait-outline', color: '#E2136E', label: 'bKash Agent' };
       case 'merchant':
@@ -39,131 +42,156 @@ export const AccountCard: React.FC<AccountCardProps> = ({
       default:
         return { name: 'phone-portrait-outline', color: '#E2136E', label: 'bKash Line' };
     }
+  }, [account.type]);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.98,
+      friction: 5,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const provider = getProviderIcon(account.type);
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 4,
+      tension: 80,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
     <TouchableOpacity
-      activeOpacity={0.88}
+      activeOpacity={1}
       onPress={onPress}
-      style={[
-        styles.card,
-        {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        },
-      ]}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
     >
-      {/* Top Header */}
-      <View style={styles.header}>
-        <View style={styles.accountInfo}>
-          <View style={[styles.avatar, { backgroundColor: provider.color + '1A' }]}>
-            <Ionicons
-              name={provider.name as any}
-              size={20}
-              color={provider.color}
-            />
-          </View>
-          <View style={{ flex: 1, marginRight: 8 }}>
-            <View style={styles.nameRow}>
-              <Text style={[styles.accountName, { color: theme.text }]} numberOfLines={1}>
-                {account.name}
-              </Text>
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: account.isActive ? theme.success : theme.textMuted },
-                ]}
+      <Animated.View
+        style={[
+          styles.card,
+          {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+            transform: [{ scale: scaleAnim }],
+          },
+        ]}
+      >
+        {/* Top Header */}
+        <View style={styles.header}>
+          <View style={styles.accountInfo}>
+            <View style={[styles.avatar, { backgroundColor: provider.color + '18' }]}>
+              <Ionicons
+                name={provider.name as any}
+                size={20}
+                color={provider.color}
               />
             </View>
-            <Text style={[styles.accountNumber, { color: theme.textSecondary }]} numberOfLines={1}>
-              {account.accountNumber}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.providerBadgeContainer}>
-          <View style={[styles.providerBadge, { backgroundColor: provider.color + '18' }]}>
-            <Text style={[styles.providerText, { color: provider.color }]}>
-              {provider.label}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Main Balance Display */}
-      <View style={styles.balanceContainer}>
-        <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>
-          CURRENT FLOAT BALANCE
-        </Text>
-        <View style={styles.balanceRow}>
-          <Text
-            style={[styles.balanceAmount, { color: theme.text }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            {formatCurrency(account.balance)}
-          </Text>
-          {account.todayProfit > 0 && (
-            <View style={[styles.profitBadge, { backgroundColor: theme.successLight }]}>
-              <Text style={[styles.profitText, { color: theme.success }]}>
-                +{formatCurrency(account.todayProfit)} Commission
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <View style={styles.nameRow}>
+                <Text style={[styles.accountName, { color: theme.text }]} numberOfLines={1}>
+                  {account.name}
+                </Text>
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: account.isActive ? theme.success : theme.textMuted },
+                  ]}
+                />
+              </View>
+              <Text style={[styles.accountNumber, { color: theme.textSecondary }]} numberOfLines={1}>
+                {account.accountNumber}
               </Text>
             </View>
+          </View>
+
+          <View style={styles.providerBadgeContainer}>
+            <View style={[styles.providerBadge, { backgroundColor: provider.color + '18' }]}>
+              <Text style={[styles.providerText, { color: provider.color }]}>
+                {provider.label}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Main Balance Display */}
+        <View style={styles.balanceContainer}>
+          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>
+            CURRENT FLOAT BALANCE
+          </Text>
+          <View style={styles.balanceRow}>
+            <Text
+              style={[styles.balanceAmount, { color: theme.text }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.65}
+            >
+              {formatCurrency(account.balance)}
+            </Text>
+            {account.todayProfit > 0 && (
+              <View style={[styles.profitBadge, { backgroundColor: theme.successLight }]}>
+                <Text style={[styles.profitText, { color: theme.success }]}>
+                  +{formatCurrency(account.todayProfit)} Commission
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Limit Usage Bar */}
+        <LimitProgressBar
+          usedAmount={account.todaySend}
+          totalLimit={account.dailyLimit}
+          label="TODAY'S SEND LIMIT USAGE"
+        />
+
+        {/* Limit Breakdown Stats */}
+        <View style={[styles.statsRow, { backgroundColor: theme.cardSecondary }]}>
+          <View style={styles.statItem}>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Today's Send</Text>
+            <Text style={[styles.statValue, { color: theme.text }]}>
+              {formatCurrency(account.todaySend)}
+            </Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Remaining Limit</Text>
+            <Text style={[styles.statValue, { color: theme.primary }]}>
+              {formatCurrency(remainingLimit)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Quick Action Footer */}
+        <View style={styles.footerRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, { borderColor: theme.border }]}
+            onPress={onPress}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="stats-chart-outline" size={14} color={theme.textSecondary} />
+            <Text style={[styles.actionBtnText, { color: theme.textSecondary }]}>Details</Text>
+          </TouchableOpacity>
+
+          {onAddTransactionPress && (
+            <TouchableOpacity
+              style={[styles.primaryActionBtn, { backgroundColor: theme.primary }]}
+              onPress={onAddTransactionPress}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="add" size={16} color="#FFFFFF" />
+              <Text style={styles.primaryActionBtnText}>Log bKash Entry</Text>
+            </TouchableOpacity>
           )}
         </View>
-      </View>
-
-      {/* Limit Usage Bar */}
-      <LimitProgressBar
-        usedAmount={account.todaySend}
-        totalLimit={account.dailyLimit}
-        label="TODAY'S SEND LIMIT USAGE"
-      />
-
-      {/* Limit Breakdown Stats */}
-      <View style={[styles.statsRow, { backgroundColor: theme.cardSecondary }]}>
-        <View style={styles.statItem}>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Today's Send</Text>
-          <Text style={[styles.statValue, { color: theme.text }]}>
-            {formatCurrency(account.todaySend)}
-          </Text>
-        </View>
-        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Remaining Limit</Text>
-          <Text style={[styles.statValue, { color: theme.primary }]}>
-            {formatCurrency(remainingLimit)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Quick Action Footer */}
-      <View style={styles.footerRow}>
-        <TouchableOpacity
-          style={[styles.actionBtn, { borderColor: theme.border }]}
-          onPress={onPress}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="stats-chart-outline" size={14} color={theme.textSecondary} />
-          <Text style={[styles.actionBtnText, { color: theme.textSecondary }]}>Details</Text>
-        </TouchableOpacity>
-
-        {onAddTransactionPress && (
-          <TouchableOpacity
-            style={[styles.primaryActionBtn, { backgroundColor: theme.primary }]}
-            onPress={onAddTransactionPress}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="add" size={16} color="#FFFFFF" />
-            <Text style={styles.primaryActionBtnText}>Log bKash Entry</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      </Animated.View>
     </TouchableOpacity>
   );
 };
+
+export const AccountCard = React.memo(AccountCardComponent);
 
 const styles = StyleSheet.create({
   card: {

@@ -2,6 +2,8 @@ export type AccountType = 'agent' | 'merchant' | 'personal' | 'corporate' | 'bka
 
 export type TransactionType = 'cash_out' | 'cash_in' | 'send_money' | 'receive_money' | 'b2b' | 'adjustment';
 
+export type SyncStatus = 'synced' | 'pending' | 'failed';
+
 export interface Account {
   id: string;
   name: string;
@@ -15,10 +17,12 @@ export interface Account {
   isActive: boolean;
   color?: string;
   createdAt: string;
+  syncStatus?: SyncStatus;
 }
 
 export interface Transaction {
   id: string;
+  clientTxId?: string; // Idempotency key for offline sync
   accountId: string;
   accountNumber: string;
   accountName: string;
@@ -30,6 +34,9 @@ export interface Transaction {
   profit: number;
   date: string; // ISO string
   note?: string;
+  syncStatus?: SyncStatus;
+  retryCount?: number;
+  lastError?: string;
 }
 
 export type DateFilter = 'all' | 'today' | 'yesterday' | 'this_week' | 'this_month';

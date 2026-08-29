@@ -28,34 +28,45 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
   onOpenAddTransaction,
 }) => {
   const { theme } = useTheme();
-  const { accounts, deleteAccount, updateAccount } = useLedger();
+  const { accounts, deleteAccount, updateAccount, refetch } = useLedger();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      if (refetch) await refetch();
+    } catch (e) {
+      console.error('Refresh error:', e);
+    } finally {
       setRefreshing(false);
-    }, 600);
-  }, []);
+    }
+  }, [refetch]);
 
   const formatCurrency = (val: number) => {
     return '৳' + val.toLocaleString('en-US');
   };
 
-  const filteredAccounts = accounts.filter((acc) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase().trim();
-    return (
-      acc.name.toLowerCase().includes(q) ||
-      acc.accountNumber.toLowerCase().includes(q) ||
-      acc.type.toLowerCase().includes(q)
-    );
-  });
+  const filteredAccounts = React.useMemo(() => {
+    return accounts.filter((acc) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        acc.name.toLowerCase().includes(q) ||
+        acc.accountNumber.toLowerCase().includes(q) ||
+        acc.type.toLowerCase().includes(q)
+      );
+    });
+  }, [accounts, searchQuery]);
 
-  const totalLimitAll = accounts.reduce((sum, a) => sum + (a.isActive ? a.dailyLimit : 0), 0);
-  const totalSendToday = accounts.reduce((sum, a) => sum + (a.isActive ? a.todaySend : 0), 0);
+  const totalLimitAll = React.useMemo(() => {
+    return accounts.reduce((sum, a) => sum + (a.isActive ? a.dailyLimit : 0), 0);
+  }, [accounts]);
+
+  const totalSendToday = React.useMemo(() => {
+    return accounts.reduce((sum, a) => sum + (a.isActive ? a.todaySend : 0), 0);
+  }, [accounts]);
 
   const handleDelete = (account: Account) => {
     Alert.alert('Delete Account', `Are you sure you want to delete ${account.name}?`, [
@@ -101,9 +112,14 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
           <View style={styles.summaryTop}>
             <View>
               <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
-                TOTAL BKASH DAILY LIMIT ALLOCATION
+                TOTAL DAILY SEND LIMIT ACROSS ALL LINES
               </Text>
-              <Text style={[styles.summaryAmount, { color: theme.text }]}>
+              <Text
+                style={[styles.summaryAmount, { color: theme.text }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
+              >
                 {formatCurrency(totalLimitAll)}
               </Text>
             </View>
@@ -117,13 +133,13 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
           <LimitProgressBar
             usedAmount={totalSendToday}
             totalLimit={totalLimitAll}
-            label="AGGREGATE USAGE TODAY"
+            label="TODAY'S COMBINED SEND USAGE"
           />
         </View>
 
         {/* Accounts List */}
         <View style={styles.listHeader}>
-          <Text style={[styles.listTitle, { color: theme.text }]}>bKash SIMs & Counters</Text>
+          <Text style={[styles.listTitle, { color: theme.text }]}>Active bKash Lines & SIMs</Text>
           <TouchableOpacity onPress={onOpenAddAccount} style={styles.addTextBtn} activeOpacity={0.7}>
             <Ionicons name="add-circle" size={16} color={theme.primary} />
             <Text style={[styles.addTextBtnTitle, { color: theme.primary }]}>Add Line</Text>
@@ -234,7 +250,12 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
                   <Text style={[styles.balanceSmallLabel, { color: theme.textSecondary }]}>
                     BALANCE
                   </Text>
-                  <Text style={[styles.balanceAmount, { color: theme.text }]}>
+                  <Text
+                    style={[styles.balanceAmount, { color: theme.text }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.65}
+                  >
                     {formatCurrency(account.balance)}
                   </Text>
                 </View>
@@ -243,7 +264,12 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
                   <Text style={[styles.balanceSmallLabel, { color: theme.textSecondary }]}>
                     REMAINING LIMIT
                   </Text>
-                  <Text style={[styles.remainingAmount, { color: theme.primary }]}>
+                  <Text
+                    style={[styles.remainingAmount, { color: theme.primary }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.65}
+                  >
                     {formatCurrency(remaining)}
                   </Text>
                 </View>
@@ -274,14 +300,6 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
 
         <View style={{ height: 60 }} />
       </ScrollView>
-
-      {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: theme.primary }]}
-        onPress={onOpenAddAccount}
-      >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
-      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -460,20 +478,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '700',
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
   },
 });

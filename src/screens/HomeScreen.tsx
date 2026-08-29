@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
 import { Header } from '../components/Header';
+import { NetworkStatusBanner } from '../components/NetworkStatusBanner';
 import { StatCard } from '../components/StatCard';
 import { AccountCard } from '../components/AccountCard';
 import { TransactionItem } from '../components/TransactionItem';
@@ -24,6 +25,8 @@ interface HomeScreenProps {
   onNavigateToAccounts: () => void;
 }
 
+const formatCurrency = (val: number) => '৳' + val.toLocaleString('en-US');
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenAccountDetails,
   onOpenAddTransaction,
@@ -31,7 +34,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateToAccounts,
 }) => {
   const { theme, isDarkMode } = useTheme();
-  const { accounts, transactions, metrics, resetToMockData } = useLedger();
+  const { accounts, transactions, metrics, refetch } = useLedger();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortHighToLow, setSortHighToLow] = useState(true);
@@ -39,31 +42,34 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      if (refetch) await refetch();
+    } catch (e) {
+      console.error('Refresh error:', e);
+    } finally {
       setRefreshing(false);
-    }, 600);
-  }, []);
+    }
+  }, [refetch]);
 
-  // Format currency
-  const formatCurrency = (val: number) => {
-    return '৳' + val.toLocaleString('en-US');
-  };
+  // Memoized Filter & sort accounts
+  const filteredAccounts = React.useMemo(() => {
+    return accounts
+      .filter((acc) => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase().trim();
+        return (
+          acc.name.toLowerCase().includes(q) ||
+          acc.accountNumber.toLowerCase().includes(q) ||
+          acc.type.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => (sortHighToLow ? b.balance - a.balance : a.balance - b.balance));
+  }, [accounts, searchQuery, sortHighToLow]);
 
-  // Filter & sort accounts
-  const filteredAccounts = accounts
-    .filter((acc) => {
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase().trim();
-      return (
-        acc.name.toLowerCase().includes(q) ||
-        acc.accountNumber.toLowerCase().includes(q) ||
-        acc.type.toLowerCase().includes(q)
-      );
-    })
-    .sort((a, b) => (sortHighToLow ? b.balance - a.balance : a.balance - b.balance));
-
-  // Top recent 4 transactions
-  const recentTransactions = transactions.slice(0, 4);
+  // Memoized top recent 4 transactions
+  const recentTransactions = React.useMemo(() => {
+    return transactions.slice(0, 4);
+  }, [transactions]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -75,6 +81,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onSearchChange={setSearchQuery}
         searchPlaceholder="Search bKash number, line..."
       />
+
+      <NetworkStatusBanner />
 
       <ScrollView
         style={styles.container}
@@ -142,7 +150,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Text style={[styles.profitBannerTitle, { color: isDarkMode ? '#6EE7B7' : '#065F46' }]}>
                 Today's Net Profit
               </Text>
-              <Text style={[styles.profitBannerAmount, { color: theme.success }]}>
+              <Text
+                style={[styles.profitBannerAmount, { color: theme.success }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+              >
                 +{formatCurrency(metrics.todayProfit)}
               </Text>
             </View>
@@ -182,7 +195,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 color={theme.primary}
               />
               <Text style={[styles.sortButtonText, { color: theme.textSecondary }]}>
-                {sortHighToLow ? 'High -> Low' : 'Low -> High'}
+                {sortHighToLow ? 'Highest Balance' : 'Lowest Balance'}
               </Text>
             </TouchableOpacity>
 

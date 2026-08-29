@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AccountType } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
+import { validateAccount, normalizePhoneNumber } from '../utils/validation';
 
 interface AddAccountModalProps {
   visible: boolean;
@@ -23,7 +24,7 @@ interface AddAccountModalProps {
 
 export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClose }) => {
   const { theme } = useTheme();
-  const { addAccount } = useLedger();
+  const { accounts, addAccount } = useLedger();
 
   const [name, setName] = useState('');
   const [accountType, setAccountType] = useState<AccountType>('agent');
@@ -31,7 +32,9 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
   const [initialBalance, setInitialBalance] = useState('');
   const [dailyLimit, setDailyLimit] = useState('300000');
   const [isActive, setIsActive] = useState(true);
+  const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const scrollViewRef = React.useRef<ScrollView>(null);
 
   const accountTypes: { type: AccountType; label: string; icon: string; color: string }[] = [
     { type: 'agent', label: 'Agent SIM', icon: 'phone-portrait-outline', color: '#E2136E' },
@@ -40,25 +43,40 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
     { type: 'corporate', label: 'Corporate B2B', icon: 'business-outline', color: '#831843' },
   ];
 
+  // Real-time validation computation
+  const validation = useMemo(() => {
+    return validateAccount(name, accountNumber, initialBalance, dailyLimit, accounts);
+  }, [name, accountNumber, initialBalance, dailyLimit, accounts]);
+
+  const handleBlur = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
   const handleSave = async () => {
-    if (!name.trim()) {
-      Alert.alert('Validation Error', 'Please enter an account name.');
-      return;
-    }
-    if (!accountNumber.trim()) {
-      Alert.alert('Validation Error', 'Please enter a bKash phone or SIM number.');
+    // Mark all touched to display inline red borders & error messages
+    setTouched({
+      name: true,
+      accountNumber: true,
+      initialBalance: true,
+      dailyLimit: true,
+    });
+
+    if (!validation.isValid) {
+      // Auto-scroll to top so user sees the inline red fields immediately
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       return;
     }
 
-    const numBalance = parseFloat(initialBalance.replace(/[^0-9.]/g, '')) || 0;
-    const numLimit = parseFloat(dailyLimit.replace(/[^0-9.]/g, '')) || 300000;
+    const numBalance = parseFloat(initialBalance.trim().replace(/[^0-9.]/g, '')) || 0;
+    const numLimit = parseFloat(dailyLimit.trim().replace(/[^0-9.]/g, '')) || 300000;
+    const cleanNumber = normalizePhoneNumber(accountNumber.trim());
 
     setIsSubmitting(true);
     try {
       await addAccount({
         name: name.trim(),
         type: accountType,
-        accountNumber: accountNumber.trim(),
+        accountNumber: cleanNumber,
         balance: numBalance,
         dailyLimit: numLimit,
         isActive,
@@ -69,6 +87,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
       setAccountNumber('');
       setInitialBalance('');
       setDailyLimit('300000');
+      setTouched({});
       onClose();
     } catch (e) {
       console.error('Error adding account:', e);
@@ -88,15 +107,20 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
           {/* Header */}
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: theme.text }]}>Add bKash Line</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
               <Ionicons name="close" size={22} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
+          <ScrollView ref={scrollViewRef} style={styles.formScroll} showsVerticalScrollIndicator={false}>
             {/* Account Type Selector */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>BKASH LINE TYPE</Text>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>BKASH LINE TYPE</Text>
+                <View style={styles.requiredBadge}>
+                  <Text style={styles.requiredText}>* Required</Text>
+                </View>
+              </View>
               <View style={styles.providerGrid}>
                 {accountTypes.map((item) => {
                   const isSelected = accountType === item.type;
@@ -111,6 +135,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
                         },
                       ]}
                       onPress={() => setAccountType(item.type)}
+                      activeOpacity={0.8}
                     >
                       <Ionicons
                         name={item.icon as any}
@@ -132,45 +157,119 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
               </View>
             </View>
 
-            {/* Name Input */}
+            {/* Name Input with Validation */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>LINE LABEL / NAME</Text>
-              <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>LINE LABEL / NAME</Text>
+                <View style={styles.requiredBadge}>
+                  <Text style={styles.requiredText}>* Required</Text>
+                </View>
+              </View>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor:
+                      touched.name && validation.errors.name
+                        ? theme.danger
+                        : theme.border,
+                  },
+                ]}
+              >
                 <Ionicons name="bookmark-outline" size={18} color={theme.textMuted} />
                 <TextInput
                   style={[styles.inputField, { color: theme.text }]}
                   placeholder="e.g. Counter 1 - Agent SIM"
                   placeholderTextColor={theme.textMuted}
+                  maxLength={40}
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={(val) => {
+                    setName(val);
+                    if (!touched.name) setTouched((prev) => ({ ...prev, name: true }));
+                  }}
+                  onBlur={() => handleBlur('name')}
                 />
               </View>
+              {touched.name && validation.errors.name && (
+                <View style={styles.errorRow}>
+                  <Ionicons name="alert-circle" size={14} color={theme.danger} />
+                  <Text style={[styles.errorText, { color: theme.danger }]}>
+                    {validation.errors.name}
+                  </Text>
+                </View>
+              )}
             </View>
 
-            {/* Account / Phone Number */}
+            {/* Account / Phone Number with Validation */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                PHONE / ACCOUNT NUMBER
-              </Text>
-              <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+                  PHONE / ACCOUNT NUMBER
+                </Text>
+                <View style={styles.requiredBadge}>
+                  <Text style={styles.requiredText}>* Required</Text>
+                </View>
+              </View>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor:
+                      touched.accountNumber && validation.errors.accountNumber
+                        ? theme.danger
+                        : theme.border,
+                  },
+                ]}
+              >
                 <Ionicons name="call-outline" size={18} color={theme.textMuted} />
                 <TextInput
                   style={[styles.inputField, { color: theme.text }]}
-                  placeholder="e.g. 01716 553 880"
+                  placeholder="e.g. 01716553880"
                   placeholderTextColor={theme.textMuted}
-                  value={accountNumber}
-                  onChangeText={setAccountNumber}
                   keyboardType="phone-pad"
+                  maxLength={14}
+                  value={accountNumber}
+                  onChangeText={(val) => {
+                    setAccountNumber(val);
+                    if (!touched.accountNumber) setTouched((prev) => ({ ...prev, accountNumber: true }));
+                  }}
+                  onBlur={() => handleBlur('accountNumber')}
                 />
               </View>
+              {touched.accountNumber && validation.errors.accountNumber && (
+                <View style={styles.errorRow}>
+                  <Ionicons name="alert-circle" size={14} color={theme.danger} />
+                  <Text style={[styles.errorText, { color: theme.danger }]}>
+                    {validation.errors.accountNumber}
+                  </Text>
+                </View>
+              )}
             </View>
 
-            {/* Initial Balance */}
+            {/* Initial Balance with Validation (Optional, allows 0) */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                INITIAL BALANCE (৳)
-              </Text>
-              <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+                  INITIAL BALANCE (৳)
+                </Text>
+                <View style={styles.optionalBadge}>
+                  <Text style={[styles.optionalText, { color: theme.textMuted }]}>Optional (Can be ৳0)</Text>
+                </View>
+              </View>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor:
+                      touched.initialBalance && validation.errors.initialBalance
+                        ? theme.danger
+                        : theme.border,
+                  },
+                ]}
+              >
                 <Text style={[styles.currencyPrefix, { color: theme.primary }]}>৳</Text>
                 <TextInput
                   style={[styles.inputField, { color: theme.text, fontSize: 18, fontWeight: '700' }]}
@@ -178,17 +277,45 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
                   placeholderTextColor={theme.textMuted}
                   keyboardType="numeric"
                   value={initialBalance}
-                  onChangeText={setInitialBalance}
+                  onChangeText={(val) => {
+                    setInitialBalance(val);
+                    if (!touched.initialBalance) setTouched((prev) => ({ ...prev, initialBalance: true }));
+                  }}
+                  onBlur={() => handleBlur('initialBalance')}
                 />
               </View>
+              {touched.initialBalance && validation.errors.initialBalance && (
+                <View style={styles.errorRow}>
+                  <Ionicons name="alert-circle" size={14} color={theme.danger} />
+                  <Text style={[styles.errorText, { color: theme.danger }]}>
+                    {validation.errors.initialBalance}
+                  </Text>
+                </View>
+              )}
             </View>
 
-            {/* Daily Send Limit */}
+            {/* Daily Send Limit with Validation */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                DAILY SEND LIMIT (৳)
-              </Text>
-              <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+                  DAILY SEND LIMIT (৳)
+                </Text>
+                <View style={styles.requiredBadge}>
+                  <Text style={styles.requiredText}>* Required</Text>
+                </View>
+              </View>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor:
+                      touched.dailyLimit && validation.errors.dailyLimit
+                        ? theme.danger
+                        : theme.border,
+                  },
+                ]}
+              >
                 <Text style={[styles.currencyPrefix, { color: theme.warning }]}>৳</Text>
                 <TextInput
                   style={[styles.inputField, { color: theme.text, fontSize: 18, fontWeight: '700' }]}
@@ -196,29 +323,55 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
                   placeholderTextColor={theme.textMuted}
                   keyboardType="numeric"
                   value={dailyLimit}
-                  onChangeText={setDailyLimit}
+                  onChangeText={(val) => {
+                    setDailyLimit(val);
+                    if (!touched.dailyLimit) setTouched((prev) => ({ ...prev, dailyLimit: true }));
+                  }}
+                  onBlur={() => handleBlur('dailyLimit')}
                 />
               </View>
+              {touched.dailyLimit && validation.errors.dailyLimit && (
+                <View style={styles.errorRow}>
+                  <Ionicons name="alert-circle" size={14} color={theme.danger} />
+                  <Text style={[styles.errorText, { color: theme.danger }]}>
+                    {validation.errors.dailyLimit}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Active Toggle */}
-            <TouchableOpacity
-              style={[styles.activeToggleRow, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}
-              onPress={() => setIsActive(!isActive)}
-              activeOpacity={0.7}
-            >
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={[styles.activeToggleTitle, { color: theme.text }]}>Active Status</Text>
-                <Text style={[styles.activeToggleSubtitle, { color: theme.textSecondary }]}>
-                  {isActive ? 'Line is active and included in float & limit totals' : 'Line is currently disabled'}
+            <View style={styles.toggleRow}>
+              <View>
+                <Text style={[styles.toggleTitle, { color: theme.text }]}>Line Status</Text>
+                <Text style={[styles.toggleSubtitle, { color: theme.textSecondary }]}>
+                  Enable to allow sending and logging on this SIM
                 </Text>
               </View>
-              <Ionicons
-                name={isActive ? 'checkbox' : 'square-outline'}
-                size={24}
-                color={isActive ? theme.primary : theme.textMuted}
-              />
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.toggleBadge,
+                  { backgroundColor: isActive ? theme.successLight : theme.cardSecondary },
+                ]}
+                onPress={() => setIsActive(!isActive)}
+                activeOpacity={0.8}
+              >
+                <View
+                  style={[
+                    styles.toggleDot,
+                    { backgroundColor: isActive ? theme.success : theme.textMuted },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.toggleBadgeText,
+                    { color: isActive ? theme.success : theme.textSecondary },
+                  ]}
+                >
+                  {isActive ? 'ACTIVE' : 'DISABLED'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
 
           {/* Action Buttons */}
@@ -233,13 +386,19 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: theme.primary }]}
+              style={[
+                styles.saveBtn,
+                {
+                  backgroundColor: theme.primary,
+                  opacity: isSubmitting ? 0.7 : 1,
+                },
+              ]}
               onPress={handleSave}
               disabled={isSubmitting}
               activeOpacity={0.8}
             >
               <Text style={styles.saveBtnText}>
-                {isSubmitting ? 'Adding...' : 'Add bKash Line'}
+                {isSubmitting ? 'Saving...' : 'Save bKash Line'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -285,11 +444,36 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 16,
   },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  requiredBadge: {
+    backgroundColor: 'rgba(225, 29, 72, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  requiredText: {
+    color: '#E11D48',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  optionalBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  optionalText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
   inputLabel: {
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
-    marginBottom: 6,
   },
   providerGrid: {
     flexDirection: 'row',
@@ -297,10 +481,11 @@ const styles = StyleSheet.create({
   },
   providerCard: {
     flex: 1,
-    alignItems: 'center',
     paddingVertical: 10,
+    paddingHorizontal: 4,
     borderRadius: 12,
     borderWidth: 1,
+    alignItems: 'center',
     gap: 4,
   },
   providerLabel: {
@@ -322,55 +507,79 @@ const styles = StyleSheet.create({
   },
   inputField: {
     flex: 1,
+    padding: 0,
     fontSize: 14,
-    paddingVertical: 0,
   },
-  activeToggleRow: {
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+    paddingHorizontal: 2,
+  },
+  errorText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  toggleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 16,
+    paddingVertical: 10,
+    marginBottom: 10,
   },
-  activeToggleTitle: {
-    fontSize: 14,
+  toggleTitle: {
+    fontSize: 13.5,
     fontWeight: '700',
   },
-  activeToggleSubtitle: {
+  toggleSubtitle: {
     fontSize: 11,
-    marginTop: 2,
+    marginTop: 1,
+  },
+  toggleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  toggleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  toggleBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   footer: {
     flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
     paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 12,
-    borderTopWidth: 1,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   cancelBtn: {
-    flex: 1,
-    paddingVertical: 13,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   cancelBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
   saveBtn: {
-    flex: 2,
-    paddingVertical: 13,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   saveBtnText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

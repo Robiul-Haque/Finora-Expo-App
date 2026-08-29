@@ -1,96 +1,102 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  FlatList,
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
 import { Header } from '../components/Header';
+import { NetworkStatusBanner } from '../components/NetworkStatusBanner';
 import { TransactionItem } from '../components/TransactionItem';
 import { FilterModal } from '../components/FilterModal';
-import { Transaction, TransactionType } from '../types/ledger';
+import { Transaction } from '../types/ledger';
+
+const PAGE_SIZE = 15;
 
 interface TransactionsScreenProps {
   onOpenAddTransaction: () => void;
 }
 
+const FILTER_CHIPS: { label: string; value: string }[] = [
+  { label: 'All', value: 'all' },
+  { label: 'Cash Out', value: 'cash_out' },
+  { label: 'Cash In', value: 'receive_money' },
+  { label: 'Send Money', value: 'send_money' },
+  { label: 'B2B Float', value: 'b2b' },
+];
+
 export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
   onOpenAddTransaction,
 }) => {
   const { theme } = useTheme();
-  const { filteredTransactions, filters, setFilters, deleteTransaction } = useLedger();
+  const { filteredTransactions, filters, setFilters, deleteTransaction, refetch } = useLedger();
 
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [displayedCount, setDisplayedCount] = useState(PAGE_SIZE);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    setDisplayedCount(PAGE_SIZE);
+    try {
+      if (refetch) await refetch();
+    } catch (e) {
+      console.error('Refresh error:', e);
+    } finally {
       setRefreshing(false);
-    }, 600);
-  }, []);
+    }
+  }, [refetch]);
 
-  const chips: { label: string; value: string }[] = [
-    { label: 'All', value: 'all' },
-    { label: 'Cash Out', value: 'cash_out' },
-    { label: 'Cash In', value: 'receive_money' },
-    { label: 'Send Money', value: 'send_money' },
-    { label: 'B2B Float', value: 'b2b' },
-  ];
+  // Infinite Scroll / Paginated slicing
+  const visibleTransactions = useMemo(() => {
+    return filteredTransactions.slice(0, displayedCount);
+  }, [filteredTransactions, displayedCount]);
 
-  // Group transactions by date
-  const groupedTransactions = useMemo(() => {
-    const now = new Date();
-    const todayStr = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toDateString();
-    const yesterdayStr = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toDateString();
+  const hasMore = displayedCount < filteredTransactions.length;
 
-    const groups: { [key: string]: Transaction[] } = {
-      TODAY: [],
-      YESTERDAY: [],
-      EARLIER: [],
-    };
+  const handleEndReached = useCallback(() => {
+    if (!hasMore || isLoadingMore) return;
 
-    filteredTransactions.forEach((tx) => {
-      const txDate = new Date(tx.date).toDateString();
-      if (txDate === todayStr) {
-        groups.TODAY.push(tx);
-      } else if (txDate === yesterdayStr) {
-        groups.YESTERDAY.push(tx);
-      } else {
-        groups.EARLIER.push(tx);
-      }
-    });
+    setIsLoadingMore(true);
+    // Simulate smooth next-page API call batch
+    setTimeout(() => {
+      setDisplayedCount((prev) => Math.min(prev + PAGE_SIZE, filteredTransactions.length));
+      setIsLoadingMore(false);
+    }, 300);
+  }, [hasMore, isLoadingMore, filteredTransactions.length]);
 
-    return groups;
-  }, [filteredTransactions]);
+  const keyExtractor = useCallback((item: Transaction) => item.id, []);
+
+  const renderItem = useCallback(({ item }: { item: Transaction }) => (
+    <TransactionItem
+      transaction={item}
+      onDelete={() => deleteTransaction(item.id)}
+    />
+  ), [deleteTransaction]);
 
   const hasActiveFilters =
     filters.accountId !== 'all' ||
     filters.dateRange !== 'all' ||
     filters.sortBy !== 'newest';
 
-  return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <Header
-        title="bKash Ledger"
-        subtitle={`${filteredTransactions.length} recorded entries`}
-        showSearch
-        searchQuery={filters.searchQuery}
-        onSearchChange={(q) => setFilters({ searchQuery: q })}
-        searchPlaceholder="Search bKash number, note, amount..."
-        onFilterPress={() => setFilterModalVisible(true)}
-      />
+  // Render Header Chips
+  const renderHeader = () => (
+    <View>
+      <NetworkStatusBanner />
 
       {/* Horizontal Filter Chips */}
       <View style={styles.chipBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
-          {chips.map((chip) => {
+          {FILTER_CHIPS.map((chip) => {
             const isSelected = filters.type === chip.value;
             return (
               <TouchableOpacity
@@ -102,7 +108,10 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
                     borderColor: isSelected ? theme.primary : theme.border,
                   },
                 ]}
-                onPress={() => setFilters({ type: chip.value })}
+                onPress={() => {
+                  setFilters({ type: chip.value });
+                  setDisplayedCount(PAGE_SIZE);
+                }}
                 activeOpacity={0.7}
               >
                 <Text
@@ -145,11 +154,89 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
         </ScrollView>
       </View>
 
-      {/* Transactions List */}
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.contentContainer}
+      {filteredTransactions.length > 0 && (
+        <View style={styles.listMetaRow}>
+          <Text style={[styles.listMetaText, { color: theme.textSecondary }]}>
+            Showing {visibleTransactions.length} of {filteredTransactions.length} entries
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+
+  // Render Footer loading spinner for Infinite Scroll
+  const renderFooter = () => {
+    if (isLoadingMore) {
+      return (
+        <View style={styles.footerLoader}>
+          <ActivityIndicator size="small" color={theme.primary} />
+          <Text style={[styles.footerLoaderText, { color: theme.textSecondary }]}>
+            Loading more records...
+          </Text>
+        </View>
+      );
+    }
+    if (filteredTransactions.length > 0 && !hasMore) {
+      return (
+        <View style={styles.footerEndRow}>
+          <Text style={[styles.footerEndText, { color: theme.textMuted }]}>
+            All {filteredTransactions.length} transactions loaded
+          </Text>
+        </View>
+      );
+    }
+    return <View style={{ height: 60 }} />;
+  };
+
+  // Render Empty State
+  const renderEmpty = () => (
+    <View style={[styles.emptyContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <Ionicons name="receipt-outline" size={44} color={theme.textMuted} />
+      <Text style={[styles.emptyTitle, { color: theme.text }]}>No transactions found</Text>
+      <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+        No matching records for the selected filters.
+      </Text>
+      <TouchableOpacity
+        style={[styles.emptyAddBtn, { backgroundColor: theme.primary }]}
+        onPress={onOpenAddTransaction}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.emptyAddBtnText}>Add New Transaction</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <Header
+        title="bKash Ledger"
+        subtitle={`${filteredTransactions.length} recorded entries`}
+        showSearch
+        searchQuery={filters.searchQuery}
+        onSearchChange={(q) => {
+          setFilters({ searchQuery: q });
+          setDisplayedCount(PAGE_SIZE);
+        }}
+        searchPlaceholder="Search bKash number, note, amount..."
+        onFilterPress={() => setFilterModalVisible(true)}
+      />
+
+      {/* High-Performance Virtualized Infinite-Scroll FlatList */}
+      <FlatList
+        data={visibleTransactions}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        ListHeaderComponent={renderHeader}
+        ListFooterComponent={renderFooter}
+        ListEmptyComponent={renderEmpty}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        removeClippedSubviews={true}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -158,91 +245,7 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
             colors={[theme.primary]}
           />
         }
-      >
-        {filteredTransactions.length === 0 ? (
-          <View style={[styles.emptyContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Ionicons name="receipt-outline" size={44} color={theme.textMuted} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>No transactions found</Text>
-            <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-              No matching records for the selected filters.
-            </Text>
-            <TouchableOpacity
-              style={[styles.emptyAddBtn, { backgroundColor: theme.primary }]}
-              onPress={onOpenAddTransaction}
-            >
-              <Text style={styles.emptyAddBtnText}>Add New Transaction</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {groupedTransactions.TODAY.length > 0 && (
-              <View style={styles.groupSection}>
-                <View style={styles.groupHeader}>
-                  <Text style={[styles.groupTitle, { color: theme.textSecondary }]}>TODAY</Text>
-                  <Text style={[styles.groupCount, { color: theme.textMuted }]}>
-                    {groupedTransactions.TODAY.length} records
-                  </Text>
-                </View>
-                {groupedTransactions.TODAY.map((tx) => (
-                  <TransactionItem
-                    key={tx.id}
-                    transaction={tx}
-                    onDelete={() => deleteTransaction(tx.id)}
-                  />
-                ))}
-              </View>
-            )}
-
-            {groupedTransactions.YESTERDAY.length > 0 && (
-              <View style={styles.groupSection}>
-                <View style={styles.groupHeader}>
-                  <Text style={[styles.groupTitle, { color: theme.textSecondary }]}>YESTERDAY</Text>
-                  <Text style={[styles.groupCount, { color: theme.textMuted }]}>
-                    {groupedTransactions.YESTERDAY.length} records
-                  </Text>
-                </View>
-                {groupedTransactions.YESTERDAY.map((tx) => (
-                  <TransactionItem
-                    key={tx.id}
-                    transaction={tx}
-                    onDelete={() => deleteTransaction(tx.id)}
-                  />
-                ))}
-              </View>
-            )}
-
-            {groupedTransactions.EARLIER.length > 0 && (
-              <View style={styles.groupSection}>
-                <View style={styles.groupHeader}>
-                  <Text style={[styles.groupTitle, { color: theme.textSecondary }]}>
-                    EARLIER THIS MONTH
-                  </Text>
-                  <Text style={[styles.groupCount, { color: theme.textMuted }]}>
-                    {groupedTransactions.EARLIER.length} records
-                  </Text>
-                </View>
-                {groupedTransactions.EARLIER.map((tx) => (
-                  <TransactionItem
-                    key={tx.id}
-                    transaction={tx}
-                    onDelete={() => deleteTransaction(tx.id)}
-                  />
-                ))}
-              </View>
-            )}
-          </>
-        )}
-
-        <View style={{ height: 60 }} />
-      </ScrollView>
-
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: theme.primary }]}
-        onPress={onOpenAddTransaction}
-      >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
-      </TouchableOpacity>
+      />
 
       {/* Filter Modal */}
       <FilterModal
@@ -257,16 +260,13 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  container: {
-    flex: 1,
-  },
-  contentContainer: {
+  listContent: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 60,
+    paddingBottom: 40,
   },
   chipBar: {
     paddingVertical: 8,
+    marginHorizontal: -16,
   },
   chipScroll: {
     paddingHorizontal: 16,
@@ -291,23 +291,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  groupSection: {
-    marginBottom: 18,
+  listMetaRow: {
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+    marginBottom: 4,
   },
-  groupHeader: {
+  listMetaText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  footerLoader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
-    marginTop: 6,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 18,
   },
-  groupTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+  footerLoaderText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
-  groupCount: {
-    fontSize: 11,
+  footerEndRow: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingBottom: 60,
+  },
+  footerEndText: {
+    fontSize: 11.5,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -337,20 +347,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
   },
 });

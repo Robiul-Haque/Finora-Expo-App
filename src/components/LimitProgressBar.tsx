@@ -9,7 +9,7 @@ interface LimitProgressBarProps {
   showPercentage?: boolean;
 }
 
-export const LimitProgressBar: React.FC<LimitProgressBarProps> = ({
+const LimitProgressBarComponent: React.FC<LimitProgressBarProps> = ({
   usedAmount,
   totalLimit,
   label = 'LIMIT USAGE',
@@ -30,14 +30,11 @@ export const LimitProgressBar: React.FC<LimitProgressBarProps> = ({
   }, [percentage]);
 
   // Determine color based on threshold
-  let barColor = theme.primary;
-  if (percentage > 85) {
-    barColor = theme.danger;
-  } else if (percentage > 60) {
-    barColor = theme.warning;
-  } else {
-    barColor = theme.primary;
-  }
+  const barColor = React.useMemo(() => {
+    if (percentage > 85) return theme.danger;
+    if (percentage > 60) return theme.warning;
+    return theme.primary;
+  }, [percentage, theme.danger, theme.warning, theme.primary]);
 
   const widthInterpolation = animatedWidth.interpolate({
     inputRange: [0, 100],
@@ -68,6 +65,8 @@ export const LimitProgressBar: React.FC<LimitProgressBarProps> = ({
     </View>
   );
 };
+
+export const LimitProgressBar = React.memo(LimitProgressBarComponent);
 
 const styles = StyleSheet.create({
   container: {

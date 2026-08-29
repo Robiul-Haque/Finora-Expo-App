@@ -1,7 +1,16 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Account, Transaction, FilterOptions, LedgerMetrics, TransactionType } from '../types/ledger';
-import { initialAccounts, initialTransactions } from '../constants/mockData';
+import React, { createContext, useContext, useMemo, useCallback } from 'react';
+import { Account, Transaction, FilterOptions, LedgerMetrics } from '../types/ledger';
+import {
+  useAccountsQuery,
+  useTransactionsQuery,
+  useAddTransactionMutation,
+  useDeleteTransactionMutation,
+  useAddAccountMutation,
+  useUpdateAccountMutation,
+  useDeleteAccountMutation,
+  useResetDatabaseMutation,
+} from '../hooks/useLedgerQueries';
+import { useFilterStore } from '../store/useFilterStore';
 
 interface LedgerContextType {
   accounts: Account[];
@@ -18,207 +27,76 @@ interface LedgerContextType {
   deleteAccount: (id: string) => Promise<void>;
   getAccountById: (id: string) => Account | undefined;
   resetToMockData: () => Promise<void>;
+  refetch: () => Promise<void>;
   isLoading: boolean;
+  isFetching: boolean;
 }
-
-const defaultFilters: FilterOptions = {
-  accountId: 'all',
-  type: 'all',
-  dateRange: 'all',
-  sortBy: 'newest',
-  searchQuery: '',
-};
-
-const ACCOUNTS_STORAGE_KEY = '@finora_accounts_v1';
-const TRANSACTIONS_STORAGE_KEY = '@finora_transactions_v1';
 
 const LedgerContext = createContext<LedgerContextType>({} as LedgerContextType);
 
 export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
-  const [filters, setFiltersState] = useState<FilterOptions>(defaultFilters);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  // TanStack Queries (Server & Cache State)
+  const { data: accounts = [], isLoading: isAccountsLoading, isFetching: isAccountsFetching, refetch: refetchAccounts } = useAccountsQuery();
+  const { data: transactions = [], isLoading: isTxsLoading, isFetching: isTxsFetching, refetch: refetchTransactions } = useTransactionsQuery();
 
-  // Load from local storage
-  useEffect(() => {
-    const loadStoredData = async () => {
-      try {
-        const storedAccounts = await AsyncStorage.getItem(ACCOUNTS_STORAGE_KEY);
-        const storedTransactions = await AsyncStorage.getItem(TRANSACTIONS_STORAGE_KEY);
+  // Refetch all queries
+  const refetchAll = useCallback(async () => {
+    await Promise.all([refetchAccounts(), refetchTransactions()]);
+  }, [refetchAccounts, refetchTransactions]);
 
-        if (storedAccounts) {
-          setAccounts(JSON.parse(storedAccounts));
-        } else {
-          await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(initialAccounts));
-        }
+  // TanStack Mutations
+  const addTxMutation = useAddTransactionMutation();
+  const deleteTxMutation = useDeleteTransactionMutation();
+  const addAccountMutation = useAddAccountMutation();
+  const updateAccountMutation = useUpdateAccountMutation();
+  const deleteAccountMutation = useDeleteAccountMutation();
+  const resetDbMutation = useResetDatabaseMutation();
 
-        if (storedTransactions) {
-          setTransactions(JSON.parse(storedTransactions));
-        } else {
-          await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(initialTransactions));
-        }
-      } catch (error) {
-        console.error('Error loading ledger data from AsyncStorage:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Zustand Client State (Filters & Search)
+  const filters = useFilterStore((state) => state.filters);
+  const setFilters = useFilterStore((state) => state.setFilters);
+  const resetFilters = useFilterStore((state) => state.resetFilters);
 
-    loadStoredData();
-  }, []);
+  const isLoading = isAccountsLoading || isTxsLoading;
+  const isFetching = isAccountsFetching || isTxsFetching;
 
-  // Save changes to storage
-  const saveAccounts = async (newAccounts: Account[]) => {
-    setAccounts(newAccounts);
-    try {
-      await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(newAccounts));
-    } catch (e) {
-      console.error('Error saving accounts:', e);
-    }
-  };
+  // Memoized Mutation Handlers
+  const addTransaction = useCallback(async (txData: Omit<Transaction, 'id' | 'date'>) => {
+    await addTxMutation.mutateAsync(txData);
+  }, [addTxMutation]);
 
-  const saveTransactions = async (newTransactions: Transaction[]) => {
-    setTransactions(newTransactions);
-    try {
-      await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(newTransactions));
-    } catch (e) {
-      console.error('Error saving transactions:', e);
-    }
-  };
+  const deleteTransaction = useCallback(async (id: string) => {
+    await deleteTxMutation.mutateAsync(id);
+  }, [deleteTxMutation]);
 
-  const setFilters = (newFilters: Partial<FilterOptions>) => {
-    setFiltersState((prev) => ({ ...prev, ...newFilters }));
-  };
-
-  const resetFilters = () => {
-    setFiltersState(defaultFilters);
-  };
-
-  // Add new transaction and balance updates
-  const addTransaction = async (txData: Omit<Transaction, 'id' | 'date'>) => {
-    const newTx: Transaction = {
-      ...txData,
-      id: 'tx_' + Date.now(),
-      date: new Date().toISOString(),
-    };
-
-    const updatedTransactions = [newTx, ...transactions];
-
-    // Update account balances & limits
-    const updatedAccounts = accounts.map((acc) => {
-      if (acc.id === txData.accountId) {
-        let newBalance = acc.balance;
-        let newTodaySend = acc.todaySend;
-        let newTodayReceive = acc.todayReceive;
-        let newTodayProfit = acc.todayProfit + (txData.profit || 0);
-
-        if (txData.type === 'send_money' || txData.type === 'cash_out' || txData.type === 'b2b') {
-          newBalance -= txData.amount + (txData.cost || 0);
-          newTodaySend += txData.amount;
-        } else if (txData.type === 'receive_money' || txData.type === 'cash_in') {
-          newBalance += txData.amount;
-          newTodayReceive += txData.amount;
-        } else if (txData.type === 'adjustment') {
-          newBalance += txData.amount;
-        }
-
-        return {
-          ...acc,
-          balance: newBalance,
-          todaySend: newTodaySend,
-          todayReceive: newTodayReceive,
-          todayProfit: newTodayProfit,
-        };
-      }
-      return acc;
-    });
-
-    await saveTransactions(updatedTransactions);
-    await saveAccounts(updatedAccounts);
-  };
-
-  const deleteTransaction = async (id: string) => {
-    const txToDelete = transactions.find((t) => t.id === id);
-    if (!txToDelete) return;
-
-    const updatedTransactions = transactions.filter((t) => t.id !== id);
-
-    // Revert account impact
-    const updatedAccounts = accounts.map((acc) => {
-      if (acc.id === txToDelete.accountId) {
-        let newBalance = acc.balance;
-        let newTodaySend = acc.todaySend;
-        let newTodayReceive = acc.todayReceive;
-        let newTodayProfit = Math.max(0, acc.todayProfit - (txToDelete.profit || 0));
-
-        if (txToDelete.type === 'send_money' || txToDelete.type === 'cash_out' || txToDelete.type === 'b2b') {
-          newBalance += txToDelete.amount + (txToDelete.cost || 0);
-          newTodaySend = Math.max(0, newTodaySend - txToDelete.amount);
-        } else if (txToDelete.type === 'receive_money' || txToDelete.type === 'cash_in') {
-          newBalance -= txToDelete.amount;
-          newTodayReceive = Math.max(0, newTodayReceive - txToDelete.amount);
-        } else if (txToDelete.type === 'adjustment') {
-          newBalance -= txToDelete.amount;
-        }
-
-        return {
-          ...acc,
-          balance: newBalance,
-          todaySend: newTodaySend,
-          todayReceive: newTodayReceive,
-          todayProfit: newTodayProfit,
-        };
-      }
-      return acc;
-    });
-
-    await saveTransactions(updatedTransactions);
-    await saveAccounts(updatedAccounts);
-  };
-
-  const addAccount = async (
+  const addAccount = useCallback(async (
     accData: Omit<Account, 'id' | 'createdAt' | 'todaySend' | 'todayReceive' | 'todayProfit'>
   ) => {
-    const newAccount: Account = {
-      ...accData,
-      id: 'acc_' + Date.now(),
-      todaySend: 0,
-      todayReceive: 0,
-      todayProfit: 0,
-      createdAt: new Date().toISOString(),
-    };
+    await addAccountMutation.mutateAsync(accData);
+  }, [addAccountMutation]);
 
-    const updated = [newAccount, ...accounts];
-    await saveAccounts(updated);
-  };
+  const updateAccount = useCallback(async (id: string, updates: Partial<Account>) => {
+    await updateAccountMutation.mutateAsync({ id, updates });
+  }, [updateAccountMutation]);
 
-  const updateAccount = async (id: string, updates: Partial<Account>) => {
-    const updated = accounts.map((a) => (a.id === id ? { ...a, ...updates } : a));
-    await saveAccounts(updated);
-  };
+  const deleteAccount = useCallback(async (id: string) => {
+    await deleteAccountMutation.mutateAsync(id);
+  }, [deleteAccountMutation]);
 
-  const deleteAccount = async (id: string) => {
-    const updated = accounts.filter((a) => a.id !== id);
-    await saveAccounts(updated);
-  };
-
-  const getAccountById = (id: string) => {
+  const getAccountById = useCallback((id: string) => {
     return accounts.find((a) => a.id === id);
-  };
+  }, [accounts]);
 
-  const resetToMockData = async () => {
-    await saveAccounts(initialAccounts);
-    await saveTransactions(initialTransactions);
-  };
+  const resetToMockData = useCallback(async () => {
+    await resetDbMutation.mutateAsync();
+  }, [resetDbMutation]);
 
-  // Metrics computation
+  // High-performance memoized Metrics calculation
   const metrics: LedgerMetrics = useMemo(() => {
     const totalBalance = accounts.reduce((sum, acc) => (acc.isActive ? sum + acc.balance : sum), 0);
     const todayProfit = accounts.reduce((sum, acc) => sum + (acc.todayProfit || 0), 0);
     const todaySendTotal = accounts.reduce((sum, acc) => sum + (acc.todaySend || 0), 0);
 
-    // Calculate monthly income / expenses from transactions
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
@@ -246,7 +124,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [accounts, transactions]);
 
-  // Filtered transactions computation
+  // High-performance memoized Filtered Transactions
   const filteredTransactions = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -283,7 +161,9 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Search query filter
       if (filters.searchQuery.trim()) {
         const query = filters.searchQuery.toLowerCase().trim();
-        const matchesAccount = tx.accountNumber?.toLowerCase().includes(query) || tx.accountName?.toLowerCase().includes(query);
+        const matchesAccount =
+          tx.accountNumber?.toLowerCase().includes(query) ||
+          tx.accountName?.toLowerCase().includes(query);
         const matchesRecipient = tx.recipientNumber?.toLowerCase().includes(query);
         const matchesSender = tx.senderNumber?.toLowerCase().includes(query);
         const matchesNote = tx.note?.toLowerCase().includes(query);
@@ -320,26 +200,47 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return list;
   }, [transactions, filters]);
 
+  // Context value memoized to eliminate unnecessary child re-renders
+  const contextValue = useMemo<LedgerContextType>(() => ({
+    accounts,
+    transactions,
+    metrics,
+    filters,
+    filteredTransactions,
+    setFilters,
+    resetFilters,
+    addTransaction,
+    deleteTransaction,
+    addAccount,
+    updateAccount,
+    deleteAccount,
+    getAccountById,
+    resetToMockData,
+    refetch: refetchAll,
+    isLoading,
+    isFetching,
+  }), [
+    accounts,
+    transactions,
+    metrics,
+    filters,
+    filteredTransactions,
+    setFilters,
+    resetFilters,
+    addTransaction,
+    deleteTransaction,
+    addAccount,
+    updateAccount,
+    deleteAccount,
+    getAccountById,
+    resetToMockData,
+    refetchAll,
+    isLoading,
+    isFetching,
+  ]);
+
   return (
-    <LedgerContext.Provider
-      value={{
-        accounts,
-        transactions,
-        metrics,
-        filters,
-        filteredTransactions,
-        setFilters,
-        resetFilters,
-        addTransaction,
-        deleteTransaction,
-        addAccount,
-        updateAccount,
-        deleteAccount,
-        getAccountById,
-        resetToMockData,
-        isLoading,
-      }}
-    >
+    <LedgerContext.Provider value={contextValue}>
       {children}
     </LedgerContext.Provider>
   );

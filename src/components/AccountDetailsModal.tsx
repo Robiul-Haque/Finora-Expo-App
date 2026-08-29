@@ -92,7 +92,12 @@ export const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
               <Text style={[styles.balanceCardLabel, { color: theme.textSecondary }]}>
                 CURRENT BALANCE
               </Text>
-              <Text style={[styles.balanceCardAmount, { color: theme.text }]}>
+              <Text
+                style={[styles.balanceCardAmount, { color: theme.text }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
+              >
                 {formatCurrency(account.balance)}
               </Text>
 
@@ -111,7 +116,12 @@ export const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                   <Ionicons name="arrow-up" size={16} color={theme.danger} />
                   <Text style={[styles.statBoxLabel, { color: theme.textSecondary }]}>Today's Send</Text>
                 </View>
-                <Text style={[styles.statBoxValue, { color: theme.text }]}>
+                <Text
+                  style={[styles.statBoxValue, { color: theme.text }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}
+                >
                   {formatCurrency(account.todaySend)}
                 </Text>
               </View>
@@ -122,7 +132,12 @@ export const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                   <Ionicons name="trending-up" size={16} color={theme.success} />
                   <Text style={[styles.statBoxLabel, { color: theme.textSecondary }]}>Profit</Text>
                 </View>
-                <Text style={[styles.statBoxValue, { color: theme.success }]}>
+                <Text
+                  style={[styles.statBoxValue, { color: theme.success }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}
+                >
                   +{formatCurrency(account.todayProfit)}
                 </Text>
               </View>
@@ -133,7 +148,12 @@ export const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                   <Ionicons name="shield-checkmark-outline" size={16} color={theme.primary} />
                   <Text style={[styles.statBoxLabel, { color: theme.textSecondary }]}>Daily Limit</Text>
                 </View>
-                <Text style={[styles.statBoxValue, { color: theme.text }]}>
+                <Text
+                  style={[styles.statBoxValue, { color: theme.text }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}
+                >
                   {formatCurrency(account.dailyLimit)}
                 </Text>
               </View>
@@ -144,7 +164,12 @@ export const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                   <Ionicons name="time-outline" size={16} color={theme.warning} />
                   <Text style={[styles.statBoxLabel, { color: theme.textSecondary }]}>Remaining</Text>
                 </View>
-                <Text style={[styles.statBoxValue, { color: theme.primary }]}>
+                <Text
+                  style={[styles.statBoxValue, { color: theme.primary }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}
+                >
                   {formatCurrency(remainingLimit)}
                 </Text>
               </View>

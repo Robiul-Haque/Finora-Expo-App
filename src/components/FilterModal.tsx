@@ -63,11 +63,11 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose }) =>
   ];
 
   const sortOptions: { label: string; value: SortFilter }[] = [
-    { label: 'Newest First', value: 'newest' },
+    { label: 'Newest First (Recent)', value: 'newest' },
     { label: 'Oldest First', value: 'oldest' },
-    { label: 'Amount: High -> Low', value: 'amount_high' },
-    { label: 'Amount: Low -> High', value: 'amount_low' },
-    { label: 'Profit: High -> Low', value: 'profit_high' },
+    { label: 'Highest Amount First', value: 'amount_high' },
+    { label: 'Lowest Amount First', value: 'amount_low' },
+    { label: 'Highest Profit First', value: 'profit_high' },
   ];
 
   return (

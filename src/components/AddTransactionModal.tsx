@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TransactionType } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
+import { validateTransaction, normalizePhoneNumber } from '../utils/validation';
 
 interface AddTransactionModalProps {
   visible: boolean;
@@ -33,13 +34,15 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const [accountId, setAccountId] = useState(
     preselectedAccountId || (accounts.length > 0 ? accounts[0].id : '')
   );
-  const [type, setType] = useState<TransactionType>('send_money');
+  const [type, setType] = useState<TransactionType>('cash_out');
   const [amount, setAmount] = useState('');
   const [targetNumber, setTargetNumber] = useState('');
   const [cost, setCost] = useState('');
   const [profit, setProfit] = useState('');
   const [note, setNote] = useState('');
+  const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const scrollViewRef = React.useRef<ScrollView>(null);
 
   // Sync if preselectedAccountId changes
   React.useEffect(() => {
@@ -52,20 +55,34 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
 
   const selectedAccount = accounts.find((a) => a.id === accountId) || accounts[0];
 
+  // Real-time validation computation
+  const validation = useMemo(() => {
+    return validateTransaction(selectedAccount, type, amount, targetNumber, cost, profit);
+  }, [selectedAccount, type, amount, targetNumber, cost, profit]);
+
+  const handleBlur = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
   const handleSave = async () => {
-    const numAmount = parseFloat(amount.replace(/[^0-9.]/g, ''));
-    if (isNaN(numAmount) || numAmount <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid transaction amount.');
+    // Mark all as touched to display inline errors on invalid fields
+    setTouched({
+      amount: true,
+      targetNumber: true,
+      cost: true,
+      profit: true,
+    });
+
+    if (!validation.isValid) {
+      // Auto-scroll to top so user sees the inline red fields immediately
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       return;
     }
 
-    if (!selectedAccount) {
-      Alert.alert('Validation Error', 'Please select an account.');
-      return;
-    }
-
-    const numCost = parseFloat(cost.replace(/[^0-9.]/g, '')) || 0;
-    const numProfit = parseFloat(profit.replace(/[^0-9.]/g, '')) || 0;
+    const numAmount = parseFloat(amount.trim().replace(/[^0-9.]/g, '')) || 0;
+    const numCost = parseFloat(cost.trim().replace(/[^0-9.]/g, '')) || 0;
+    const numProfit = parseFloat(profit.trim().replace(/[^0-9.]/g, '')) || 0;
+    const cleanTargetNumber = normalizePhoneNumber(targetNumber.trim());
 
     setIsSubmitting(true);
     try {
@@ -75,8 +92,8 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         accountName: selectedAccount.name,
         type,
         amount: numAmount,
-        recipientNumber: (type === 'send_money' || type === 'cash_out' || type === 'b2b') ? targetNumber.trim() : undefined,
-        senderNumber: (type === 'receive_money' || type === 'cash_in') ? targetNumber.trim() : undefined,
+        recipientNumber: (type === 'send_money' || type === 'cash_out' || type === 'b2b') ? cleanTargetNumber : undefined,
+        senderNumber: (type === 'receive_money' || type === 'cash_in') ? cleanTargetNumber : undefined,
         cost: numCost,
         profit: numProfit,
         note: note.trim() || undefined,
@@ -88,6 +105,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       setCost('');
       setProfit('');
       setNote('');
+      setTouched({});
       onClose();
     } catch (e) {
       console.error('Error saving transaction:', e);
@@ -109,22 +127,28 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           {/* Header */}
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
-              <TouchableOpacity onPress={onClose} style={styles.backBtn}>
+              <TouchableOpacity onPress={onClose} style={styles.backBtn} activeOpacity={0.7}>
                 <Ionicons name="arrow-back" size={22} color={theme.text} />
               </TouchableOpacity>
               <Text style={[styles.modalTitle, { color: theme.text }]}>Add bKash Entry</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
               <Ionicons name="close" size={22} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
+          <ScrollView ref={scrollViewRef} style={styles.formScroll} showsVerticalScrollIndicator={false}>
             {/* Account Selector */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                SOURCE BKASH LINE / SIM
-              </Text>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+                  SOURCE BKASH LINE / SIM
+                </Text>
+                <View style={styles.requiredBadge}>
+                  <Text style={styles.requiredText}>* Required</Text>
+                </View>
+              </View>
+
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accountSelectorRow}>
                 {accounts.map((acc) => {
                   const isSelected = acc.id === accountId;
@@ -139,6 +163,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                         },
                       ]}
                       onPress={() => setAccountId(acc.id)}
+                      activeOpacity={0.8}
                     >
                       <Ionicons
                         name={acc.type === 'merchant' ? 'qr-code-outline' : 'phone-portrait-outline'}
@@ -166,9 +191,15 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
 
             {/* Transaction Type Segmented Toggle */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                BKASH TRANSACTION TYPE
-              </Text>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+                  BKASH TRANSACTION TYPE
+                </Text>
+                <View style={styles.requiredBadge}>
+                  <Text style={styles.requiredText}>* Required</Text>
+                </View>
+              </View>
+
               <View style={[styles.typeSegment, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}>
                 <TouchableOpacity
                   style={[
@@ -176,6 +207,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     (type === 'cash_out' || type === 'send_money') && { backgroundColor: theme.danger, borderRadius: 10 },
                   ]}
                   onPress={() => setType('cash_out')}
+                  activeOpacity={0.8}
                 >
                   <Text
                     style={[
@@ -193,6 +225,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     (type === 'receive_money' || type === 'cash_in') && { backgroundColor: theme.success, borderRadius: 10 },
                   ]}
                   onPress={() => setType('receive_money')}
+                  activeOpacity={0.8}
                 >
                   <Text
                     style={[
@@ -210,6 +243,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     type === 'b2b' && { backgroundColor: theme.primary, borderRadius: 10 },
                   ]}
                   onPress={() => setType('b2b')}
+                  activeOpacity={0.8}
                 >
                   <Text
                     style={[
@@ -227,6 +261,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     type === 'adjustment' && { backgroundColor: '#64748B', borderRadius: 10 },
                   ]}
                   onPress={() => setType('adjustment')}
+                  activeOpacity={0.8}
                 >
                   <Text
                     style={[
@@ -240,10 +275,34 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               </View>
             </View>
 
-            {/* Amount Input */}
+            {/* Amount Input (Allows 0 and above) */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>AMOUNT (৳)</Text>
-              <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+              <View style={styles.labelRow}>
+                <View style={styles.labelWithBadge}>
+                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>AMOUNT (৳)</Text>
+                  <View style={styles.requiredBadge}>
+                    <Text style={styles.requiredText}>* Required</Text>
+                  </View>
+                </View>
+                {selectedAccount && isSend && (
+                  <Text style={[styles.balanceHint, { color: theme.textSecondary }]}>
+                    Avail: ৳{selectedAccount.balance.toLocaleString()}
+                  </Text>
+                )}
+              </View>
+
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor:
+                      touched.amount && validation.errors.amount
+                        ? theme.danger
+                        : theme.border,
+                  },
+                ]}
+              >
                 <Text style={[styles.currencyPrefix, { color: theme.primary }]}>৳</Text>
                 <TextInput
                   style={[styles.inputField, { color: theme.text, fontSize: 20, fontWeight: '700' }]}
@@ -251,36 +310,106 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                   placeholderTextColor={theme.textMuted}
                   keyboardType="numeric"
                   value={amount}
-                  onChangeText={setAmount}
+                  onChangeText={(val) => {
+                    setAmount(val);
+                    if (!touched.amount) setTouched((prev) => ({ ...prev, amount: true }));
+                  }}
+                  onBlur={() => handleBlur('amount')}
                 />
               </View>
+
+              {/* Error Message */}
+              {touched.amount && validation.errors.amount && (
+                <View style={styles.errorRow}>
+                  <Ionicons name="alert-circle" size={14} color={theme.danger} />
+                  <Text style={[styles.errorText, { color: theme.danger }]}>
+                    {validation.errors.amount}
+                  </Text>
+                </View>
+              )}
+
+              {/* Warning Message */}
+              {!validation.errors.amount && validation.warnings?.amount && (
+                <View style={styles.warningRow}>
+                  <Ionicons name="warning" size={14} color={theme.warning} />
+                  <Text style={[styles.warningText, { color: theme.warning }]}>
+                    {validation.warnings.amount}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Recipient / Sender Number */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                {isSend ? 'RECIPIENT / CUSTOMER BKASH NUMBER' : 'SENDER / CUSTOMER BKASH NUMBER'}
-              </Text>
-              <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+                  {isSend ? 'RECIPIENT BKASH NUMBER' : 'SENDER BKASH NUMBER'}
+                </Text>
+                <View style={styles.requiredBadge}>
+                  <Text style={styles.requiredText}>* Required</Text>
+                </View>
+              </View>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor:
+                      touched.targetNumber && validation.errors.targetNumber
+                        ? theme.danger
+                        : theme.border,
+                  },
+                ]}
+              >
                 <Ionicons name="call-outline" size={18} color={theme.textMuted} />
                 <TextInput
                   style={[styles.inputField, { color: theme.text }]}
-                  placeholder={isSend ? 'e.g. 01712 345 678' : 'e.g. 01888 111 222'}
+                  placeholder={isSend ? 'e.g. 01712345678' : 'e.g. 01888111222'}
                   placeholderTextColor={theme.textMuted}
                   keyboardType="phone-pad"
+                  maxLength={14}
                   value={targetNumber}
-                  onChangeText={setTargetNumber}
+                  onChangeText={(val) => {
+                    setTargetNumber(val);
+                    if (!touched.targetNumber) setTouched((prev) => ({ ...prev, targetNumber: true }));
+                  }}
+                  onBlur={() => handleBlur('targetNumber')}
                 />
               </View>
+
+              {touched.targetNumber && validation.errors.targetNumber && (
+                <View style={styles.errorRow}>
+                  <Ionicons name="alert-circle" size={14} color={theme.danger} />
+                  <Text style={[styles.errorText, { color: theme.danger }]}>
+                    {validation.errors.targetNumber}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* 2-Column Grid: Send Cost & Profit */}
             <View style={styles.rowGrid}>
               <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                  {isSend ? 'BKASH FEE / COST' : 'COST'} (৳)
-                </Text>
-                <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+                <View style={styles.labelRow}>
+                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+                    {isSend ? 'FEE' : 'COST'} (৳)
+                  </Text>
+                  <View style={styles.requiredBadge}>
+                    <Text style={styles.requiredText}>* Required</Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      backgroundColor: theme.inputBg,
+                      borderColor:
+                        touched.cost && validation.errors.cost
+                          ? theme.danger
+                          : theme.border,
+                    },
+                  ]}
+                >
                   <Text style={[styles.currencyPrefixSmall, { color: theme.danger }]}>৳</Text>
                   <TextInput
                     style={[styles.inputField, { color: theme.text }]}
@@ -288,14 +417,42 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     placeholderTextColor={theme.textMuted}
                     keyboardType="numeric"
                     value={cost}
-                    onChangeText={setCost}
+                    onChangeText={(val) => {
+                      setCost(val);
+                      if (!touched.cost) setTouched((prev) => ({ ...prev, cost: true }));
+                    }}
+                    onBlur={() => handleBlur('cost')}
                   />
                 </View>
+                {touched.cost && validation.errors.cost && (
+                  <View style={styles.errorRow}>
+                    <Ionicons name="alert-circle" size={12} color={theme.danger} />
+                    <Text style={[styles.errorText, { color: theme.danger }]}>
+                      {validation.errors.cost}
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>COMMISSION (৳)</Text>
-                <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+                <View style={styles.labelRow}>
+                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>COMMISSION (৳)</Text>
+                  <View style={styles.optionalBadge}>
+                    <Text style={[styles.optionalText, { color: theme.textMuted }]}>Optional</Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      backgroundColor: theme.inputBg,
+                      borderColor:
+                        touched.profit && validation.errors.profit
+                          ? theme.danger
+                          : theme.border,
+                    },
+                  ]}
+                >
                   <Text style={[styles.currencyPrefixSmall, { color: theme.success }]}>৳</Text>
                   <TextInput
                     style={[styles.inputField, { color: theme.text }]}
@@ -303,23 +460,41 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     placeholderTextColor={theme.textMuted}
                     keyboardType="numeric"
                     value={profit}
-                    onChangeText={setProfit}
+                    onChangeText={(val) => {
+                      setProfit(val);
+                      if (!touched.profit) setTouched((prev) => ({ ...prev, profit: true }));
+                    }}
+                    onBlur={() => handleBlur('profit')}
                   />
                 </View>
+                {touched.profit && validation.errors.profit && (
+                  <View style={styles.errorRow}>
+                    <Ionicons name="alert-circle" size={12} color={theme.danger} />
+                    <Text style={[styles.errorText, { color: theme.danger }]}>
+                      {validation.errors.profit}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
             {/* Note Optional */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                NOTE (OPTIONAL)
-              </Text>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+                  NOTE (DETAILS)
+                </Text>
+                <View style={styles.optionalBadge}>
+                  <Text style={[styles.optionalText, { color: theme.textMuted }]}>Optional</Text>
+                </View>
+              </View>
               <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
                 <Ionicons name="document-text-outline" size={18} color={theme.textMuted} />
                 <TextInput
                   style={[styles.inputField, { color: theme.text }]}
                   placeholder="e.g. Retail purchase settlement"
                   placeholderTextColor={theme.textMuted}
+                  maxLength={100}
                   value={note}
                   onChangeText={setNote}
                 />
@@ -339,7 +514,13 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: theme.primary }]}
+              style={[
+                styles.saveBtn,
+                {
+                  backgroundColor: theme.primary,
+                  opacity: isSubmitting ? 0.7 : 1,
+                },
+              ]}
               onPress={handleSave}
               disabled={isSubmitting}
               activeOpacity={0.8}
@@ -399,11 +580,45 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 16,
   },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  labelWithBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  requiredBadge: {
+    backgroundColor: 'rgba(225, 29, 72, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  requiredText: {
+    color: '#E11D48',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  optionalBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  optionalText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  balanceHint: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
   inputLabel: {
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
-    marginBottom: 6,
   },
   accountSelectorRow: {
     flexDirection: 'row',
@@ -452,50 +667,69 @@ const styles = StyleSheet.create({
   },
   currencyPrefix: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   currencyPrefixSmall: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   inputField: {
     flex: 1,
+    padding: 0,
     fontSize: 14,
-    paddingVertical: 0,
   },
   rowGrid: {
     flexDirection: 'row',
     gap: 12,
   },
-  footer: {
+  errorRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 12,
-    borderTopWidth: 1,
-  },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 13,
-    borderRadius: 12,
-    borderWidth: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    marginTop: 4,
+    paddingHorizontal: 2,
   },
-  cancelBtnText: {
-    fontSize: 14,
+  errorText: {
+    fontSize: 11.5,
     fontWeight: '600',
   },
-  saveBtn: {
-    flex: 2,
-    paddingVertical: 13,
-    borderRadius: 12,
+  warningRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    marginTop: 4,
+    paddingHorizontal: 2,
+  },
+  warningText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  cancelBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  cancelBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  saveBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   saveBtnText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });
