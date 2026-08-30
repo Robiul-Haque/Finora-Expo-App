@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -14,30 +13,26 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.finora.ledger",
-      "buildNumber": "1"
+      "bundleIdentifier": "com.finora.ledger"
     },
     "android": {
       "package": "com.finora.ledger",
-      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E2136E",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#E2136E"
       }
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": [
-      "expo-font"
-    ],
     "extra": {
       "eas": {
         "projectId": "f25fc669-756b-44be-a819-d3711bcdfb46"
       }
-    }
+    },
+    "plugins": [
+      "expo-asset"
+    ]
   }
 }
