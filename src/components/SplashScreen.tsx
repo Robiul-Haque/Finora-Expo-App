@@ -79,7 +79,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           },
         ]}
       >
-        {/* Finora App Icon with Glow Badge & Instant Fallback */}
+        {/* Finora App Icon with Glow Badge */}
         <Animated.View
           style={[
             styles.iconWrapper,
@@ -90,14 +90,10 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
             },
           ]}
         >
-          {/* Instant Fallback Vector */}
-          <View style={styles.fallbackIcon}>
-            <Ionicons name="wallet" size={44} color="#FFFFFF" />
-          </View>
           <Image
             source={require('../../assets/icon.png')}
             style={styles.logoImage}
-            resizeMode="cover"
+            resizeMode="contain"
             fadeDuration={0}
           />
         </Animated.View>
