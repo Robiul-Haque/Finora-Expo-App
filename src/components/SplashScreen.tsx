@@ -42,23 +42,23 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       }),
     ]).start();
 
-    // Fast exit after 800ms for instant, premium app startup
+    // Fast exit after 950ms for instant, premium app startup
     const timer = setTimeout(() => {
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 180,
+          duration: 200,
           useNativeDriver: true,
         }),
         Animated.timing(scaleAnim, {
           toValue: 1.05,
-          duration: 180,
+          duration: 200,
           useNativeDriver: true,
         }),
       ]).start(() => {
         if (onFinish) onFinish();
       });
-    }, 850);
+    }, 950);
 
     return () => clearTimeout(timer);
   }, []);
@@ -79,20 +79,26 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           },
         ]}
       >
-        {/* Finora App Icon with Glow Badge */}
+        {/* Finora App Icon with Glow Badge & Instant Fallback */}
         <Animated.View
           style={[
             styles.iconWrapper,
             {
               transform: [{ scale: logoScale }],
               shadowColor: theme.primary,
+              backgroundColor: theme.primary,
             },
           ]}
         >
+          {/* Instant Fallback Vector */}
+          <View style={styles.fallbackIcon}>
+            <Ionicons name="wallet" size={44} color="#FFFFFF" />
+          </View>
           <Image
             source={require('../../assets/icon.png')}
             style={styles.logoImage}
             resizeMode="cover"
+            fadeDuration={0}
           />
         </Animated.View>
 
@@ -135,6 +141,15 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 10,
     overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fallbackIcon: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
   },
   logoImage: {
     width: '100%',

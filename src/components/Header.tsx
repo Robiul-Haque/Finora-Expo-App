@@ -17,18 +17,7 @@ interface HeaderProps {
   rightActions?: React.ReactNode;
 }
 
-const HeaderComponent: React.FC<HeaderProps> = ({
-  title = 'Finora bKash',
-  subtitle = 'bKash Business Ledger',
-  showSearch = false,
-  searchQuery = '',
-  onSearchChange,
-  searchPlaceholder = 'Search bKash number, note...',
-  onMenuPress,
-  onFilterPress,
-  onReload,
-  rightActions,
-}) => {
+const HeaderComponent: React.FC<HeaderProps> = ({ title = 'Finora bKash', subtitle = 'bKash Business Ledger', showSearch = false, searchQuery = '', onSearchChange, searchPlaceholder = 'Search bKash number, note...', onMenuPress, onFilterPress, onReload, rightActions }) => {
   const { theme, isDarkMode, toggleTheme } = useTheme();
   const { refetch, isFetching } = useLedger();
 

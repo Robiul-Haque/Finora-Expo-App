@@ -17,9 +17,6 @@ export const defaultFilters: FilterOptions = {
 
 export const useFilterStore = create<FilterState>((set) => ({
   filters: defaultFilters,
-  setFilters: (newFilters) =>
-    set((state) => ({
-      filters: { ...state.filters, ...newFilters },
-    })),
-  resetFilters: () => set({ filters: defaultFilters }),
+  setFilters: (newFilters) => set((state) => ({ filters: { ...state.filters, ...newFilters } })),
+  resetFilters: () => set({ filters: defaultFilters })
 }));

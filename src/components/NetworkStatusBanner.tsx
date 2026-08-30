@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNetworkStatus } from '../services/network';
 import { syncService } from '../services/sync/syncService';
@@ -33,9 +33,7 @@ const NetworkStatusBannerComponent: React.FC = () => {
   };
 
   // Only show banner when offline or when there are pending sync items
-  if (isOnline && pendingCount === 0 && !isSyncing) {
-    return null;
-  }
+  if (isOnline && pendingCount === 0 && !isSyncing) return null;
 
   return (
     <View
@@ -57,8 +55,8 @@ const NetworkStatusBannerComponent: React.FC = () => {
           {!isOnline
             ? `Offline Mode ${pendingCount > 0 ? `(${pendingCount} pending)` : ''}`
             : isSyncing
-            ? 'Syncing changes to cloud...'
-            : `${pendingCount} item(s) pending sync`}
+              ? 'Syncing changes to cloud...'
+              : `${pendingCount} item(s) pending sync`}
         </Text>
       </View>
 

@@ -1,22 +1,62 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Account, Transaction } from '../../types/ledger';
 import { initialAccounts, initialTransactions } from '../../constants/mockData';
+import { syncService } from '../sync/syncService';
 
 const ACCOUNTS_STORAGE_KEY = '@finora_accounts_v1';
 const TRANSACTIONS_STORAGE_KEY = '@finora_transactions_v1';
 
 /**
  * Production API Configuration
- * When backend server is ready, update BASE_URL and set USE_MOCK_STORAGE to false!
+ * Supports Android Emulator (10.0.2.2), iOS/Web (localhost), and local LAN backend servers.
  */
-export const API_CONFIG = {
-  BASE_URL: 'https://api.finora.app/v1', // Replace with your real backend API URL
-  USE_MOCK_STORAGE: true, // Set to false when connecting to real backend API!
-  TIMEOUT_MS: 8000,
+const getDefaultBaseUrl = () => {
+  if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL;
+
+  return 'https://finora-express-js.vercel.app/api/v1';
 };
 
-// Simulated network latency
-const simulateLatency = (ms = 100) => new Promise((resolve) => setTimeout(resolve, ms));
+export const API_CONFIG = {
+  BASE_URL: getDefaultBaseUrl(),
+  USE_MOCK_STORAGE: false, // Set to false to connect to Express backend!
+  TIMEOUT_MS: 10000,
+};
+
+/**
+ * Robust HTTP client wrapper with timeout & AbortController
+ */
+async function httpRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT_MS);
+
+  const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(options.headers || {}),
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      const message = errorBody?.message || errorBody?.error || `HTTP Error ${response.status}: ${response.statusText}`;
+      throw new Error(message);
+    }
+
+    const data = await response.json();
+    return data?.data ?? data;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') throw new Error('Network request timed out. Please check your connection.');
+    throw error;
+  }
+}
 
 /**
  * Production Ledger API Service
@@ -24,16 +64,29 @@ const simulateLatency = (ms = 100) => new Promise((resolve) => setTimeout(resolv
  */
 export const ledgerApi = {
   /**
+   * Set dynamic backend Base URL (e.g. for physical devices over Wi-Fi)
+   */
+  setBaseUrl(url: string) {
+    API_CONFIG.BASE_URL = url;
+  },
+
+  /**
    * Fetch all bKash business accounts
    */
   async getAccounts(): Promise<Account[]> {
     if (!API_CONFIG.USE_MOCK_STORAGE) {
-      // Real backend API call ready:
-      // const res = await fetch(`${API_CONFIG.BASE_URL}/accounts`);
-      // return res.json();
+      try {
+        const accounts = await httpRequest<Account[]>('/accounts');
+        if (Array.isArray(accounts) && accounts.length > 0) {
+          await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+          return accounts;
+        }
+      } catch {
+        // Fallback to local cache on API failure
+      }
     }
 
-    await simulateLatency(70);
+    // Fallback to local cache
     try {
       const data = await AsyncStorage.getItem(ACCOUNTS_STORAGE_KEY);
       if (data) {
@@ -41,8 +94,7 @@ export const ledgerApi = {
       }
       await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(initialAccounts));
       return initialAccounts;
-    } catch (e) {
-      console.error('API Error: getAccounts', e);
+    } catch {
       return initialAccounts;
     }
   },
@@ -52,12 +104,18 @@ export const ledgerApi = {
    */
   async getTransactions(): Promise<Transaction[]> {
     if (!API_CONFIG.USE_MOCK_STORAGE) {
-      // Real backend API call ready:
-      // const res = await fetch(`${API_CONFIG.BASE_URL}/transactions`);
-      // return res.json();
+      try {
+        const transactions = await httpRequest<Transaction[]>('/transactions');
+        if (Array.isArray(transactions)) {
+          await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
+          return transactions;
+        }
+      } catch {
+        // Fallback to local cache on API failure
+      }
     }
 
-    await simulateLatency(80);
+    // Fallback to local cache
     try {
       const data = await AsyncStorage.getItem(TRANSACTIONS_STORAGE_KEY);
       if (data) {
@@ -65,8 +123,7 @@ export const ledgerApi = {
       }
       await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(initialTransactions));
       return initialTransactions;
-    } catch (e) {
-      console.error('API Error: getTransactions', e);
+    } catch {
       return initialTransactions;
     }
   },
@@ -74,22 +131,7 @@ export const ledgerApi = {
   /**
    * Create a new transaction with idempotency key (clientTxId)
    */
-  async createTransaction(txData: Omit<Transaction, 'id' | 'date'> & { clientTxId?: string }): Promise<{
-    transaction: Transaction;
-    updatedAccounts: Account[];
-  }> {
-    if (!API_CONFIG.USE_MOCK_STORAGE) {
-      // Real backend API call ready:
-      // const res = await fetch(`${API_CONFIG.BASE_URL}/transactions`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': txData.clientTxId || '' },
-      //   body: JSON.stringify(txData),
-      // });
-      // return res.json();
-    }
-
-    await simulateLatency(120);
-
+  async createTransaction(txData: Omit<Transaction, 'id' | 'date'> & { clientTxId?: string }): Promise<{ transaction: Transaction; updatedAccounts: Account[] }> {
     const clientTxId = txData.clientTxId || 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
 
     const newTx: Transaction = {
@@ -101,18 +143,34 @@ export const ledgerApi = {
       retryCount: 0,
     };
 
+    let apiSucceeded = false;
+    let backendResult: any = null;
+
+    if (!API_CONFIG.USE_MOCK_STORAGE) {
+      try {
+        backendResult = await httpRequest<{ transaction: Transaction; updatedAccounts: Account[] }>('/transactions', {
+          method: 'POST',
+          headers: { 'X-Idempotency-Key': clientTxId },
+          body: JSON.stringify({ ...txData, clientTxId }),
+        });
+        apiSucceeded = true;
+      } catch {
+        newTx.syncStatus = 'pending';
+        await syncService.enqueueTransaction({ ...txData, clientTxId });
+      }
+    }
+
+    // Always update local cache for instant UI feedback
     const currentTxs = await this.getTransactions();
     const currentAccounts = await this.getAccounts();
 
-    // Check for duplicate by idempotency key
+    // Check duplicate by idempotency
     const exists = currentTxs.some((t) => t.clientTxId === clientTxId || t.id === clientTxId);
-    if (exists) {
-      return { transaction: newTx, updatedAccounts: currentAccounts };
-    }
+    if (exists && !apiSucceeded) return { transaction: newTx, updatedAccounts: currentAccounts };
 
-    const updatedTransactions = [newTx, ...currentTxs];
+    const updatedTransactions = [newTx, ...currentTxs.filter((t) => t.id !== clientTxId)];
 
-    // Compute updated balance & limit stats
+    // Recalculate account balance locally
     const updatedAccounts = currentAccounts.map((acc) => {
       if (acc.id === txData.accountId) {
         let newBalance = acc.balance;
@@ -142,19 +200,25 @@ export const ledgerApi = {
     });
 
     await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(updatedTransactions));
-    await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(updatedAccounts));
+    await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(backendResult?.updatedAccounts || updatedAccounts));
 
-    return { transaction: newTx, updatedAccounts };
+    return {
+      transaction: backendResult?.transaction || newTx,
+      updatedAccounts: backendResult?.updatedAccounts || updatedAccounts,
+    };
   },
 
   /**
    * Delete a transaction & revert balance impact
    */
-  async deleteTransaction(id: string): Promise<{
-    deletedId: string;
-    updatedAccounts: Account[];
-  }> {
-    await simulateLatency(100);
+  async deleteTransaction(id: string): Promise<{ deletedId: string; updatedAccounts: Account[]; }> {
+    if (!API_CONFIG.USE_MOCK_STORAGE) {
+      try {
+        await httpRequest(`/transactions/${id}`, { method: 'DELETE' });
+      } catch {
+        // Continue with local update
+      }
+    }
 
     const currentTxs = await this.getTransactions();
     const currentAccounts = await this.getAccounts();
@@ -201,12 +265,8 @@ export const ledgerApi = {
   /**
    * Add a new bKash account line
    */
-  async createAccount(
-    accData: Omit<Account, 'id' | 'createdAt' | 'todaySend' | 'todayReceive' | 'todayProfit'>
-  ): Promise<Account> {
-    await simulateLatency(100);
-
-    const newAccount: Account = {
+  async createAccount(accData: Omit<Account, 'id' | 'createdAt' | 'todaySend' | 'todayReceive' | 'todayProfit'>): Promise<Account> {
+    let newAccount: Account = {
       ...accData,
       id: 'acc_' + Date.now(),
       todaySend: 0,
@@ -215,6 +275,15 @@ export const ledgerApi = {
       createdAt: new Date().toISOString(),
       syncStatus: 'synced',
     };
+
+    if (!API_CONFIG.USE_MOCK_STORAGE) {
+      try {
+        const created = await httpRequest<Account>('/accounts', { method: 'POST', body: JSON.stringify(accData), });
+        if (created?.id) newAccount = created;
+      } catch {
+        // Fallback to local
+      }
+    }
 
     const currentAccounts = await this.getAccounts();
     const updated = [newAccount, ...currentAccounts];
@@ -227,7 +296,16 @@ export const ledgerApi = {
    * Update an account line
    */
   async updateAccount(id: string, updates: Partial<Account>): Promise<Account[]> {
-    await simulateLatency(90);
+    if (!API_CONFIG.USE_MOCK_STORAGE) {
+      try {
+        await httpRequest(`/accounts/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(updates),
+        });
+      } catch {
+        // Fallback to local
+      }
+    }
 
     const currentAccounts = await this.getAccounts();
     const updated = currentAccounts.map((a) => (a.id === id ? { ...a, ...updates } : a));
@@ -240,7 +318,13 @@ export const ledgerApi = {
    * Delete an account line
    */
   async deleteAccount(id: string): Promise<string> {
-    await simulateLatency(100);
+    if (!API_CONFIG.USE_MOCK_STORAGE) {
+      try {
+        await httpRequest(`/accounts/${id}`, { method: 'DELETE' });
+      } catch {
+        // Fallback to local
+      }
+    }
 
     const currentAccounts = await this.getAccounts();
     const updated = currentAccounts.filter((a) => a.id !== id);
@@ -250,10 +334,30 @@ export const ledgerApi = {
   },
 
   /**
-   * Reset database back to mock data
+   * Batch sync offline transactions
+   */
+  async syncBatchTransactions(items: any[]): Promise<{ syncedIds: string[]; failedIds: string[] }> {
+    if (!API_CONFIG.USE_MOCK_STORAGE) {
+      try {
+        return await httpRequest<{ syncedIds: string[]; failedIds: string[] }>('/transactions/sync', {
+          method: 'POST',
+          body: JSON.stringify({ items }),
+        });
+      } catch {
+        // Return IDs on error
+      }
+    }
+    return { syncedIds: items.map((i) => i.clientTxId || i.id), failedIds: [] };
+  },
+
+  /**
+   * Reset database back to clean empty state or mock
    */
   async resetDatabase(): Promise<void> {
-    await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(initialAccounts));
-    await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(initialTransactions));
+    await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify([]));
+    await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify([]));
   },
 };
+
+// Break circular dependency by registering sync executor after definition
+syncService.setSyncExecutor((items) => ledgerApi.syncBatchTransactions(items));

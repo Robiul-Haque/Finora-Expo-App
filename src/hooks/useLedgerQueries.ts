@@ -132,12 +132,8 @@ export const useAddAccountMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (
-      accData: Omit<Account, 'id' | 'createdAt' | 'todaySend' | 'todayReceive' | 'todayProfit'>
-    ) => ledgerApi.createAccount(accData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ledgerKeys.accounts() });
-    },
+    mutationFn: (accData: Omit<Account, 'id' | 'createdAt' | 'todaySend' | 'todayReceive' | 'todayProfit'>) => ledgerApi.createAccount(accData),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ledgerKeys.accounts() }); },
   });
 };
 
@@ -148,11 +144,8 @@ export const useUpdateAccountMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Account> }) =>
-      ledgerApi.updateAccount(id, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ledgerKeys.accounts() });
-    },
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Account> }) => ledgerApi.updateAccount(id, updates),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ledgerKeys.accounts() }) }
   });
 };
 
@@ -179,8 +172,6 @@ export const useResetDatabaseMutation = () => {
 
   return useMutation({
     mutationFn: () => ledgerApi.resetDatabase(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ledgerKeys.all });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ledgerKeys.all })}
   });
 };

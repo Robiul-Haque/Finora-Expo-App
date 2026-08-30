@@ -114,13 +114,19 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     });
 
+    // Calculate net growth if data exists
+    const growthPercent =
+      monthlyExpense > 0 && monthlyIncome > 0
+        ? Number((((monthlyIncome - monthlyExpense) / monthlyExpense) * 100).toFixed(1))
+        : 0;
+
     return {
       totalBalance,
-      monthlyIncome: monthlyIncome || 45200,
-      monthlyExpense: monthlyExpense || 28150,
-      todayProfit: todayProfit || 850,
-      todaySendTotal: todaySendTotal || 42000,
-      balanceGrowthPercentage: 2.4,
+      monthlyIncome,
+      monthlyExpense,
+      todayProfit,
+      todaySendTotal,
+      balanceGrowthPercentage: Math.max(0, growthPercent),
     };
   }, [accounts, transactions]);
 
@@ -177,25 +183,18 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return true;
     });
 
-    // Sorting
-    list = [...list].sort((a, b) => {
-      if (filters.sortBy === 'newest') {
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      }
-      if (filters.sortBy === 'oldest') {
-        return new Date(a.date).getTime() - new Date(b.date).getTime();
-      }
-      if (filters.sortBy === 'amount_high') {
-        return b.amount - a.amount;
-      }
-      if (filters.sortBy === 'amount_low') {
-        return a.amount - b.amount;
-      }
-      if (filters.sortBy === 'profit_high') {
-        return (b.profit || 0) - (a.profit || 0);
-      }
-      return 0;
-    });
+    // Fast sorting with zero Date heap allocation overhead
+    if (filters.sortBy === 'newest') {
+      list.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
+    } else if (filters.sortBy === 'oldest') {
+      list.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
+    } else if (filters.sortBy === 'amount_high') {
+      list.sort((a, b) => b.amount - a.amount);
+    } else if (filters.sortBy === 'amount_low') {
+      list.sort((a, b) => a.amount - b.amount);
+    } else if (filters.sortBy === 'profit_high') {
+      list.sort((a, b) => (b.profit || 0) - (a.profit || 0));
+    }
 
     return list;
   }, [transactions, filters]);

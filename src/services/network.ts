@@ -1,7 +1,6 @@
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import { onlineManager } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 
 /**
  * Configure TanStack Query onlineManager with NetInfo
@@ -21,8 +20,11 @@ export const useNetworkStatus = () => {
   const [connectionType, setConnectionType] = useState<string>('unknown');
 
   useEffect(() => {
+    let isMounted = true;
+
     // Initial fetch
     NetInfo.fetch().then((state) => {
+      if (!isMounted) return;
       const online = Boolean(state.isConnected && (state.isInternetReachable ?? true));
       setIsOnline(online);
       setConnectionType(state.type);
@@ -30,12 +32,16 @@ export const useNetworkStatus = () => {
 
     // Event listener
     const unsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
+      if (!isMounted) return;
       const online = Boolean(state.isConnected && (state.isInternetReachable ?? true));
       setIsOnline(online);
       setConnectionType(state.type);
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   return { isOnline, connectionType };

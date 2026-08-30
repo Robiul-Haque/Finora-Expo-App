@@ -1,22 +1,12 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
-import { Header } from '../components/Header';
-import { NetworkStatusBanner } from '../components/NetworkStatusBanner';
-import { StatCard } from '../components/StatCard';
-import { AccountCard } from '../components/AccountCard';
-import { TransactionItem } from '../components/TransactionItem';
-import { Account } from '../types/ledger';
+import { Header, NetworkStatusBanner, StatCard, AccountCard, TransactionItem } from '../components';
+import { Account } from '../types';
+import { formatCurrency } from '../utils';
 
 interface HomeScreenProps {
   onOpenAccountDetails: (account: Account) => void;
@@ -25,14 +15,7 @@ interface HomeScreenProps {
   onNavigateToAccounts: () => void;
 }
 
-const formatCurrency = (val: number) => '৳' + val.toLocaleString('en-US');
-
-export const HomeScreen: React.FC<HomeScreenProps> = ({
-  onOpenAccountDetails,
-  onOpenAddTransaction,
-  onNavigateToTransactions,
-  onNavigateToAccounts,
-}) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenAccountDetails, onOpenAddTransaction, onNavigateToTransactions, onNavigateToAccounts }) => {
   const { theme, isDarkMode } = useTheme();
   const { accounts, transactions, metrics, refetch } = useLedger();
 
@@ -44,8 +27,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setRefreshing(true);
     try {
       if (refetch) await refetch();
-    } catch (e) {
-      console.error('Refresh error:', e);
+    } catch {
+      // Ignore network refresh errors in UI
     } finally {
       setRefreshing(false);
     }
@@ -79,7 +62,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         showSearch
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search bKash number, line..."
+        searchPlaceholder="Search bKash number or name..."
       />
 
       <NetworkStatusBanner />
@@ -101,8 +84,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <StatCard
           title="Total bKash Float"
           value={formatCurrency(metrics.totalBalance)}
-          subtitle="Real-time Balance Across All Lines"
-          badgeText={`+${metrics.balanceGrowthPercentage}% vs last month`}
+          subtitle="Real-time Balance Across All Numbers"
+          badgeText={metrics.balanceGrowthPercentage > 0 ? `+${metrics.balanceGrowthPercentage}% vs last month` : undefined}
           isPositive
           iconName="wallet-outline"
           variant="primary"
@@ -142,19 +125,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             },
           ]}
         >
-          <View style={styles.profitBannerLeft}>
+          <View style={[styles.profitBannerLeft, { flex: 1, minWidth: 0, marginRight: 8 }]}>
             <View style={[styles.profitIconBadge, { backgroundColor: theme.success }]}>
               <Ionicons name="sparkles" size={18} color="#FFFFFF" />
             </View>
-            <View>
-              <Text style={[styles.profitBannerTitle, { color: isDarkMode ? '#6EE7B7' : '#065F46' }]}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.profitBannerTitle, { color: isDarkMode ? '#6EE7B7' : '#065F46' }]} numberOfLines={1}>
                 Today's Net Profit
               </Text>
               <Text
                 style={[styles.profitBannerAmount, { color: theme.success }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.7}
+                minimumFontScale={0.6}
               >
                 +{formatCurrency(metrics.todayProfit)}
               </Text>
@@ -162,7 +145,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
 
           <TouchableOpacity
-            style={[styles.profitBannerBtn, { backgroundColor: theme.success }]}
+            style={[styles.profitBannerBtn, { backgroundColor: theme.success, flexShrink: 0 }]}
             onPress={() => onOpenAddTransaction()}
             activeOpacity={0.75}
           >
@@ -173,14 +156,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* Accounts Section Header */}
         <View style={styles.sectionHeader}>
-          <View>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>bKash Business Lines</Text>
-            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-              {filteredAccounts.length} active SIMs / counters
+          <View style={{ flex: 1, minWidth: 0, marginRight: 6 }}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">
+              bKash Numbers
+            </Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
+              {filteredAccounts.filter((a) => a.isActive).length} active numbers
             </Text>
           </View>
 
-          <View style={styles.sortToggleGroup}>
+          <View style={[styles.sortToggleGroup, { flexShrink: 0 }]}>
             <TouchableOpacity
               style={[
                 styles.sortButton,
@@ -195,7 +180,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 color={theme.primary}
               />
               <Text style={[styles.sortButtonText, { color: theme.textSecondary }]}>
-                {sortHighToLow ? 'Highest Balance' : 'Lowest Balance'}
+                {sortHighToLow ? 'Highest' : 'Lowest'}
               </Text>
             </TouchableOpacity>
 
@@ -213,9 +198,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {filteredAccounts.length === 0 ? (
           <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <Ionicons name="search-outline" size={32} color={theme.textMuted} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>No bKash lines found</Text>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>No bKash numbers found</Text>
             <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-              Try a different search or add a new bKash line.
+              Try a different search or add a new number.
             </Text>
           </View>
         ) : (
@@ -231,14 +216,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* Recent Transactions Section */}
         <View style={styles.sectionHeader}>
-          <View>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Transactions</Text>
-            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+          <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">
+              Recent Transactions
+            </Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
               Latest ledger activity
             </Text>
           </View>
 
-          <TouchableOpacity onPress={onNavigateToTransactions}>
+          <TouchableOpacity onPress={onNavigateToTransactions} activeOpacity={0.7} style={{ flexShrink: 0 }}>
             <Text style={[styles.seeAllText, { color: theme.primary }]}>View All</Text>
           </TouchableOpacity>
         </View>

@@ -1,28 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
-  StatusBar,
-  Animated,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar, Animated } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './src/services/queryClient';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { LedgerProvider } from './src/context/LedgerContext';
-import { SplashScreen } from './src/components/SplashScreen';
-import { HomeScreen } from './src/screens/HomeScreen';
-import { TransactionsScreen } from './src/screens/TransactionsScreen';
-import { AccountsScreen } from './src/screens/AccountsScreen';
-import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
-import { AddTransactionModal } from './src/components/AddTransactionModal';
-import { AddAccountModal } from './src/components/AddAccountModal';
-import { AccountDetailsModal } from './src/components/AccountDetailsModal';
-import { Account } from './src/types/ledger';
+import { HomeScreen, TransactionsScreen, AccountsScreen, AnalyticsScreen } from './src/screens';
+import { SplashScreen, AddTransactionModal, AddAccountModal, AccountDetailsModal, ErrorBoundary } from './src/components';
+import { Account } from './src/types';
 
 type TabType = 'home' | 'transactions' | 'accounts' | 'analytics';
 
@@ -38,17 +24,7 @@ interface TabButtonProps {
   activeBgColor: string;
 }
 
-const AnimatedTabButtonComponent: React.FC<TabButtonProps> = ({
-  tab,
-  activeTab,
-  label,
-  activeIcon,
-  inactiveIcon,
-  onPress,
-  activeColor,
-  inactiveColor,
-  activeBgColor,
-}) => {
+const AnimatedTabButtonComponent: React.FC<TabButtonProps> = ({ tab, activeTab, label, activeIcon, inactiveIcon, onPress, activeColor, inactiveColor, activeBgColor }) => {
   const isActive = activeTab === tab;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -287,13 +263,13 @@ const MainApp: React.FC = () => {
             </Animated.View>
           </TouchableOpacity>
 
-          {/* Tab 3: Accounts */}
+          {/* Tab 3: Accounts / Numbers */}
           <AnimatedTabButton
             tab="accounts"
             activeTab={activeTab}
-            label="Lines"
-            activeIcon="wallet"
-            inactiveIcon="wallet-outline"
+            label="Numbers"
+            activeIcon="phone-portrait"
+            inactiveIcon="phone-portrait-outline"
             onPress={() => switchTab('accounts')}
             activeColor={theme.tabBarActive}
             inactiveColor={theme.tabBarInactive}
@@ -339,15 +315,17 @@ const MainApp: React.FC = () => {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <SafeAreaProvider>
-        <ThemeProvider>
-          <LedgerProvider>
-            <MainApp />
-          </LedgerProvider>
-        </ThemeProvider>
-      </SafeAreaProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <LedgerProvider>
+              <MainApp />
+            </LedgerProvider>
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
@@ -415,4 +393,3 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
 });
-

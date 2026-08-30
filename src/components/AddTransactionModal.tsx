@@ -1,16 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TransactionType } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
@@ -23,17 +12,11 @@ interface AddTransactionModalProps {
   preselectedAccountId?: string;
 }
 
-export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
-  visible,
-  onClose,
-  preselectedAccountId,
-}) => {
+export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onClose, preselectedAccountId }) => {
   const { theme } = useTheme();
   const { accounts, addTransaction } = useLedger();
 
-  const [accountId, setAccountId] = useState(
-    preselectedAccountId || (accounts.length > 0 ? accounts[0].id : '')
-  );
+  const [accountId, setAccountId] = useState(preselectedAccountId || (accounts.length > 0 ? accounts[0].id : ''));
   const [type, setType] = useState<TransactionType>('cash_out');
   const [amount, setAmount] = useState('');
   const [targetNumber, setTargetNumber] = useState('');
@@ -107,8 +90,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       setNote('');
       setTouched({});
       onClose();
-    } catch (e) {
-      console.error('Error saving transaction:', e);
+    } catch {
       Alert.alert('Error', 'Could not save transaction. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -142,7 +124,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
                 <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                  SOURCE BKASH LINE / SIM
+                  SOURCE BKASH NUMBER
                 </Text>
                 <View style={styles.requiredBadge}>
                   <Text style={styles.requiredText}>* Required</Text>
@@ -170,16 +152,17 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                         size={16}
                         color={isSelected ? theme.primary : theme.textSecondary}
                       />
-                      <View>
+                      <View style={{ flexShrink: 1 }}>
                         <Text
                           style={[
                             styles.accountPillName,
                             { color: isSelected ? theme.primary : theme.text },
                           ]}
+                          numberOfLines={1}
                         >
                           {acc.name}
                         </Text>
-                        <Text style={[styles.accountPillNumber, { color: theme.textSecondary }]}>
+                        <Text style={[styles.accountPillNumber, { color: theme.textSecondary }]} numberOfLines={1}>
                           {acc.accountNumber} (৳{acc.balance.toLocaleString()})
                         </Text>
                       </View>

@@ -1,20 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
-import { Header } from '../components/Header';
-import { StatCard } from '../components/StatCard';
-import { LimitProgressBar } from '../components/LimitProgressBar';
+import { Header, StatCard, LimitProgressBar, ConfirmationModal } from '../components';
+import { formatCurrency } from '../utils';
 
 export const AnalyticsScreen: React.FC = () => {
-  const { theme, isDarkMode, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const { metrics, accounts, transactions, resetToMockData } = useLedger();
-
-  const formatCurrency = (val: number) => {
-    return '৳' + val.toLocaleString('en-US');
-  };
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const totalSendCount = transactions.filter((t) => t.type === 'send_money').length;
   const totalReceiveCount = transactions.filter((t) => t.type === 'receive_money').length;
@@ -89,7 +85,7 @@ export const AnalyticsScreen: React.FC = () => {
 
         {/* Channel Share */}
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>bKash SIM Balance Float Share</Text>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>bKash Balance Float Share by Number</Text>
           {accounts.map((acc) => {
             const share =
               metrics.totalBalance > 0
@@ -98,8 +94,17 @@ export const AnalyticsScreen: React.FC = () => {
             return (
               <View key={acc.id} style={styles.channelRow}>
                 <View style={styles.channelHeader}>
-                  <Text style={[styles.channelName, { color: theme.text }]}>{acc.name}</Text>
-                  <Text style={[styles.channelAmount, { color: theme.textSecondary }]}>
+                  <Text
+                    style={[styles.channelName, { color: theme.text, flex: 1, marginRight: 8 }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {acc.name}
+                  </Text>
+                  <Text
+                    style={[styles.channelAmount, { color: theme.textSecondary, flexShrink: 0 }]}
+                    numberOfLines={1}
+                  >
                     {formatCurrency(acc.balance)} ({share}%)
                   </Text>
                 </View>
@@ -109,20 +114,36 @@ export const AnalyticsScreen: React.FC = () => {
           })}
         </View>
 
-        {/* Reset / Developer Option */}
+        {/* Reset / Clear Data Option */}
         <TouchableOpacity
           style={[styles.resetButton, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}
-          onPress={resetToMockData}
+          onPress={() => setShowResetConfirm(true)}
           activeOpacity={0.7}
         >
-          <Ionicons name="refresh-outline" size={16} color={theme.textSecondary} />
+          <Ionicons name="trash-outline" size={16} color={theme.textSecondary} />
           <Text style={[styles.resetButtonText, { color: theme.textSecondary }]}>
-            Reset to bKash Demo Data
+            Clear Ledger Records
           </Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Clear Data Confirmation Modal */}
+      <ConfirmationModal
+        visible={showResetConfirm}
+        title="Clear All Ledger Data"
+        message="Are you sure you want to clear all transactions and reset data? This action cannot be undone."
+        confirmText="Clear All Data"
+        cancelText="Cancel"
+        type="danger"
+        icon="alert-circle-outline"
+        onConfirm={() => {
+          setShowResetConfirm(false);
+          resetToMockData();
+        }}
+        onCancel={() => setShowResetConfirm(false)}
+      />
     </SafeAreaView>
   );
 };

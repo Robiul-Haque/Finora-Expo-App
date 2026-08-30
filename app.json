@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "Finora bKash",
+    "name": "Finora",
     "slug": "finora",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -14,10 +14,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.finora.ledger"
+      "bundleIdentifier": "com.finora.ledger",
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.finora.ledger",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E2136E",
         "foregroundImage": "./assets/android-icon-foreground.png",

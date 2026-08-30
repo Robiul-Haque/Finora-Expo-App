@@ -27,9 +27,8 @@ export const isValidBkashNumber = (phone: string): boolean => {
  */
 export const formatDisplayPhoneNumber = (phone: string): string => {
   const normalized = normalizePhoneNumber(phone);
-  if (normalized.length === 11) {
-    return `${normalized.slice(0, 5)} ${normalized.slice(5)}`;
-  }
+  if (normalized.length === 11) return `${normalized.slice(0, 5)} ${normalized.slice(5)}`;
+
   return phone;
 };
 
@@ -47,20 +46,13 @@ export interface TransactionValidationResult {
   };
 }
 
-export const validateTransaction = (
-  account: Account | undefined,
-  type: TransactionType,
-  amountStr: string,
-  targetNumber: string,
-  costStr: string,
-  profitStr: string
-): TransactionValidationResult => {
+export const validateTransaction = (account: Account | undefined, type: TransactionType, amountStr: string, targetNumber: string, costStr: string, profitStr: string): TransactionValidationResult => {
   const errors: TransactionValidationResult['errors'] = {};
   const warnings: TransactionValidationResult['warnings'] = {};
 
   // 1. Account validation (Required)
   if (!account) {
-    errors.accountId = 'Please select a valid bKash account line';
+    errors.accountId = 'Please select a valid bKash number';
   } else if (!account.isActive) {
     errors.accountId = 'Selected bKash account is currently inactive';
   }
@@ -75,7 +67,7 @@ export const validateTransaction = (
     errors.amount = 'Amount must be greater than ৳0';
   } else if (account) {
     const isOutflow = type === 'send_money' || type === 'cash_out' || type === 'b2b';
-    
+
     // Balance check for outflows
     if (isOutflow && numAmount > account.balance) {
       errors.amount = `Insufficient float balance! Available: ৳${account.balance.toLocaleString('en-US')}`;
@@ -84,10 +76,9 @@ export const validateTransaction = (
     // Limit check for outflows
     if (isOutflow && numAmount > 0) {
       const remainingLimit = Math.max(0, account.dailyLimit - account.todaySend);
-      if (numAmount > remainingLimit) {
-        warnings.amount = `Amount exceeds remaining daily limit (৳${remainingLimit.toLocaleString('en-US')})`;
-      }
+      if (numAmount > remainingLimit) warnings.amount = `Amount exceeds remaining daily limit (৳${remainingLimit.toLocaleString('en-US')})`;
     }
+
   }
 
   // 3. Sender / Recipient bKash Number validation (Required)
@@ -95,14 +86,10 @@ export const validateTransaction = (
   const trimmedTarget = targetNumber.trim();
   if (needsTargetNumber) {
     if (!trimmedTarget) {
-      errors.targetNumber = type === 'receive_money' || type === 'cash_in'
-        ? 'Sender bKash number is required'
-        : 'Recipient bKash number is required';
+      errors.targetNumber = type === 'receive_money' || type === 'cash_in' ? 'Sender bKash number is required' : 'Recipient bKash number is required';
     } else {
       const normalized = normalizePhoneNumber(trimmedTarget);
-      if (!isValidBkashNumber(normalized)) {
-        errors.targetNumber = 'Please enter a valid 11-digit bKash number (e.g. 017XXXXXXXX)';
-      }
+      if (!isValidBkashNumber(normalized)) errors.targetNumber = 'Please enter a valid 11-digit bKash number (e.g. 017XXXXXXXX)';
     }
   }
 
@@ -122,9 +109,7 @@ export const validateTransaction = (
   // 5. Profit / Commission validation (Optional, >= 0)
   if (profitStr.trim()) {
     const numProfit = parseFloat(profitStr.replace(/[^0-9.]/g, ''));
-    if (isNaN(numProfit) || numProfit < 0) {
-      errors.profit = 'Commission cannot be negative';
-    }
+    if (isNaN(numProfit) || numProfit < 0) errors.profit = 'Commission cannot be negative';
   }
 
   return {
@@ -144,20 +129,13 @@ export interface AccountValidationResult {
   };
 }
 
-export const validateAccount = (
-  name: string,
-  accountNumber: string,
-  initialBalanceStr: string,
-  dailyLimitStr: string,
-  existingAccounts: Account[],
-  currentAccountId?: string
-): AccountValidationResult => {
+export const validateAccount = (name: string, accountNumber: string, initialBalanceStr: string, dailyLimitStr: string, existingAccounts: Account[], currentAccountId?: string): AccountValidationResult => {
   const errors: AccountValidationResult['errors'] = {};
 
   // 1. Name validation (Required)
   const trimmedName = name.trim();
   if (!trimmedName) {
-    errors.name = 'Account line name is required';
+    errors.name = 'Account / Number name is required';
   } else if (trimmedName.length < 2) {
     errors.name = 'Name must be at least 2 characters long';
   } else if (trimmedName.length > 40) {
@@ -174,22 +152,14 @@ export const validateAccount = (
     errors.accountNumber = 'Must be a valid 11-digit bKash number (e.g. 017XXXXXXXX)';
   } else {
     // Unique check
-    const isDuplicate = existingAccounts.some(
-      (acc) =>
-        acc.id !== currentAccountId &&
-        normalizePhoneNumber(acc.accountNumber) === normalized
-    );
-    if (isDuplicate) {
-      errors.accountNumber = 'An account with this bKash number already exists';
-    }
+    const isDuplicate = existingAccounts.some((acc) => acc.id !== currentAccountId && normalizePhoneNumber(acc.accountNumber) === normalized);
+    if (isDuplicate) errors.accountNumber = 'An account with this bKash number already exists';
   }
 
   // 3. Initial balance validation (Optional, >= 0)
   if (initialBalanceStr.trim()) {
     const numBalance = parseFloat(initialBalanceStr.replace(/[^0-9.]/g, ''));
-    if (isNaN(numBalance) || numBalance < 0) {
-      errors.initialBalance = 'Initial balance must be ৳0 or more';
-    }
+    if (isNaN(numBalance) || numBalance < 0) errors.initialBalance = 'Initial balance must be ৳0 or more';
   }
 
   // 4. Daily limit validation (Required, >= 0)
@@ -206,6 +176,6 @@ export const validateAccount = (
 
   return {
     isValid: Object.keys(errors).length === 0,
-    errors,
+    errors
   };
 };

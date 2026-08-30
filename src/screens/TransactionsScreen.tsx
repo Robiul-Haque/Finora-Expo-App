@@ -1,23 +1,11 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
-import { Header } from '../components/Header';
-import { NetworkStatusBanner } from '../components/NetworkStatusBanner';
-import { TransactionItem } from '../components/TransactionItem';
-import { FilterModal } from '../components/FilterModal';
-import { Transaction } from '../types/ledger';
+import { Header, NetworkStatusBanner, TransactionItem, FilterModal, ConfirmationModal } from '../components';
+import { Transaction } from '../types';
 
 const PAGE_SIZE = 15;
 
@@ -33,24 +21,23 @@ const FILTER_CHIPS: { label: string; value: string }[] = [
   { label: 'B2B Float', value: 'b2b' },
 ];
 
-export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
-  onOpenAddTransaction,
-}) => {
+export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({ onOpenAddTransaction }) => {
   const { theme } = useTheme();
   const { filteredTransactions, filters, setFilters, deleteTransaction, refetch } = useLedger();
 
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [displayedCount, setDisplayedCount] = useState(PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
     setDisplayedCount(PAGE_SIZE);
     try {
       if (refetch) await refetch();
-    } catch (e) {
-      console.error('Refresh error:', e);
+    } catch {
+      // Ignore refresh network errors in UI
     } finally {
       setRefreshing(false);
     }
@@ -74,14 +61,19 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
     }, 300);
   }, [hasMore, isLoadingMore, filteredTransactions.length]);
 
-  const keyExtractor = useCallback((item: Transaction) => item.id, []);
+  const handleConfirmDeleteTransaction = () => {
+    if (transactionToDelete) {
+      deleteTransaction(transactionToDelete.id);
+      setTransactionToDelete(null);
+    }
+  };
 
   const renderItem = useCallback(({ item }: { item: Transaction }) => (
     <TransactionItem
       transaction={item}
-      onDelete={() => deleteTransaction(item.id)}
+      onPress={() => setTransactionToDelete(item)}
     />
-  ), [deleteTransaction]);
+  ), []);
 
   const hasActiveFilters =
     filters.accountId !== 'all' ||
@@ -224,17 +216,22 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
       {/* High-Performance Virtualized Infinite-Scroll FlatList */}
       <FlatList
         data={visibleTransactions}
-        keyExtractor={keyExtractor}
+        keyExtractor={(item) => item.clientTxId || item.id}
         renderItem={renderItem}
+        getItemLayout={(_data, index) => ({
+          length: 86,
+          offset: 86 * index,
+          index,
+        })}
         ListHeaderComponent={renderHeader}
         ListFooterComponent={renderFooter}
         ListEmptyComponent={renderEmpty}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={10}
-        maxToRenderPerBatch={8}
-        windowSize={5}
-        removeClippedSubviews={true}
+        initialNumToRender={12}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS === 'android'}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}
         refreshControl={
@@ -251,6 +248,23 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({
       <FilterModal
         visible={filterModalVisible}
         onClose={() => setFilterModalVisible(false)}
+      />
+
+      {/* Delete Transaction Confirmation Modal */}
+      <ConfirmationModal
+        visible={Boolean(transactionToDelete)}
+        title="Delete Transaction"
+        message={
+          transactionToDelete
+            ? `Are you sure you want to remove this ৳${transactionToDelete.amount.toLocaleString('en-US')} ${transactionToDelete.type.replace('_', ' ').toUpperCase()} record?`
+            : ''
+        }
+        confirmText="Delete Record"
+        cancelText="Cancel"
+        type="danger"
+        icon="trash-outline"
+        onConfirm={handleConfirmDeleteTransaction}
+        onCancel={() => setTransactionToDelete(null)}
       />
     </SafeAreaView>
   );

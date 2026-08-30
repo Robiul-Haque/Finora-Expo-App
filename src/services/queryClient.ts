@@ -6,9 +6,7 @@ import { AppState, AppStateStatus, Platform } from 'react-native';
  * Automatically refetches stale queries when the app comes back to the foreground.
  */
 function onAppStateChange(status: AppStateStatus) {
-  if (Platform.OS !== 'web') {
-    focusManager.setFocused(status === 'active');
-  }
+  if (Platform.OS !== 'web') focusManager.setFocused(status === 'active');
 }
 
 const subscription = AppState.addEventListener('change', onAppStateChange);

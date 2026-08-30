@@ -1,14 +1,7 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  ScrollView,
-} from 'react-native';
+import {View,Text,StyleSheet,Modal,TouchableOpacity,ScrollView} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { FilterOptions, DateFilter, SortFilter, TransactionType } from '../types/ledger';
+import { DateFilter, SortFilter } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
 interface LimitProgressBarProps {
@@ -9,22 +9,20 @@ interface LimitProgressBarProps {
   showPercentage?: boolean;
 }
 
-const LimitProgressBarComponent: React.FC<LimitProgressBarProps> = ({
-  usedAmount,
-  totalLimit,
-  label = 'LIMIT USAGE',
-  showPercentage = true,
-}) => {
-  const { theme } = useTheme();
+const LimitProgressBarComponent: React.FC<LimitProgressBarProps> = ({ usedAmount, totalLimit, label = 'LIMIT USAGE', showPercentage = true }) => {
+  const { theme, isDarkMode } = useTheme();
 
-  const percentage = totalLimit > 0 ? Math.min(100, Math.round((usedAmount / totalLimit) * 100)) : 0;
-  const animatedWidth = useRef(new Animated.Value(0)).current;
+  const percentage =
+    totalLimit > 0 ? Math.min(100, Math.max(0, Math.round((usedAmount / totalLimit) * 100))) : 0;
+
+  // Initialized directly with the percentage value (clean, instant, zero flicker)
+  const animatedWidth = useRef(new Animated.Value(percentage)).current;
 
   useEffect(() => {
-    Animated.spring(animatedWidth, {
+    Animated.timing(animatedWidth, {
       toValue: percentage,
-      friction: 8,
-      tension: 45,
+      duration: 300,
+      easing: Easing.out(Easing.quad),
       useNativeDriver: false,
     }).start();
   }, [percentage]);
@@ -39,19 +37,28 @@ const LimitProgressBarComponent: React.FC<LimitProgressBarProps> = ({
   const widthInterpolation = animatedWidth.interpolate({
     inputRange: [0, 100],
     outputRange: ['0%', '100%'],
+    extrapolate: 'clamp',
   });
+
+  const trackBg = isDarkMode ? '#28203A' : '#F1E8F0';
 
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>
+        <Text
+          style={[styles.label, { color: theme.textSecondary }]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {label}
+        </Text>
         {showPercentage && (
-          <Text style={[styles.percentage, { color: barColor }]}>
+          <Text style={[styles.percentage, { color: barColor }]} numberOfLines={1}>
             {percentage}%
           </Text>
         )}
       </View>
-      <View style={[styles.track, { backgroundColor: theme.progressBarBg }]}>
+      <View style={[styles.track, { backgroundColor: trackBg }]}>
         <Animated.View
           style={[
             styles.fill,
@@ -77,26 +84,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   label: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+    flex: 1,
+    marginRight: 6,
   },
   percentage: {
     fontSize: 11,
     fontWeight: '800',
+    flexShrink: 0,
   },
   track: {
-    height: 6,
-    borderRadius: 3,
+    height: 7,
+    borderRadius: 4,
     overflow: 'hidden',
     width: '100%',
   },
   fill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 4,
   },
 });

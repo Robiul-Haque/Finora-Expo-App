@@ -1,16 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from 'react-native';
+import {View,Text,StyleSheet,Modal,TouchableOpacity,TextInput,ScrollView,KeyboardAvoidingView,Platform,Alert} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AccountType } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
@@ -89,8 +78,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
       setDailyLimit('300000');
       setTouched({});
       onClose();
-    } catch (e) {
-      console.error('Error adding account:', e);
+    } catch {
       Alert.alert('Error', 'Failed to add bKash account.');
     } finally {
       setIsSubmitting(false);
@@ -106,7 +94,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
         <View style={[styles.modalContent, { backgroundColor: theme.card, borderColor: theme.border }]}>
           {/* Header */}
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Add bKash Line</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Add bKash Number</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
               <Ionicons name="close" size={22} color={theme.textMuted} />
             </TouchableOpacity>
@@ -116,7 +104,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
             {/* Account Type Selector */}
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
-                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>BKASH LINE TYPE</Text>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>BKASH NUMBER TYPE</Text>
                 <View style={styles.requiredBadge}>
                   <Text style={styles.requiredText}>* Required</Text>
                 </View>
@@ -160,7 +148,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
             {/* Name Input with Validation */}
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
-                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>LINE LABEL / NAME</Text>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>ACCOUNT / NUMBER NAME</Text>
                 <View style={styles.requiredBadge}>
                   <Text style={styles.requiredText}>* Required</Text>
                 </View>
@@ -180,7 +168,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
                 <Ionicons name="bookmark-outline" size={18} color={theme.textMuted} />
                 <TextInput
                   style={[styles.inputField, { color: theme.text }]}
-                  placeholder="e.g. Counter 1 - Agent SIM"
+                  placeholder="e.g. Counter 1 - Agent"
                   placeholderTextColor={theme.textMuted}
                   maxLength={40}
                   value={name}
@@ -343,9 +331,9 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
             {/* Active Toggle */}
             <View style={styles.toggleRow}>
               <View>
-                <Text style={[styles.toggleTitle, { color: theme.text }]}>Line Status</Text>
+                <Text style={[styles.toggleTitle, { color: theme.text }]}>Number Status</Text>
                 <Text style={[styles.toggleSubtitle, { color: theme.textSecondary }]}>
-                  Enable to allow sending and logging on this SIM
+                  Enable to allow sending and logging on this number
                 </Text>
               </View>
               <TouchableOpacity
@@ -398,7 +386,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ visible, onClo
               activeOpacity={0.8}
             >
               <Text style={styles.saveBtnText}>
-                {isSubmitting ? 'Saving...' : 'Save bKash Line'}
+                {isSubmitting ? 'Saving...' : 'Save bKash Number'}
               </Text>
             </TouchableOpacity>
           </View>

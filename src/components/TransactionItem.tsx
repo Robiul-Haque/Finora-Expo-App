@@ -3,18 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { Transaction } from '../types/ledger';
 import { useTheme } from '../context/ThemeContext';
+import { formatCurrency, formatTime } from '../utils';
 
 interface TransactionItemProps {
   transaction: Transaction;
   onPress?: () => void;
-  onDelete?: () => void;
 }
 
-const TransactionItemComponent: React.FC<TransactionItemProps> = ({
-  transaction,
-  onPress,
-  onDelete,
-}) => {
+const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction, onPress }) => {
   const { theme } = useTheme();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -63,13 +59,10 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
     }
   }, [transaction.type, theme]);
 
-  const formattedAmount = React.useMemo(() => '৳' + transaction.amount.toLocaleString('en-US'), [transaction.amount]);
-  const formattedDate = React.useMemo(() => {
-    const d = new Date(transaction.date);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }, [transaction.date]);
-  const formattedProfit = React.useMemo(() => transaction.profit > 0 ? '৳' + transaction.profit.toLocaleString('en-US') : '', [transaction.profit]);
-  const formattedCost = React.useMemo(() => transaction.cost > 0 ? '৳' + transaction.cost.toLocaleString('en-US') : '', [transaction.cost]);
+  const formattedAmount = React.useMemo(() => formatCurrency(transaction.amount), [transaction.amount]);
+  const formattedDate = React.useMemo(() => formatTime(transaction.date), [transaction.date]);
+  const formattedProfit = React.useMemo(() => transaction.profit > 0 ? formatCurrency(transaction.profit) : '', [transaction.profit]);
+  const formattedCost = React.useMemo(() => transaction.cost > 0 ? formatCurrency(transaction.cost) : '', [transaction.cost]);
 
   const handlePressIn = () => {
     if (!onPress) return;
@@ -117,34 +110,42 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
           <View style={styles.details}>
             <View style={styles.topMeta}>
               <View style={[styles.typeBadge, { backgroundColor: badge.bg }]}>
-                <Text style={[styles.typeBadgeText, { color: badge.color }]}>{badge.label}</Text>
+                <Text style={[styles.typeBadgeText, { color: badge.color }]} numberOfLines={1}>{badge.label}</Text>
               </View>
-              <Text style={[styles.timeText, { color: theme.textMuted }]}>
+              <Text style={[styles.timeText, { color: theme.textMuted }]} numberOfLines={1}>
                 {formattedDate}
               </Text>
               {transaction.syncStatus === 'pending' && (
                 <View style={[styles.syncBadge, { backgroundColor: '#FEF3C7' }]}>
                   <Ionicons name="cloud-upload-outline" size={10} color="#D97706" />
-                  <Text style={[styles.syncBadgeText, { color: '#92400E' }]}>Offline</Text>
+                  <Text style={[styles.syncBadgeText, { color: '#92400E' }]} numberOfLines={1}>Offline</Text>
                 </View>
               )}
               {transaction.syncStatus === 'failed' && (
                 <View style={[styles.syncBadge, { backgroundColor: '#FEE2E2' }]}>
                   <Ionicons name="alert-circle-outline" size={10} color="#DC2626" />
-                  <Text style={[styles.syncBadgeText, { color: '#991B1B' }]}>Failed</Text>
+                  <Text style={[styles.syncBadgeText, { color: '#991B1B' }]} numberOfLines={1}>Failed</Text>
                 </View>
               )}
             </View>
 
-            <Text style={[styles.targetNumber, { color: theme.text }]} numberOfLines={1}>
+            <Text
+              style={[styles.targetNumber, { color: theme.text }]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
               {isSend && transaction.recipientNumber
                 ? `To: ${transaction.recipientNumber}`
                 : isReceive && transaction.senderNumber
-                ? `From: ${transaction.senderNumber}`
-                : transaction.note || transaction.accountName}
+                  ? `From: ${transaction.senderNumber}`
+                  : transaction.note || transaction.accountName}
             </Text>
 
-            <Text style={[styles.accountMeta, { color: theme.textSecondary }]}>
+            <Text
+              style={[styles.accountMeta, { color: theme.textSecondary }]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
               Via: {transaction.accountName} ({transaction.accountNumber})
             </Text>
           </View>
@@ -158,7 +159,7 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
             ]}
             numberOfLines={1}
             adjustsFontSizeToFit
-            minimumFontScale={0.75}
+            minimumFontScale={0.7}
           >
             {isSend ? '-' : '+'}{formattedAmount}
           </Text>
@@ -166,13 +167,13 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({
           <View style={styles.subAmounts}>
             {transaction.profit > 0 && (
               <View style={[styles.profitPill, { backgroundColor: theme.successLight }]}>
-                <Text style={[styles.profitText, { color: theme.success }]}>
+                <Text style={[styles.profitText, { color: theme.success }]} numberOfLines={1}>
                   +{formattedProfit} Profit
                 </Text>
               </View>
             )}
             {transaction.cost > 0 && (
-              <Text style={[styles.costText, { color: theme.textMuted }]}>
+              <Text style={[styles.costText, { color: theme.textMuted }]} numberOfLines={1}>
                 Fee: {formattedCost}
               </Text>
             )}
@@ -198,9 +199,11 @@ const styles = StyleSheet.create({
   },
   leftSection: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 11,
     flex: 1,
+    minWidth: 0,
+    marginRight: 6,
   },
   iconContainer: {
     width: 40,
@@ -208,16 +211,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
+    marginTop: 2,
   },
   details: {
     flex: 1,
-    marginRight: 6,
+    minWidth: 0,
   },
   topMeta: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   typeBadge: {
     paddingHorizontal: 6,
@@ -237,13 +243,16 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: '700',
     marginTop: 1,
+    lineHeight: 18,
   },
   accountMeta: {
     fontSize: 11,
-    marginTop: 1,
+    marginTop: 2,
+    lineHeight: 15,
   },
   rightSection: {
     alignItems: 'flex-end',
+    flexShrink: 0,
     marginLeft: 6,
   },
   amountText: {

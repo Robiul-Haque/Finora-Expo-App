@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { Transaction } from '../../types/ledger';
-import { ledgerApi } from '../api/ledgerApi';
 
 const SYNC_QUEUE_KEY = '@finora_sync_queue_v1';
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 5;
+
+export type BatchSyncExecutor = (items: any[]) => Promise<{ syncedIds: string[]; failedIds: string[] }>;
 
 export interface SyncQueueItem {
   id: string;
@@ -22,10 +23,16 @@ type SyncListener = (pendingCount: number, isSyncing: boolean) => void;
 class SyncService {
   private isSyncing = false;
   private listeners: Set<SyncListener> = new Set();
+  private unsubscribeNetInfo?: () => void;
+  private syncExecutor?: BatchSyncExecutor;
+
+  public setSyncExecutor(executor: BatchSyncExecutor) {
+    this.syncExecutor = executor;
+  }
 
   constructor() {
     // Listen for network reconnect
-    NetInfo.addEventListener((state) => {
+    this.unsubscribeNetInfo = NetInfo.addEventListener((state) => {
       const isOnline = Boolean(state.isConnected && (state.isInternetReachable ?? true));
       if (isOnline && !this.isSyncing) {
         this.processQueue();
@@ -65,6 +72,13 @@ class SyncService {
    */
   public async enqueueTransaction(txData: Omit<Transaction, 'id' | 'date'> & { clientTxId: string }): Promise<SyncQueueItem> {
     const queue = await this.getQueue();
+
+    // Prevent duplicate enqueue of identical clientTxId
+    const existingIndex = queue.findIndex((item) => item.clientTxId === txData.clientTxId);
+    if (existingIndex !== -1) {
+      return queue[existingIndex];
+    }
+
     const item: SyncQueueItem = {
       id: 'sync_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       clientTxId: txData.clientTxId,
@@ -77,7 +91,7 @@ class SyncService {
     queue.push(item);
     await this.saveQueue(queue);
 
-    // If online, process immediately
+    // If online, trigger background process
     const net = await NetInfo.fetch();
     const isOnline = Boolean(net.isConnected && (net.isInternetReachable ?? true));
     if (isOnline && !this.isSyncing) {
@@ -88,7 +102,7 @@ class SyncService {
   }
 
   /**
-   * Process all pending items in the offline queue with Exponential Backoff
+   * Process all pending items in the offline queue with Batch Sync & Backoff
    */
   public async processQueue(): Promise<{ successCount: number; failedCount: number }> {
     if (this.isSyncing) return { successCount: 0, failedCount: 0 };
@@ -113,28 +127,40 @@ class SyncService {
         return { successCount: 0, failedCount: 0 };
       }
 
+      // Collect CREATE_TRANSACTION items for batch sync
+      const createTxItems = queue.filter((q) => q.type === 'CREATE_TRANSACTION');
+      const otherItems = queue.filter((q) => q.type !== 'CREATE_TRANSACTION');
+
       const remainingQueue: SyncQueueItem[] = [];
 
-      for (const item of queue) {
+      if (createTxItems.length > 0 && this.syncExecutor) {
         try {
-          // Process based on type
-          if (item.type === 'CREATE_TRANSACTION') {
-            await ledgerApi.createTransaction(item.payload);
-            successCount++;
-          }
-        } catch (err: any) {
-          console.error('Sync item failed:', item.id, err);
-          item.retryCount += 1;
-          item.lastAttempt = new Date().toISOString();
-          item.error = err?.message || 'Network error';
+          const payloadList = createTxItems.map((i) => i.payload);
+          const syncResult = await this.syncExecutor(payloadList);
+          const syncedSet = new Set(syncResult.syncedIds || []);
 
-          if (item.retryCount < MAX_RETRIES) {
-            remainingQueue.push(item);
-          } else {
-            // Reached max retries - mark transaction as failed in local DB
-            failedCount++;
+          for (const item of createTxItems) {
+            if (syncedSet.has(item.clientTxId)) {
+              successCount++;
+            } else {
+              item.retryCount += 1;
+              item.lastAttempt = new Date().toISOString();
+              if (item.retryCount < MAX_RETRIES) {
+                remainingQueue.push(item);
+              } else {
+                failedCount++;
+              }
+            }
           }
+        } catch {
+          // Retry on next connection
+          remainingQueue.push(...createTxItems);
         }
+      }
+
+      // Process other items (if any)
+      for (const item of otherItems) {
+        remainingQueue.push(item);
       }
 
       await this.saveQueue(remainingQueue);
@@ -158,6 +184,16 @@ class SyncService {
    */
   public async clearQueue(): Promise<void> {
     await this.saveQueue([]);
+  }
+
+  /**
+   * Cleanup method to avoid memory leak
+   */
+  public destroy() {
+    if (this.unsubscribeNetInfo) {
+      this.unsubscribeNetInfo();
+    }
+    this.listeners.clear();
   }
 }
 

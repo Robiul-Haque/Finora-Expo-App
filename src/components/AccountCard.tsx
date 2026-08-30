@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { Account } from '../types/ledger';
 import { useTheme } from '../context/ThemeContext';
+import { useLedger } from '../context/LedgerContext';
 import { LimitProgressBar } from './LimitProgressBar';
+import { formatCurrency } from '../utils';
 
 interface AccountCardProps {
   account: Account;
@@ -11,44 +13,43 @@ interface AccountCardProps {
   onAddTransactionPress?: () => void;
 }
 
-const formatCurrency = (val: number) => '৳' + val.toLocaleString('en-US');
-
-const AccountCardComponent: React.FC<AccountCardProps> = ({
-  account,
-  onPress,
-  onAddTransactionPress,
-}) => {
+const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress, onAddTransactionPress }) => {
   const { theme } = useTheme();
+  const { updateAccount } = useLedger();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const remainingLimit = Math.max(0, account.dailyLimit - account.todaySend);
-
-  const formattedBalance = React.useMemo(() => '৳' + account.balance.toLocaleString('en-US'), [account.balance]);
-  const formattedTodayProfit = React.useMemo(() => '৳' + (account.todayProfit || 0).toLocaleString('en-US'), [account.todayProfit]);
-  const formattedTodaySend = React.useMemo(() => '৳' + account.todaySend.toLocaleString('en-US'), [account.todaySend]);
-  const formattedTodayReceive = React.useMemo(() => '৳' + account.todayReceive.toLocaleString('en-US'), [account.todayReceive]);
-
-  const provider = React.useMemo(() => {
-    switch (account.type) {
+  const getProviderConfig = (type: Account['type']) => {
+    switch (type) {
       case 'agent':
-        return { name: 'phone-portrait-outline', color: '#E2136E', label: 'bKash Agent' };
+        return {
+          name: 'business-outline',
+          label: 'Agent SIM',
+          color: '#E2136E',
+        };
       case 'merchant':
-        return { name: 'qr-code-outline', color: '#BE123C', label: 'Merchant QR' };
+        return {
+          name: 'storefront-outline',
+          label: 'Merchant QR',
+          color: '#BE123C',
+        };
       case 'personal':
-        return { name: 'person-circle-outline', color: '#9D174D', label: 'Personal bKash' };
-      case 'corporate':
-        return { name: 'business-outline', color: '#831843', label: 'Corporate B2B' };
-      case 'bkash':
       default:
-        return { name: 'phone-portrait-outline', color: '#E2136E', label: 'bKash Line' };
+        return {
+          name: 'person-outline',
+          label: 'Personal bKash',
+          color: '#0284C7',
+        };
     }
-  }, [account.type]);
+  };
+
+  const provider = getProviderConfig(account.type);
+  const remainingLimit = Math.max(0, account.dailyLimit - account.todaySend);
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
       toValue: 0.98,
-      friction: 5,
-      tension: 100,
+      friction: 4,
+      tension: 80,
       useNativeDriver: true,
     }).start();
   };
@@ -60,6 +61,11 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
       tension: 80,
       useNativeDriver: true,
     }).start();
+  };
+
+  const handleToggleStatus = (e: any) => {
+    e?.stopPropagation?.();
+    updateAccount(account.id, { isActive: !account.isActive });
   };
 
   return (
@@ -75,6 +81,7 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
           {
             backgroundColor: theme.card,
             borderColor: theme.border,
+            opacity: account.isActive ? 1 : 0.65,
             transform: [{ scale: scaleAnim }],
           },
         ]}
@@ -89,19 +96,43 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
                 color={provider.color}
               />
             </View>
-            <View style={{ flex: 1, marginRight: 8 }}>
+            <View style={styles.accountTextContainer}>
               <View style={styles.nameRow}>
-                <Text style={[styles.accountName, { color: theme.text }]} numberOfLines={1}>
+                <Text
+                  style={[styles.accountName, { color: theme.text }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
                   {account.name}
                 </Text>
-                <View
+                <TouchableOpacity
+                  onPress={handleToggleStatus}
                   style={[
-                    styles.statusDot,
-                    { backgroundColor: account.isActive ? theme.success : theme.textMuted },
+                    styles.activeBadge,
+                    {
+                      backgroundColor: account.isActive
+                        ? theme.successLight
+                        : theme.cardSecondary,
+                    },
                   ]}
-                />
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text
+                    style={[
+                      styles.activeBadgeText,
+                      { color: account.isActive ? theme.success : theme.textMuted },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {account.isActive ? 'Active' : 'Inactive'}
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <Text style={[styles.accountNumber, { color: theme.textSecondary }]} numberOfLines={1}>
+              <Text
+                style={[styles.accountNumber, { color: theme.textSecondary }]}
+                numberOfLines={1}
+              >
                 {account.accountNumber}
               </Text>
             </View>
@@ -109,7 +140,7 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
 
           <View style={styles.providerBadgeContainer}>
             <View style={[styles.providerBadge, { backgroundColor: provider.color + '18' }]}>
-              <Text style={[styles.providerText, { color: provider.color }]}>
+              <Text style={[styles.providerText, { color: provider.color }]} numberOfLines={1}>
                 {provider.label}
               </Text>
             </View>
@@ -118,21 +149,21 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
 
         {/* Main Balance Display */}
         <View style={styles.balanceContainer}>
-          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>
+          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]} numberOfLines={2}>
             CURRENT FLOAT BALANCE
           </Text>
           <View style={styles.balanceRow}>
             <Text
               style={[styles.balanceAmount, { color: theme.text }]}
-              numberOfLines={1}
+              numberOfLines={2}
               adjustsFontSizeToFit
-              minimumFontScale={0.65}
+              minimumFontScale={0.6}
             >
               {formatCurrency(account.balance)}
             </Text>
             {account.todayProfit > 0 && (
               <View style={[styles.profitBadge, { backgroundColor: theme.successLight }]}>
-                <Text style={[styles.profitText, { color: theme.success }]}>
+                <Text style={[styles.profitText, { color: theme.success }]} numberOfLines={2}>
                   +{formatCurrency(account.todayProfit)} Commission
                 </Text>
               </View>
@@ -150,15 +181,29 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
         {/* Limit Breakdown Stats */}
         <View style={[styles.statsRow, { backgroundColor: theme.cardSecondary }]}>
           <View style={styles.statItem}>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Today's Send</Text>
-            <Text style={[styles.statValue, { color: theme.text }]}>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]} numberOfLines={2}>
+              Today's Send
+            </Text>
+            <Text
+              style={[styles.statValue, { color: theme.text }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
               {formatCurrency(account.todaySend)}
             </Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Remaining Limit</Text>
-            <Text style={[styles.statValue, { color: theme.primary }]}>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]} numberOfLines={2}>
+              Remaining Limit
+            </Text>
+            <Text
+              style={[styles.statValue, { color: theme.primary }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
               {formatCurrency(remainingLimit)}
             </Text>
           </View>
@@ -172,7 +217,9 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
             activeOpacity={0.7}
           >
             <Ionicons name="stats-chart-outline" size={14} color={theme.textSecondary} />
-            <Text style={[styles.actionBtnText, { color: theme.textSecondary }]}>Details</Text>
+            <Text style={[styles.actionBtnText, { color: theme.textSecondary }]} numberOfLines={1}>
+              Details
+            </Text>
           </TouchableOpacity>
 
           {onAddTransactionPress && (
@@ -182,7 +229,9 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
               activeOpacity={0.75}
             >
               <Ionicons name="add" size={16} color="#FFFFFF" />
-              <Text style={styles.primaryActionBtnText}>Log bKash Entry</Text>
+              <Text style={styles.primaryActionBtnText} numberOfLines={1}>
+                Log bKash Entry
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -208,14 +257,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   accountInfo: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 10,
     flex: 1,
+    marginRight: 6,
   },
   avatar: {
     width: 40,
@@ -223,32 +273,54 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  accountTextContainer: {
+    flex: 1,
+    minWidth: 0,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
   },
   accountName: {
     fontSize: 15,
     fontWeight: '700',
+    flexShrink: 1,
+    lineHeight: 20,
   },
   statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
+    flexShrink: 0,
   },
   accountNumber: {
     fontSize: 13,
     fontWeight: '500',
-    marginTop: 1,
+    marginTop: 2,
+    lineHeight: 18,
+  },
+  activeBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    flexShrink: 0,
+  },
+  activeBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
   },
   providerBadgeContainer: {
     marginLeft: 8,
+    flexShrink: 0,
   },
   providerBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 8,
   },
   providerText: {
@@ -263,30 +335,37 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.5,
+    lineHeight: 16,
   },
   balanceRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 2,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
   },
   balanceAmount: {
     fontSize: 26,
     fontWeight: '800',
     letterSpacing: -0.5,
+    flexShrink: 1,
   },
   profitBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 8,
+    flexShrink: 1,
   },
   profitText: {
     fontSize: 11,
     fontWeight: '700',
+    lineHeight: 16,
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -294,10 +373,12 @@ const styles = StyleSheet.create({
   },
   statItem: {
     flex: 1,
+    minWidth: 0,
   },
   statLabel: {
     fontSize: 11,
     fontWeight: '500',
+    lineHeight: 15,
   },
   statValue: {
     fontSize: 13,
@@ -306,13 +387,15 @@ const styles = StyleSheet.create({
   },
   statDivider: {
     width: 1,
-    height: '100%',
+    height: 28,
     marginHorizontal: 8,
+    alignSelf: 'center',
   },
   footerRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
     marginTop: 12,
     paddingTop: 10,

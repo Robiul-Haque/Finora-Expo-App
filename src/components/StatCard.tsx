@@ -14,16 +14,7 @@ interface StatCardProps {
   onPress?: () => void;
 }
 
-const StatCardComponent: React.FC<StatCardProps> = ({
-  title,
-  value,
-  subtitle,
-  badgeText,
-  isPositive = true,
-  iconName,
-  variant = 'card',
-  onPress,
-}) => {
+const StatCardComponent: React.FC<StatCardProps> = ({ title, value, subtitle, badgeText, isPositive = true, iconName, variant = 'card', onPress }) => {
   const { theme, isDarkMode } = useTheme();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -88,7 +79,11 @@ const StatCardComponent: React.FC<StatCardProps> = ({
                 />
               </View>
             )}
-            <Text style={[styles.title, { color: subTextColor }]} numberOfLines={1}>
+            <Text
+              style={[styles.title, { color: subTextColor }]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
               {title}
             </Text>
           </View>
@@ -100,8 +95,8 @@ const StatCardComponent: React.FC<StatCardProps> = ({
                   backgroundColor: isPrimary
                     ? 'rgba(255,255,255,0.22)'
                     : isPositive
-                    ? theme.successLight
-                    : theme.dangerLight,
+                      ? theme.successLight
+                      : theme.dangerLight,
                 },
               ]}
             >
@@ -118,6 +113,7 @@ const StatCardComponent: React.FC<StatCardProps> = ({
                   },
                 ]}
                 numberOfLines={1}
+                ellipsizeMode="tail"
               >
                 {badgeText}
               </Text>
@@ -129,16 +125,16 @@ const StatCardComponent: React.FC<StatCardProps> = ({
           style={[styles.value, { color: textColor }]}
           numberOfLines={1}
           adjustsFontSizeToFit
-          minimumFontScale={0.65}
+          minimumFontScale={0.6}
         >
           {value}
         </Text>
 
-        {subtitle && (
-          <Text style={[styles.subtitle, { color: subTextColor }]} numberOfLines={1} ellipsizeMode="tail">
+        {subtitle ? (
+          <Text style={[styles.subtitle, { color: subTextColor }]} numberOfLines={2} ellipsizeMode="tail">
             {subtitle}
           </Text>
-        )}
+        ) : null}
       </Animated.View>
     </TouchableOpacity>
   );
@@ -161,7 +157,7 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
     gap: 6,
   },
@@ -170,6 +166,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     flex: 1,
+    minWidth: 0,
   },
   iconBadge: {
     width: 26,
@@ -177,6 +174,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   title: {
     fontSize: 12,
@@ -184,6 +182,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     flex: 1,
+    flexShrink: 1,
+    lineHeight: 16,
   },
   value: {
     fontSize: 22,
@@ -196,6 +196,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
     letterSpacing: 0.1,
+    lineHeight: 15,
   },
   badge: {
     flexDirection: 'row',
@@ -204,10 +205,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
+    flexShrink: 0,
+    maxWidth: '48%',
   },
   badgeText: {
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.2,
+    flexShrink: 1,
   },
 });
