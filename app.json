@@ -33,7 +33,8 @@
     },
     "plugins": [
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      "./plugins/with16KbPageSize.js"
     ]
   }
 }

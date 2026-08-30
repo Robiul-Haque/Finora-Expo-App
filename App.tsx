@@ -91,11 +91,7 @@ const AnimatedTabButtonComponent: React.FC<TabButtonProps> = ({ tab, activeTab, 
 
 const AnimatedTabButton = React.memo(AnimatedTabButtonComponent);
 
-interface MainAppProps {
-  fontsLoaded: boolean;
-}
-
-const MainApp: React.FC<MainAppProps> = ({ fontsLoaded }) => {
+const MainApp: React.FC = () => {
   const { theme, isDarkMode } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [showSplash, setShowSplash] = useState(true);
@@ -164,7 +160,7 @@ const MainApp: React.FC<MainAppProps> = ({ fontsLoaded }) => {
     setAddAccountVisible(true);
   }, []);
 
-  if (showSplash || !fontsLoaded) {
+  if (showSplash) {
     return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
 
@@ -319,7 +315,7 @@ const MainApp: React.FC<MainAppProps> = ({ fontsLoaded }) => {
 };
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
+  useFonts({
     ...Ionicons.font,
   });
 
@@ -329,7 +325,7 @@ export default function App() {
         <SafeAreaProvider>
           <ThemeProvider>
             <LedgerProvider>
-              <MainApp fontsLoaded={fontsLoaded} />
+              <MainApp />
             </LedgerProvider>
           </ThemeProvider>
         </SafeAreaProvider>
