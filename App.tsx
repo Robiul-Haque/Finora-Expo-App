@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
@@ -160,9 +160,7 @@ const MainApp: React.FC = () => {
     setAddAccountVisible(true);
   }, []);
 
-  if (showSplash) {
-    return <SplashScreen onFinish={() => setShowSplash(false)} />;
-  }
+
 
   const renderActiveScreen = () => {
     switch (activeTab) {
@@ -310,14 +308,32 @@ const MainApp: React.FC = () => {
         onClose={() => setSelectedAccountForDetails(null)}
         onAddTransaction={(accId) => handleOpenAddTx(accId)}
       />
+
+      {/* Splash Screen Smooth Overlay */}
+      {showSplash && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <SplashScreen onFinish={() => setShowSplash(false)} />
+        </View>
+      )}
     </View>
   );
 };
 
 export default function App() {
-  useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     ...Ionicons.font,
+    ionicons: require('./assets/fonts/Ionicons.ttf'),
+    Ionicons: require('./assets/fonts/Ionicons.ttf'),
   });
+
+  if (!fontsLoaded && !fontError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0B0A12', justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar barStyle="light-content" backgroundColor="#0B0A12" />
+        <ActivityIndicator size="large" color="#E2136E" />
+      </View>
+    );
+  }
 
   return (
     <ErrorBoundary>

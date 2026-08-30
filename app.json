@@ -33,7 +33,14 @@
     },
     "plugins": [
       "expo-asset",
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Ionicons.ttf"
+          ]
+        }
+      ],
       "./plugins/with16KbPageSize.js"
     ]
   }

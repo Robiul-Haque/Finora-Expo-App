@@ -10,12 +10,13 @@ interface SplashScreenProps {
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const { theme, isDarkMode } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const logoScale = useRef(new Animated.Value(0.9)).current;
   const bottomFade = useRef(new Animated.Value(0)).current;
+  const containerOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Fast & buttery smooth spring animation
+    // Entrance animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -42,29 +43,38 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       }),
     ]).start();
 
-    // Fast exit after 950ms for instant, premium app startup
-    const timer = setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1.05,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        if (onFinish) onFinish();
-      });
-    }, 950);
+    // Guaranteed exit animation after 900ms
+    const exitTimer = setTimeout(() => {
+      Animated.timing(containerOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }, 900);
 
-    return () => clearTimeout(timer);
-  }, []);
+    // Guaranteed onFinish trigger after 1150ms
+    const finishTimer = setTimeout(() => {
+      if (onFinish) {
+        onFinish();
+      }
+    }, 1150);
+
+    return () => {
+      clearTimeout(exitTimer);
+      clearTimeout(finishTimer);
+    };
+  }, [onFinish]);
 
   return (
-    <View style={[styles.container, { backgroundColor: isDarkMode ? '#0B0A12' : '#FFFFFF' }]}>
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          backgroundColor: isDarkMode ? '#0B0A12' : '#FFFFFF',
+          opacity: containerOpacity,
+        },
+      ]}
+    >
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={isDarkMode ? '#0B0A12' : '#FFFFFF'}
@@ -114,7 +124,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           FINANCIAL INTELLIGENCE OS
         </Text>
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 };
 
