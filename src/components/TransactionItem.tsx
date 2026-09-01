@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { Transaction } from '../types/ledger';
 import { useTheme } from '../context/ThemeContext';
-import { formatCurrency, formatTime } from '../utils';
+import { formatCurrency, formatDateTime } from '../utils';
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -11,175 +11,172 @@ interface TransactionItemProps {
 }
 
 const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction, onPress }) => {
-  const { theme } = useTheme();
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const { theme, isDarkMode } = useTheme();
 
-  const isSend = transaction.type === 'send_money' || transaction.type === 'cash_out' || transaction.type === 'b2b';
-  const isReceive = transaction.type === 'receive_money' || transaction.type === 'cash_in';
+  const isSend =
+    transaction.type === 'sm' ||
+    transaction.type === 'co' ||
+    transaction.type === 'send' ||
+    transaction.type === 'send_money' ||
+    transaction.type === 'cash_out' ||
+    transaction.type === 'b2b';
 
-  const badge = React.useMemo(() => {
-    switch (transaction.type) {
-      case 'cash_out':
-        return {
-          label: 'CASH OUT',
-          color: theme.danger,
-          bg: theme.dangerLight,
-          icon: 'arrow-up-circle-outline' as const,
-        };
-      case 'receive_money':
-      case 'cash_in':
-        return {
-          label: 'CASH IN',
-          color: theme.success,
-          bg: theme.successLight,
-          icon: 'arrow-down-circle-outline' as const,
-        };
-      case 'send_money':
-        return {
-          label: 'SEND MONEY',
-          color: theme.danger,
-          bg: theme.dangerLight,
-          icon: 'arrow-up-circle-outline' as const,
-        };
-      case 'b2b':
-        return {
-          label: 'B2B FLOAT',
-          color: theme.primary,
-          bg: theme.primaryLight,
-          icon: 'swap-horizontal-outline' as const,
-        };
-      case 'adjustment':
-      default:
-        return {
-          label: 'ADJUSTMENT',
-          color: theme.textSecondary,
-          bg: theme.cardSecondary,
-          icon: 'swap-horizontal-outline' as const,
-        };
+  const isReceive =
+    transaction.type === 'recev' ||
+    transaction.type === 'receive_money' ||
+    transaction.type === 'cash_in';
+
+  const typeConfig = React.useMemo(() => {
+    if (isReceive) {
+      return {
+        label: 'RECEIVE MONEY',
+        indicatorColor: theme.success,
+        iconName: 'arrow-down' as const,
+        flowIcon: 'arrow-back' as const,
+      };
     }
-  }, [transaction.type, theme]);
+    if (isSend) {
+      return {
+        label: transaction.type === 'co' || transaction.type === 'cash_out' ? 'CASH OUT' : 'SEND MONEY',
+        indicatorColor: theme.primary,
+        iconName: 'arrow-up' as const,
+        flowIcon: 'arrow-forward' as const,
+      };
+    }
+    return {
+      label: 'ADJUSTMENT',
+      indicatorColor: theme.textMuted,
+      iconName: 'swap-horizontal' as const,
+      flowIcon: 'arrow-forward' as const,
+    };
+  }, [transaction.type, isReceive, isSend, theme]);
 
-  const formattedAmount = React.useMemo(() => formatCurrency(transaction.amount), [transaction.amount]);
-  const formattedDate = React.useMemo(() => formatTime(transaction.date), [transaction.date]);
-  const formattedProfit = React.useMemo(() => transaction.profit > 0 ? formatCurrency(transaction.profit) : '', [transaction.profit]);
-  const formattedCost = React.useMemo(() => transaction.cost > 0 ? formatCurrency(transaction.cost) : '', [transaction.cost]);
+  const sourceNumber = transaction.accountNumber || transaction.accountName;
+  const targetNumber =
+    transaction.recipientNumber ||
+    transaction.senderNumber ||
+    transaction.counterparty ||
+    transaction.note ||
+    '—';
 
-  const handlePressIn = () => {
-    if (!onPress) return;
-    Animated.spring(scaleAnim, {
-      toValue: 0.98,
-      friction: 5,
-      tension: 100,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    if (!onPress) return;
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 4,
-      tension: 80,
-      useNativeDriver: true,
-    }).start();
-  };
+  const cost = transaction.cost || 0;
+  const profit = transaction.profit !== undefined ? transaction.profit : (transaction.margin || 0);
 
   return (
     <TouchableOpacity
-      activeOpacity={1}
+      activeOpacity={0.7}
       onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
       disabled={!onPress}
     >
-      <Animated.View
+      <View
         style={[
           styles.container,
           {
             backgroundColor: theme.card,
             borderColor: theme.border,
-            transform: [{ scale: scaleAnim }],
           },
         ]}
       >
-        <View style={styles.leftSection}>
-          <View style={[styles.iconContainer, { backgroundColor: badge.bg }]}>
-            <Ionicons name={badge.icon} size={22} color={badge.color} />
-          </View>
+        {/* Left 4px Status Indicator Bar */}
+        <View style={[styles.leftIndicator, { backgroundColor: typeConfig.indicatorColor }]} />
 
-          <View style={styles.details}>
-            <View style={styles.topMeta}>
-              <View style={[styles.typeBadge, { backgroundColor: badge.bg }]}>
-                <Text style={[styles.typeBadgeText, { color: badge.color }]} numberOfLines={1}>{badge.label}</Text>
+        <View style={styles.innerContent}>
+          {/* Top Row: Type & Flow vs Amount & Date */}
+          <View style={styles.topRow}>
+            {/* Left Column: Type + Number Flow */}
+            <View style={styles.typeFlowCol}>
+              <View style={styles.typeLabelRow}>
+                <Ionicons name={typeConfig.iconName} size={14} color={typeConfig.indicatorColor} />
+                <Text style={[styles.typeLabel, { color: theme.textSecondary }]}>
+                  {typeConfig.label}
+                </Text>
+                {transaction.syncStatus === 'pending' && (
+                  <View style={[styles.offlinePill, { backgroundColor: isDarkMode ? '#4A3B18' : '#FEF3C7' }]}>
+                    <Text style={[styles.offlineText, { color: isDarkMode ? '#FBBF24' : '#92400E' }]}>
+                      Offline
+                    </Text>
+                  </View>
+                )}
               </View>
-              <Text style={[styles.timeText, { color: theme.textMuted }]} numberOfLines={1}>
-                {formattedDate}
-              </Text>
-              {transaction.syncStatus === 'pending' && (
-                <View style={[styles.syncBadge, { backgroundColor: '#FEF3C7' }]}>
-                  <Ionicons name="cloud-upload-outline" size={10} color="#D97706" />
-                  <Text style={[styles.syncBadgeText, { color: '#92400E' }]} numberOfLines={1}>Offline</Text>
-                </View>
-              )}
-              {transaction.syncStatus === 'failed' && (
-                <View style={[styles.syncBadge, { backgroundColor: '#FEE2E2' }]}>
-                  <Ionicons name="alert-circle-outline" size={10} color="#DC2626" />
-                  <Text style={[styles.syncBadgeText, { color: '#991B1B' }]} numberOfLines={1}>Failed</Text>
-                </View>
-              )}
+
+              <View style={styles.flowRow}>
+                <Text style={[styles.monoNumber, { color: theme.text }]} numberOfLines={1}>
+                  {sourceNumber}
+                </Text>
+                {targetNumber && targetNumber !== '—' && (
+                  <>
+                    <Ionicons name={typeConfig.flowIcon} size={11} color={theme.textMuted} style={styles.flowArrow} />
+                    <Text style={[styles.monoNumber, { color: theme.text }]} numberOfLines={1}>
+                      {targetNumber}
+                    </Text>
+                  </>
+                )}
+              </View>
             </View>
 
-            <Text
-              style={[styles.targetNumber, { color: theme.text }]}
-              numberOfLines={2}
-              ellipsizeMode="tail"
-            >
-              {isSend && transaction.recipientNumber
-                ? `To: ${transaction.recipientNumber}`
-                : isReceive && transaction.senderNumber
-                  ? `From: ${transaction.senderNumber}`
-                  : transaction.note || transaction.accountName}
-            </Text>
-
-            <Text
-              style={[styles.accountMeta, { color: theme.textSecondary }]}
-              numberOfLines={2}
-              ellipsizeMode="tail"
-            >
-              Via: {transaction.accountName} ({transaction.accountNumber})
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.rightSection}>
-          <Text
-            style={[
-              styles.amountText,
-              { color: isSend ? theme.text : theme.success },
-            ]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-          >
-            {isSend ? '-' : '+'}{formattedAmount}
-          </Text>
-
-          <View style={styles.subAmounts}>
-            {transaction.profit > 0 && (
-              <View style={[styles.profitPill, { backgroundColor: theme.successLight }]}>
-                <Text style={[styles.profitText, { color: theme.success }]} numberOfLines={1}>
-                  +{formattedProfit} Profit
+            {/* Right Group: Amount, Timestamp & Delete Action */}
+            <View style={styles.rightGroup}>
+              <View style={styles.amountCol}>
+                <Text
+                  style={[
+                    styles.amountText,
+                    { color: isReceive ? theme.success : theme.text },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {isReceive ? '+' : isSend ? '-' : ''}{formatCurrency(transaction.amount)}
+                </Text>
+                <Text style={[styles.dateText, { color: theme.textMuted }]} numberOfLines={1}>
+                  {formatDateTime(transaction.date)}
                 </Text>
               </View>
-            )}
-            {transaction.cost > 0 && (
-              <Text style={[styles.costText, { color: theme.textMuted }]} numberOfLines={1}>
-                Fee: {formattedCost}
-              </Text>
-            )}
+
+              {onPress && (
+                <TouchableOpacity
+                  style={[
+                    styles.deleteBtn,
+                    {
+                      backgroundColor: isDarkMode ? 'rgba(255, 82, 82, 0.12)' : 'rgba(186, 26, 26, 0.07)',
+                    },
+                  ]}
+                  onPress={onPress}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <Ionicons name="trash-outline" size={15} color={theme.danger} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
+
+          {/* Bottom Strip: Cost & Profit Breakdown */}
+          {(cost > 0 || profit > 0 || (transaction.runningBalance !== undefined && transaction.runningBalance !== null)) && (
+            <View style={[styles.bottomStrip, { borderTopColor: theme.divider }]}>
+              <View style={styles.breakdownGroup}>
+                {cost > 0 && (
+                  <Text style={[styles.metaText, { color: theme.textSecondary }]}>
+                    Cost <Text style={[styles.metaBold, { color: theme.text }]}>{formatCurrency(cost)}</Text>
+                  </Text>
+                )}
+                {profit > 0 && (
+                  <View style={styles.profitGroup}>
+                    <Ionicons name="trending-up" size={12} color={theme.success} />
+                    <Text style={[styles.metaProfit, { color: theme.success }]}>
+                      Profit <Text style={styles.metaProfitBold}>+{formatCurrency(profit)}</Text>
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {transaction.runningBalance !== undefined && (
+                <Text style={[styles.runningBalanceText, { color: theme.textMuted }]}>
+                  b/l: {formatCurrency(transaction.runningBalance)}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
-      </Animated.View>
+      </View>
     </TouchableOpacity>
   );
 };
@@ -188,107 +185,133 @@ export const TransactionItem = React.memo(TransactionItemComponent);
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 13,
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
-    marginBottom: 8,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  leftSection: {
+  leftIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    zIndex: 2,
+  },
+  innerContent: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingLeft: 16,
+    gap: 8,
+  },
+  topRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    gap: 11,
-    flex: 1,
-    minWidth: 0,
-    marginRight: 6,
   },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
+  typeFlowCol: {
+    flex: 1,
+    marginRight: 10,
+    gap: 3,
+  },
+  typeLabelRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    flexShrink: 0,
-    marginTop: 2,
+    gap: 4,
   },
-  details: {
-    flex: 1,
-    minWidth: 0,
+  typeLabel: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
-  topMeta: {
+  offlinePill: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginLeft: 4,
+  },
+  offlineText: {
+    fontSize: 8.5,
+    fontWeight: '700',
+  },
+  flowRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 3,
-  },
-  typeBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  typeBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  timeText: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  targetNumber: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    marginTop: 1,
-    lineHeight: 18,
-  },
-  accountMeta: {
-    fontSize: 11,
     marginTop: 2,
-    lineHeight: 15,
   },
-  rightSection: {
-    alignItems: 'flex-end',
+  monoNumber: {
+    fontFamily: 'monospace',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  flowArrow: {
+    marginHorizontal: 4,
+  },
+  rightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     flexShrink: 0,
-    marginLeft: 6,
+  },
+  amountCol: {
+    alignItems: 'flex-end',
+    gap: 1.5,
+  },
+  deleteBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   amountText: {
     fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: -0.3,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
-  subAmounts: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: 2,
-    marginTop: 3,
-  },
-  profitPill: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 5,
-  },
-  costText: {
-    fontSize: 10,
+  dateText: {
+    fontSize: 10.5,
     fontWeight: '500',
   },
-  profitText: {
-    fontSize: 10,
-    fontWeight: '800',
+  bottomStrip: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 7,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 2,
   },
-  syncBadge: {
+  breakdownGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 5,
+    gap: 10,
   },
-  syncBadgeText: {
-    fontSize: 9,
+  metaText: {
+    fontSize: 11,
+  },
+  metaBold: {
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  profitGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2.5,
+  },
+  metaProfit: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  metaProfitBold: {
     fontWeight: '800',
+    fontFamily: 'monospace',
+  },
+  runningBalanceText: {
+    fontSize: 10.5,
+    fontWeight: '500',
+    fontFamily: 'monospace',
   },
 });

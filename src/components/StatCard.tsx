@@ -16,48 +16,24 @@ interface StatCardProps {
 
 const StatCardComponent: React.FC<StatCardProps> = ({ title, value, subtitle, badgeText, isPositive = true, iconName, variant = 'card', onPress }) => {
   const { theme, isDarkMode } = useTheme();
-  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const isPrimary = variant === 'primary';
-  const cardBg = isPrimary ? (isDarkMode ? '#9D174D' : '#E2136E') : theme.card;
+  const cardBg = isPrimary ? (isDarkMode ? '#004493' : '#1A73E8') : theme.card;
   const textColor = isPrimary ? '#FFFFFF' : theme.text;
-  const subTextColor = isPrimary ? '#FCE7F3' : theme.textSecondary;
-
-  const handlePressIn = () => {
-    if (!onPress) return;
-    Animated.spring(scaleAnim, {
-      toValue: 0.97,
-      friction: 5,
-      tension: 100,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    if (!onPress) return;
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 4,
-      tension: 80,
-      useNativeDriver: true,
-    }).start();
-  };
+  const subTextColor = isPrimary ? '#D8E2FF' : theme.textSecondary;
 
   return (
     <TouchableOpacity
-      activeOpacity={1}
+      activeOpacity={0.8}
       onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
       disabled={!onPress}
     >
-      <Animated.View
+      <View
         style={[
           styles.card,
           {
             backgroundColor: cardBg,
             borderColor: isPrimary ? 'transparent' : theme.border,
-            transform: [{ scale: scaleAnim }],
           },
         ]}
       >
@@ -135,7 +111,7 @@ const StatCardComponent: React.FC<StatCardProps> = ({ title, value, subtitle, ba
             {subtitle}
           </Text>
         ) : null}
-      </Animated.View>
+      </View>
     </TouchableOpacity>
   );
 };
@@ -147,11 +123,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
     marginBottom: 10,
   },
   topRow: {

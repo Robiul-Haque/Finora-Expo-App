@@ -17,15 +17,18 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
   const setDarkMode = useThemeStore((state) => state.setDarkMode);
 
+  const contextValue = React.useMemo(
+    () => ({
+      isDarkMode,
+      theme,
+      toggleTheme,
+      setDarkMode,
+    }),
+    [isDarkMode, theme, toggleTheme, setDarkMode]
+  );
+
   return (
-    <ThemeContext.Provider
-      value={{
-        isDarkMode,
-        theme,
-        toggleTheme,
-        setDarkMode,
-      }}
-    >
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );

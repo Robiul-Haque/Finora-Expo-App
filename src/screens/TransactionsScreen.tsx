@@ -1,30 +1,43 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  Platform,
+  Animated,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
-import { Header, NetworkStatusBanner, TransactionItem, FilterModal, ConfirmationModal } from '../components';
+import { TransactionItem, TransactionItemSkeleton, ConfirmationModal, FilterModal } from '../components';
+import { useBounceScroll } from '../hooks';
 import { Transaction } from '../types';
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 25;
 
 interface TransactionsScreenProps {
-  onOpenAddTransaction: () => void;
+  onOpenAddTransaction?: () => void;
 }
 
-const FILTER_CHIPS: { label: string; value: string }[] = [
+const STITCH_FILTER_CHIPS: { label: string; value: string }[] = [
   { label: 'All', value: 'all' },
-  { label: 'Cash Out', value: 'cash_out' },
-  { label: 'Cash In', value: 'receive_money' },
-  { label: 'Send Money', value: 'send_money' },
-  { label: 'B2B Float', value: 'b2b' },
+  { label: 'Send Money', value: 'sm' },
+  { label: 'Receive Money', value: 'recev' },
+  { label: 'Balance Adjustment', value: 'adjustment' },
 ];
 
-export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({ onOpenAddTransaction }) => {
-  const { theme } = useTheme();
-  const { filteredTransactions, filters, setFilters, deleteTransaction, refetch } = useLedger();
+const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = () => {
+  const { theme, isDarkMode, toggleTheme } = useTheme();
+  const { transactions, isLoading, filters, setFilters, deleteTransaction, refetch } = useLedger();
+  const { scrollProps, bounceStyle } = useBounceScroll();
 
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [displayedCount, setDisplayedCount] = useState(PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -37,13 +50,85 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({ onOpenAd
     try {
       if (refetch) await refetch();
     } catch {
-      // Ignore refresh network errors in UI
+      // Offline fallback
     } finally {
       setRefreshing(false);
     }
   }, [refetch]);
 
-  // Infinite Scroll / Paginated slicing
+  // Active filter count (excluding default values)
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.accountId && filters.accountId !== 'all') count++;
+    if (filters.type && filters.type !== 'all') count++;
+    if (filters.dateRange && filters.dateRange !== 'all') count++;
+    if (filters.sortBy && filters.sortBy !== 'newest') count++;
+    return count;
+  }, [filters]);
+
+  // Filtering transactions based on global filters and local search
+  const filteredTransactions = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfYesterday = startOfToday - 86400000;
+    const startOfWeek = startOfToday - 7 * 86400000;
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    const list = transactions.filter((t) => {
+      // 1. Account Filter
+      if (filters.accountId && filters.accountId !== 'all' && t.accountId !== filters.accountId && t.accountNumber !== filters.accountId) {
+        return false;
+      }
+
+      // 2. Type Filter
+      if (filters.type && filters.type !== 'all') {
+        if (filters.type === 'sm' && !(t.type === 'sm' || t.type === 'co' || t.type === 'send' || t.type === 'send_money')) return false;
+        if (filters.type === 'recev' && !(t.type === 'recev' || t.type === 'receive_money' || t.type === 'cash_in')) return false;
+        if (filters.type === 'co' && !(t.type === 'co' || t.type === 'cash_out')) return false;
+        if (filters.type === 'send' && !(t.type === 'send' || t.type === 'b2b')) return false;
+        if (filters.type === 'adjustment' && t.type !== 'adjustment') return false;
+      }
+
+      // 3. Date Range Filter
+      const txTime = new Date(t.date).getTime();
+      if (filters.dateRange === 'today' && txTime < startOfToday) return false;
+      if (filters.dateRange === 'yesterday' && (txTime < startOfYesterday || txTime >= startOfToday)) return false;
+      if (filters.dateRange === 'this_week' && txTime < startOfWeek) return false;
+      if (filters.dateRange === 'this_month' && txTime < startOfMonth) return false;
+
+      // 4. Search Query match
+      const q = searchQuery.toLowerCase().trim();
+      if (q) {
+        const matchesQuery =
+          (t.accountNumber && t.accountNumber.toLowerCase().includes(q)) ||
+          (t.accountName && t.accountName.toLowerCase().includes(q)) ||
+          (t.recipientNumber && t.recipientNumber.toLowerCase().includes(q)) ||
+          (t.senderNumber && t.senderNumber.toLowerCase().includes(q)) ||
+          (t.counterparty && t.counterparty.toLowerCase().includes(q)) ||
+          (t.note && t.note.toLowerCase().includes(q)) ||
+          t.amount.toString().includes(q);
+        if (!matchesQuery) return false;
+      }
+
+      return true;
+    });
+
+    // 5. Sorting
+    if (filters.sortBy === 'newest') {
+      list.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
+    } else if (filters.sortBy === 'oldest') {
+      list.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
+    } else if (filters.sortBy === 'amount_high') {
+      list.sort((a, b) => b.amount - a.amount);
+    } else if (filters.sortBy === 'amount_low') {
+      list.sort((a, b) => a.amount - b.amount);
+    } else if (filters.sortBy === 'profit_high') {
+      list.sort((a, b) => (b.profit || 0) - (a.profit || 0));
+    }
+
+    return list;
+  }, [transactions, filters, searchQuery]);
+
   const visibleTransactions = useMemo(() => {
     return filteredTransactions.slice(0, displayedCount);
   }, [filteredTransactions, displayedCount]);
@@ -52,51 +137,89 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({ onOpenAd
 
   const handleEndReached = useCallback(() => {
     if (!hasMore || isLoadingMore) return;
-
     setIsLoadingMore(true);
-    // Simulate smooth next-page API call batch
     setTimeout(() => {
       setDisplayedCount((prev) => Math.min(prev + PAGE_SIZE, filteredTransactions.length));
       setIsLoadingMore(false);
-    }, 300);
+    }, 150);
   }, [hasMore, isLoadingMore, filteredTransactions.length]);
 
-  const handleConfirmDeleteTransaction = () => {
+  const handleConfirmDelete = () => {
     if (transactionToDelete) {
       deleteTransaction(transactionToDelete.id);
       setTransactionToDelete(null);
     }
   };
 
-  const renderItem = useCallback(({ item }: { item: Transaction }) => (
-    <TransactionItem
-      transaction={item}
-      onPress={() => setTransactionToDelete(item)}
-    />
-  ), []);
+  const renderItem = useCallback(
+    ({ item }: { item: Transaction }) => (
+      <TransactionItem transaction={item} onPress={() => setTransactionToDelete(item)} />
+    ),
+    []
+  );
 
-  const hasActiveFilters =
-    filters.accountId !== 'all' ||
-    filters.dateRange !== 'all' ||
-    filters.sortBy !== 'newest';
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top']}>
+      {/* Stitch Top App Bar */}
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.divider }]}>
+        <View style={styles.headerLeft}>
+          <View style={[styles.logoBadge, { backgroundColor: theme.primaryLight }]}>
+            <Ionicons name="journal-outline" size={18} color={theme.primary} />
+          </View>
+        </View>
 
-  // Render Header Chips
-  const renderHeader = () => (
-    <View>
-      <NetworkStatusBanner />
+        <Text style={[styles.headerCenterTitle, { color: theme.text }]}>Transactions</Text>
 
-      {/* Horizontal Filter Chips */}
-      <View style={styles.chipBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
-          {FILTER_CHIPS.map((chip) => {
-            const isSelected = filters.type === chip.value;
+        <View style={styles.headerRight}>
+          {/* Theme Toggle Button */}
+          <TouchableOpacity
+            style={[styles.iconButton, { backgroundColor: theme.cardSecondary }]}
+            onPress={toggleTheme}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={isDarkMode ? 'sunny-outline' : 'moon-outline'}
+              size={18}
+              color={theme.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Search & Filter Header Section */}
+      <View style={[styles.filterContainer, { backgroundColor: theme.card, borderBottomColor: theme.divider }]}>
+        {/* Search Input with Clear Button */}
+        <View style={[styles.searchBox, { backgroundColor: theme.inputBg, borderBottomColor: theme.border }]}>
+          <Ionicons name="search" size={18} color={theme.textMuted} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.text }]}
+            placeholder="Search phone number, note, amount..."
+            placeholderTextColor={theme.textMuted}
+            value={searchQuery}
+            onChangeText={(text) => {
+              setSearchQuery(text);
+              setDisplayedCount(PAGE_SIZE);
+            }}
+            clearButtonMode="while-editing"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={16} color={theme.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Filter Chips Reel */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+          {STITCH_FILTER_CHIPS.map((chip) => {
+            const isSelected = (filters.type || 'all') === chip.value;
             return (
               <TouchableOpacity
                 key={chip.value}
                 style={[
-                  styles.chip,
+                  styles.filterChip,
                   {
-                    backgroundColor: isSelected ? theme.primary : theme.card,
+                    backgroundColor: isSelected ? theme.primary : theme.cardSecondary,
                     borderColor: isSelected ? theme.primary : theme.border,
                   },
                 ]}
@@ -104,12 +227,13 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({ onOpenAd
                   setFilters({ type: chip.value });
                   setDisplayedCount(PAGE_SIZE);
                 }}
-                activeOpacity={0.7}
+                activeOpacity={0.75}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    { color: isSelected ? '#FFFFFF' : theme.text, fontWeight: isSelected ? '700' : '600' },
+                    { color: isSelected ? '#FFFFFF' : theme.textSecondary },
+                    isSelected && styles.chipTextSelected,
                   ]}
                 >
                   {chip.label}
@@ -117,249 +241,210 @@ export const TransactionsScreen: React.FC<TransactionsScreenProps> = ({ onOpenAd
               </TouchableOpacity>
             );
           })}
-
-          <TouchableOpacity
-            style={[
-              styles.filterSettingsChip,
-              {
-                backgroundColor: hasActiveFilters ? theme.primaryLight : theme.card,
-                borderColor: hasActiveFilters ? theme.primary : theme.border,
-              },
-            ]}
-            onPress={() => setFilterModalVisible(true)}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="options"
-              size={14}
-              color={hasActiveFilters ? theme.primary : theme.textSecondary}
-            />
-            <Text
-              style={[
-                styles.chipText,
-                { color: hasActiveFilters ? theme.primary : theme.textSecondary, fontWeight: hasActiveFilters ? '700' : '600' },
-              ]}
-            >
-              Filters {hasActiveFilters ? '●' : ''}
-            </Text>
-          </TouchableOpacity>
         </ScrollView>
       </View>
 
-      {filteredTransactions.length > 0 && (
-        <View style={styles.listMetaRow}>
-          <Text style={[styles.listMetaText, { color: theme.textSecondary }]}>
-            Showing {visibleTransactions.length} of {filteredTransactions.length} entries
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-
-  // Render Footer loading spinner for Infinite Scroll
-  const renderFooter = () => {
-    if (isLoadingMore) {
-      return (
-        <View style={styles.footerLoader}>
-          <ActivityIndicator size="small" color={theme.primary} />
-          <Text style={[styles.footerLoaderText, { color: theme.textSecondary }]}>
-            Loading more records...
-          </Text>
-        </View>
-      );
-    }
-    if (filteredTransactions.length > 0 && !hasMore) {
-      return (
-        <View style={styles.footerEndRow}>
-          <Text style={[styles.footerEndText, { color: theme.textMuted }]}>
-            All {filteredTransactions.length} transactions loaded
-          </Text>
-        </View>
-      );
-    }
-    return <View style={{ height: 60 }} />;
-  };
-
-  // Render Empty State
-  const renderEmpty = () => (
-    <View style={[styles.emptyContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Ionicons name="receipt-outline" size={44} color={theme.textMuted} />
-      <Text style={[styles.emptyTitle, { color: theme.text }]}>No transactions found</Text>
-      <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-        No matching records for the selected filters.
-      </Text>
-      <TouchableOpacity
-        style={[styles.emptyAddBtn, { backgroundColor: theme.primary }]}
-        onPress={onOpenAddTransaction}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.emptyAddBtnText}>Add New Transaction</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <Header
-        title="bKash Ledger"
-        subtitle={`${filteredTransactions.length} recorded entries`}
-        showSearch
-        searchQuery={filters.searchQuery}
-        onSearchChange={(q) => {
-          setFilters({ searchQuery: q });
-          setDisplayedCount(PAGE_SIZE);
-        }}
-        searchPlaceholder="Search bKash number, note, amount..."
-        onFilterPress={() => setFilterModalVisible(true)}
-      />
-
-      {/* High-Performance Virtualized Infinite-Scroll FlatList */}
+      {/* Transactions List */}
       <FlatList
         data={visibleTransactions}
-        keyExtractor={(item) => item.clientTxId || item.id}
-        renderItem={renderItem}
-        getItemLayout={(_data, index) => ({
-          length: 86,
-          offset: 86 * index,
-          index,
-        })}
-        ListHeaderComponent={renderHeader}
-        ListFooterComponent={renderFooter}
-        ListEmptyComponent={renderEmpty}
+        renderItem={({ item }) => (
+          <Animated.View style={bounceStyle}>
+            {renderItem({ item })}
+          </Animated.View>
+        )}
+        keyExtractor={(item) => item.id || String(item.clientTxId)}
         contentContainerStyle={styles.listContent}
+        ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
         showsVerticalScrollIndicator={false}
+        {...scrollProps}
         initialNumToRender={12}
-        maxToRenderPerBatch={10}
+        maxToRenderPerBatch={12}
         windowSize={7}
         removeClippedSubviews={Platform.OS === 'android'}
         onEndReached={handleEndReached}
-        onEndReachedThreshold={0.4}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={theme.primary}
-            colors={[theme.primary]}
-          />
+        onEndReachedThreshold={0.3}
+        ListEmptyComponent={
+          isLoading && transactions.length === 0 ? (
+            <View style={{ gap: 8 }}>
+              <TransactionItemSkeleton />
+              <TransactionItemSkeleton />
+              <TransactionItemSkeleton />
+              <TransactionItemSkeleton />
+            </View>
+          ) : (
+            <View style={[styles.emptyContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Ionicons name="receipt-outline" size={36} color={theme.textMuted} />
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>No transactions found</Text>
+              <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+                {searchQuery || activeFilterCount > 0
+                  ? 'No transactions matched the current filters or search query.'
+                  : 'Transactions will appear here once recorded.'}
+              </Text>
+            </View>
+          )
+        }
+        ListFooterComponent={
+          isLoadingMore ? (
+            <View style={styles.loadingMore}>
+              <ActivityIndicator size="small" color={theme.primary} />
+            </View>
+          ) : (
+            <View style={{ height: 80 }} />
+          )
         }
       />
 
-      {/* Filter Modal */}
+      {/* Advanced Filter Modal */}
       <FilterModal
         visible={filterModalVisible}
         onClose={() => setFilterModalVisible(false)}
       />
 
-      {/* Delete Transaction Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       <ConfirmationModal
-        visible={Boolean(transactionToDelete)}
+        visible={!!transactionToDelete}
         title="Delete Transaction"
-        message={
-          transactionToDelete
-            ? `Are you sure you want to remove this ৳${transactionToDelete.amount.toLocaleString('en-US')} ${transactionToDelete.type.replace('_', ' ').toUpperCase()} record?`
-            : ''
-        }
-        confirmText="Delete Record"
+        message={`Remove this transaction of ৳${transactionToDelete?.amount?.toLocaleString()}?`}
+        confirmText="Delete"
         cancelText="Cancel"
         type="danger"
-        icon="trash-outline"
-        onConfirm={handleConfirmDeleteTransaction}
+        onConfirm={handleConfirmDelete}
         onCancel={() => setTransactionToDelete(null)}
       />
     </SafeAreaView>
   );
 };
 
+export const TransactionsScreen = React.memo(TransactionsScreenComponent);
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-  },
-  chipBar: {
-    paddingVertical: 8,
-    marginHorizontal: -16,
-  },
-  chipScroll: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 18,
-    borderWidth: 1,
-  },
-  filterSettingsChip: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logoBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenterTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
     borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  filterBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  filterContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
+    gap: 10,
+    borderBottomWidth: 1,
+  },
+  searchBox: {
+    height: 44,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomWidth: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    padding: 0,
+  },
+  chipsScroll: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
     borderWidth: 1,
   },
   chipText: {
     fontSize: 12,
+    fontWeight: '600',
+  },
+  chipTextSelected: {
     fontWeight: '700',
   },
-  listMetaRow: {
-    paddingVertical: 6,
-    paddingHorizontal: 2,
-    marginBottom: 4,
+  listContent: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 105,
   },
-  listMetaText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-  },
-  footerLoader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 18,
-  },
-  footerLoaderText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  footerEndRow: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingBottom: 60,
-  },
-  footerEndText: {
-    fontSize: 11.5,
-    fontWeight: '600',
+  itemSeparator: {
+    height: 10,
   },
   emptyContainer: {
-    borderRadius: 18,
-    padding: 36,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 36,
+    borderRadius: 12,
     borderWidth: 1,
-    marginTop: 20,
     gap: 8,
+    marginTop: 20,
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   emptySubtitle: {
     fontSize: 13,
     textAlign: 'center',
-    marginBottom: 10,
   },
-  emptyAddBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  emptyAddBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
+  loadingMore: {
+    paddingVertical: 16,
+    alignItems: 'center',
   },
 });

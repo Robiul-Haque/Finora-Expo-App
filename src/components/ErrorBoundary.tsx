@@ -33,10 +33,10 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <SafeAreaView style={styles.container}>
-          <StatusBar barStyle="light-content" backgroundColor="#0D0A14" />
+          <StatusBar barStyle="light-content" backgroundColor="#191C1D" />
           <View style={styles.content}>
             <View style={styles.iconContainer}>
-              <Ionicons name="warning-outline" size={48} color="#E2136E" />
+              <Ionicons name="warning-outline" size={44} color="#1A73E8" />
             </View>
             <Text style={styles.title}>Something went wrong</Text>
             <Text style={styles.subtitle}>
@@ -62,7 +62,7 @@ export class ErrorBoundary extends Component<Props, State> {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0A14',
+    backgroundColor: '#191C1D',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -72,40 +72,35 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   iconContainer: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: 'rgba(226, 19, 110, 0.15)',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(26, 115, 232, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
   },
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: '#F0F1F2',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 28,
+    marginBottom: 24,
   },
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E2136E',
-    paddingVertical: 13,
+    backgroundColor: '#1A73E8',
+    paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 14,
-    shadowColor: '#E2136E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
+    borderRadius: 12,
   },
   retryIcon: {
     marginRight: 8,

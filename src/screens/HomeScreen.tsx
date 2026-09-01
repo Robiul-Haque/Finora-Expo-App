@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Image,
+  Animated,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
-import { Header, NetworkStatusBanner, StatCard, AccountCard, TransactionItem } from '../components';
+import { AccountCard, AccountCardSkeleton } from '../components';
+import { useBounceScroll } from '../hooks';
 import { Account } from '../types';
-import { formatCurrency } from '../utils';
 
 interface HomeScreenProps {
   onOpenAccountDetails: (account: Account) => void;
@@ -15,366 +24,372 @@ interface HomeScreenProps {
   onNavigateToAccounts: () => void;
 }
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenAccountDetails, onOpenAddTransaction, onNavigateToTransactions, onNavigateToAccounts }) => {
-  const { theme, isDarkMode } = useTheme();
-  const { accounts, transactions, metrics, refetch } = useLedger();
+type SortOption = 'balance_desc' | 'balance_asc' | 'limit_asc';
+
+const HomeScreenComponent: React.FC<HomeScreenProps> = ({
+  onOpenAccountDetails,
+  onOpenAddTransaction,
+}) => {
+  const { theme, isDarkMode, toggleTheme } = useTheme();
+  const { accounts, isLoading, refetch } = useLedger();
+  const { scrollProps, bounceStyle } = useBounceScroll();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortHighToLow, setSortHighToLow] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [sortOption, setSortOption] = useState<SortOption>('balance_desc');
+  const [showSortPicker, setShowSortPicker] = useState(false);
 
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    try {
-      if (refetch) await refetch();
-    } catch {
-      // Ignore network refresh errors in UI
-    } finally {
-      setRefreshing(false);
+  const filteredAccounts = useMemo(() => {
+    let result = accounts.filter((acc) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        acc.name.toLowerCase().includes(q) ||
+        acc.accountNumber.toLowerCase().includes(q)
+      );
+    });
+
+    switch (sortOption) {
+      case 'balance_desc':
+        return [...result].sort((a, b) => b.balance - a.balance);
+      case 'balance_asc':
+        return [...result].sort((a, b) => a.balance - b.balance);
+      case 'limit_asc':
+        return [...result].sort((a, b) => (a.remainingLimit || 0) - (b.remainingLimit || 0));
+      default:
+        return result;
     }
-  }, [refetch]);
+  }, [accounts, searchQuery, sortOption]);
 
-  // Memoized Filter & sort accounts
-  const filteredAccounts = React.useMemo(() => {
-    return accounts
-      .filter((acc) => {
-        if (!searchQuery.trim()) return true;
-        const q = searchQuery.toLowerCase().trim();
-        return (
-          acc.name.toLowerCase().includes(q) ||
-          acc.accountNumber.toLowerCase().includes(q) ||
-          acc.type.toLowerCase().includes(q)
-        );
-      })
-      .sort((a, b) => (sortHighToLow ? b.balance - a.balance : a.balance - b.balance));
-  }, [accounts, searchQuery, sortHighToLow]);
-
-  // Memoized top recent 4 transactions
-  const recentTransactions = React.useMemo(() => {
-    return transactions.slice(0, 4);
-  }, [transactions]);
+  const sortLabel = useMemo(() => {
+    switch (sortOption) {
+      case 'balance_desc':
+        return 'Balance: High -> Low';
+      case 'balance_asc':
+        return 'Balance: Low -> High';
+      case 'limit_asc':
+        return 'Limit Remaining: Low -> High';
+    }
+  }, [sortOption]);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <Header
-        title="Finora bKash"
-        subtitle="bKash Business Ledger"
-        showSearch
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchPlaceholder="Search bKash number or name..."
-      />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top']}>
+      {/* Stitch Top App Bar */}
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.divider }]}>
+        <View style={styles.headerLeft}>
+          <Image
+            source={require('../../assets/icon.png')}
+            style={styles.logoBadgeImage}
+            resizeMode="contain"
+          />
+          <View style={styles.headerTitleGroup}>
+            <Text style={[styles.appTitle, { color: theme.primary }]}>Finora</Text>
+            <Text style={[styles.appSubtitle, { color: theme.textSecondary }]}>Smart Business Ledger</Text>
+          </View>
+        </View>
 
-      <NetworkStatusBanner />
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={[styles.iconButton, { backgroundColor: theme.cardSecondary }]}
+            onPress={toggleTheme}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={isDarkMode ? 'sunny-outline' : 'moon-outline'}
+              size={18}
+              color={theme.textSecondary}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.iconButton, { backgroundColor: theme.cardSecondary }]}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="settings-outline"
+              size={18}
+              color={theme.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={theme.primary}
-            colors={[theme.primary]}
-          />
-        }
+        {...scrollProps}
       >
-        {/* Total Balance Card */}
-        <StatCard
-          title="Total bKash Float"
-          value={formatCurrency(metrics.totalBalance)}
-          subtitle="Real-time Balance Across All Numbers"
-          badgeText={metrics.balanceGrowthPercentage > 0 ? `+${metrics.balanceGrowthPercentage}% vs last month` : undefined}
-          isPositive
-          iconName="wallet-outline"
-          variant="primary"
-          onPress={() => onOpenAddTransaction()}
-        />
-
-        {/* 2-Column Analytics Overview */}
-        <View style={styles.analyticsRow}>
-          <View style={styles.halfCol}>
-            <StatCard
-              title="Monthly Income"
-              value={formatCurrency(metrics.monthlyIncome)}
-              iconName="arrow-down-circle"
-              isPositive
-              subtitle="Cash In / Received"
-            />
-          </View>
-
-          <View style={styles.halfCol}>
-            <StatCard
-              title="Monthly Expense"
-              value={formatCurrency(metrics.monthlyExpense)}
-              iconName="arrow-up-circle"
-              isPositive={false}
-              subtitle="Send Money / Costs"
-            />
-          </View>
-        </View>
-
-        {/* Today's Profit Highlight Banner */}
-        <View
-          style={[
-            styles.profitBanner,
-            {
-              backgroundColor: theme.successLight,
-              borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.25)' : 'rgba(5, 150, 105, 0.2)',
-            },
-          ]}
-        >
-          <View style={[styles.profitBannerLeft, { flex: 1, minWidth: 0, marginRight: 8 }]}>
-            <View style={[styles.profitIconBadge, { backgroundColor: theme.success }]}>
-              <Ionicons name="sparkles" size={18} color="#FFFFFF" />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.profitBannerTitle, { color: isDarkMode ? '#6EE7B7' : '#065F46' }]} numberOfLines={1}>
-                Today's Net Profit
-              </Text>
-              <Text
-                style={[styles.profitBannerAmount, { color: theme.success }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.6}
-              >
-                +{formatCurrency(metrics.todayProfit)}
-              </Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.profitBannerBtn, { backgroundColor: theme.success, flexShrink: 0 }]}
-            onPress={() => onOpenAddTransaction()}
-            activeOpacity={0.75}
+        <Animated.View style={[bounceStyle, styles.bounceContainer]}>
+          {/* Controls Section: Search & Sort */}
+          <View style={styles.controlsSection}>
+          {/* Search Box */}
+          <View
+            style={[
+              styles.searchBox,
+              {
+                backgroundColor: theme.inputBg,
+                borderBottomColor: theme.border,
+              },
+            ]}
           >
-            <Ionicons name="add" size={16} color="#FFFFFF" />
-            <Text style={styles.profitBannerBtnText}>New Record</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Accounts Section Header */}
-        <View style={styles.sectionHeader}>
-          <View style={{ flex: 1, minWidth: 0, marginRight: 6 }}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">
-              bKash Numbers
-            </Text>
-            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
-              {filteredAccounts.filter((a) => a.isActive).length} active numbers
-            </Text>
-          </View>
-
-          <View style={[styles.sortToggleGroup, { flexShrink: 0 }]}>
-            <TouchableOpacity
-              style={[
-                styles.sortButton,
-                { backgroundColor: theme.card, borderColor: theme.border },
-              ]}
-              onPress={() => setSortHighToLow(!sortHighToLow)}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={sortHighToLow ? 'arrow-down' : 'arrow-up'}
-                size={14}
-                color={theme.primary}
-              />
-              <Text style={[styles.sortButtonText, { color: theme.textSecondary }]}>
-                {sortHighToLow ? 'Highest' : 'Lowest'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.seeAllBtn, { backgroundColor: theme.primaryLight }]}
-              onPress={onNavigateToAccounts}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.seeAllBtnText, { color: theme.primary }]}>Manage</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Accounts Cards */}
-        {filteredAccounts.length === 0 ? (
-          <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Ionicons name="search-outline" size={32} color={theme.textMuted} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>No bKash numbers found</Text>
-            <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-              Try a different search or add a new number.
-            </Text>
-          </View>
-        ) : (
-          filteredAccounts.map((account) => (
-            <AccountCard
-              key={account.id}
-              account={account}
-              onPress={() => onOpenAccountDetails(account)}
-              onAddTransactionPress={() => onOpenAddTransaction(account.id)}
+            <Ionicons name="search" size={18} color={theme.textMuted} style={styles.searchIcon} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.text }]}
+              placeholder="Search phone numbers..."
+              placeholderTextColor={theme.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              clearButtonMode="while-editing"
             />
-          ))
-        )}
-
-        {/* Recent Transactions Section */}
-        <View style={styles.sectionHeader}>
-          <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">
-              Recent Transactions
-            </Text>
-            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
-              Latest ledger activity
-            </Text>
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={16} color={theme.textMuted} />
+              </TouchableOpacity>
+            )}
           </View>
 
-          <TouchableOpacity onPress={onNavigateToTransactions} activeOpacity={0.7} style={{ flexShrink: 0 }}>
-            <Text style={[styles.seeAllText, { color: theme.primary }]}>View All</Text>
+          {/* Sort Selector */}
+          <TouchableOpacity
+            style={[
+              styles.sortBox,
+              {
+                backgroundColor: theme.cardSecondary,
+                borderColor: theme.border,
+              },
+            ]}
+            onPress={() => setShowSortPicker(!showSortPicker)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.sortText, { color: theme.text }]}>{sortLabel}</Text>
+            <Ionicons name="chevron-down" size={16} color={theme.textMuted} />
           </TouchableOpacity>
+
+          {/* Sort Dropdown */}
+          {showSortPicker && (
+            <View style={[styles.sortDropdown, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <TouchableOpacity
+                style={[
+                  styles.sortItem,
+                  sortOption === 'balance_desc' && { backgroundColor: theme.primaryLight },
+                ]}
+                onPress={() => {
+                  setSortOption('balance_desc');
+                  setShowSortPicker(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.sortItemText,
+                    { color: sortOption === 'balance_desc' ? theme.primary : theme.text },
+                  ]}
+                >
+                  Balance: High -&gt; Low
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.sortItem,
+                  sortOption === 'balance_asc' && { backgroundColor: theme.primaryLight },
+                ]}
+                onPress={() => {
+                  setSortOption('balance_asc');
+                  setShowSortPicker(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.sortItemText,
+                    { color: sortOption === 'balance_asc' ? theme.primary : theme.text },
+                  ]}
+                >
+                  Balance: Low -&gt; High
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.sortItem,
+                  sortOption === 'limit_asc' && { backgroundColor: theme.primaryLight },
+                ]}
+                onPress={() => {
+                  setSortOption('limit_asc');
+                  setShowSortPicker(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.sortItemText,
+                    { color: sortOption === 'limit_asc' ? theme.primary : theme.text },
+                  ]}
+                >
+                  Limit Remaining: Low -&gt; High
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
-        {/* Recent Transactions List */}
-        {recentTransactions.map((tx) => (
-          <TransactionItem
-            key={tx.id}
-            transaction={tx}
-            onPress={() => onNavigateToTransactions()}
-          />
-        ))}
+        {/* Account Cards Grid */}
+        <View style={styles.accountsGrid}>
+          {isLoading && accounts.length === 0 ? (
+            <>
+              <AccountCardSkeleton />
+              <AccountCardSkeleton />
+              <AccountCardSkeleton />
+            </>
+          ) : filteredAccounts.length === 0 ? (
+            <View style={[styles.emptyState, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Ionicons name="search-outline" size={32} color={theme.textMuted} />
+              <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
+                No SIM accounts matching "{searchQuery}"
+              </Text>
+            </View>
+          ) : (
+            filteredAccounts.map((account) => (
+              <AccountCard
+                key={account.id}
+                account={account}
+                onPress={() => onOpenAccountDetails(account)}
+                onAddTransactionPress={() => onOpenAddTransaction(account.id)}
+              />
+            ))
+          )}
+        </View>
 
-        <View style={{ height: 30 }} />
+        <View style={{ height: 80 }} />
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
+export const HomeScreen = React.memo(HomeScreenComponent);
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logoBadgeImage: {
+    width: 36,
+    height: 36,
+  },
+  headerTitleGroup: {
+    gap: 1,
+  },
+  appTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  appSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   container: {
     flex: 1,
   },
   contentContainer: {
     paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 30,
+    paddingTop: 12,
+    paddingBottom: 105,
   },
-  analyticsRow: {
-    flexDirection: 'row',
+  bounceContainer: {
+    gap: 16,
+  },
+  controlsSection: {
     gap: 10,
-    marginBottom: 4,
+    position: 'relative',
+    zIndex: 10,
   },
-  halfCol: {
-    flex: 1,
-  },
-  profitBanner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 13,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 14,
-  },
-  profitBannerLeft: {
+  searchBox: {
+    height: 48,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomWidth: 2,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    flex: 1,
+    paddingHorizontal: 12,
+  },
+  searchIcon: {
     marginRight: 8,
   },
-  profitIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profitBannerTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  profitBannerAmount: {
-    fontSize: 17,
-    fontWeight: '900',
-    letterSpacing: -0.3,
-  },
-  profitBannerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  profitBannerBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: 10,
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  sectionSubtitle: {
-    fontSize: 11,
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
     fontWeight: '500',
-    marginTop: 1,
+    padding: 0,
   },
-  sortToggleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  sortButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 9,
+  sortBox: {
+    height: 44,
+    borderRadius: 8,
     borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
   },
-  sortButtonText: {
-    fontSize: 11,
+  sortText: {
+    fontSize: 13,
     fontWeight: '600',
   },
-  seeAllBtn: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 9,
-  },
-  seeAllBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  seeAllText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  emptyCard: {
-    borderRadius: 16,
-    padding: 26,
+  sortDropdown: {
+    borderRadius: 8,
     borderWidth: 1,
+    overflow: 'hidden',
+    marginTop: -4,
+  },
+  sortItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  sortItemText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  accountsGrid: {
+    gap: 12,
+  },
+  emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 10,
-    gap: 6,
+    padding: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 10,
+    marginTop: 10,
   },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  emptySubtitle: {
-    fontSize: 12,
+  emptyStateText: {
+    fontSize: 14,
+    fontWeight: '500',
     textAlign: 'center',
   },
 });

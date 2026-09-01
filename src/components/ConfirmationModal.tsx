@@ -9,17 +9,32 @@ export interface ConfirmationModalProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
-  type?: 'danger' | 'warning' | 'info';
+  type?: 'danger' | 'warning' | 'info' | 'primary';
+  isDestructive?: boolean;
   icon?: keyof typeof Ionicons.glyphMap;
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;
 }
 
-export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ visible, title, message, confirmText = 'Confirm', cancelText = 'Cancel', type = 'danger', icon, onConfirm, onCancel, isLoading = false }) => {
+const ConfirmationModalComponent: React.FC<ConfirmationModalProps> = ({
+  visible,
+  title,
+  message,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  type = 'danger',
+  isDestructive,
+  icon,
+  onConfirm,
+  onCancel,
+  isLoading = false,
+}) => {
   const { theme, isDarkMode } = useTheme();
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  const effectiveType = isDestructive ? 'danger' : type;
 
   useEffect(() => {
     if (visible) {
@@ -57,7 +72,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ visible, t
   if (!visible) return null;
 
   const getThemeColors = () => {
-    switch (type) {
+    switch (effectiveType) {
       case 'danger':
         return {
           icon: icon || 'trash-outline',
@@ -74,12 +89,13 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ visible, t
           btnBg: '#F59E0B',
           btnText: '#FFFFFF',
         };
+      case 'primary':
       case 'info':
       default:
         return {
           icon: icon || 'information-circle-outline',
           iconColor: theme.primary,
-          iconBg: isDarkMode ? 'rgba(226, 19, 110, 0.2)' : theme.primaryLight,
+          iconBg: isDarkMode ? 'rgba(26, 115, 232, 0.2)' : theme.primaryLight,
           btnBg: theme.primary,
           btnText: '#FFFFFF',
         };
@@ -89,13 +105,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ visible, t
   const colors = getThemeColors();
 
   return (
-    <Modal
-      transparent
-      visible={visible}
-      animationType="none"
-      onRequestClose={onCancel}
-      statusBarTranslucent
-    >
+    <Modal transparent visible={visible} animationType="none" onRequestClose={onCancel} statusBarTranslucent>
       <TouchableWithoutFeedback onPress={onCancel}>
         <Animated.View
           style={[
@@ -127,9 +137,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ visible, t
               <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
                 {title}
               </Text>
-              <Text style={[styles.message, { color: theme.textSecondary }]}>
-                {message}
-              </Text>
+              <Text style={[styles.message, { color: theme.textSecondary }]}>{message}</Text>
 
               {/* Action Buttons */}
               <View style={styles.buttonRow}>
@@ -146,9 +154,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ visible, t
                   activeOpacity={0.75}
                   disabled={isLoading}
                 >
-                  <Text style={[styles.cancelButtonText, { color: theme.textSecondary }]}>
-                    {cancelText}
-                  </Text>
+                  <Text style={[styles.cancelButtonText, { color: theme.textSecondary }]}>{cancelText}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -177,6 +183,8 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ visible, t
   );
 };
 
+export const ConfirmationModal = React.memo(ConfirmationModalComponent);
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -192,11 +200,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     alignItems: 'center',
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
-    elevation: 12,
   },
   iconCircle: {
     width: 60,
@@ -240,13 +243,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  confirmButton: {
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
+  confirmButton: {},
   confirmButtonText: {
     fontSize: 14,
     fontWeight: '800',

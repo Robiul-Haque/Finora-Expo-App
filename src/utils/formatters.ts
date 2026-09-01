@@ -34,3 +34,17 @@ export const formatDate = (dateStr: string): string => {
     return '';
   }
 };
+
+/**
+ * Formats an ISO date string into formatted date + time (e.g. 23 Aug, 10:32 AM)
+ */
+export const formatDateTime = (dateStr: string): string => {
+  try {
+    const d = new Date(dateStr);
+    const datePart = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    const timePart = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${datePart}, ${timePart}`;
+  } catch {
+    return '';
+  }
+};

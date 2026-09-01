@@ -1,5 +1,14 @@
-import React, { useState } from 'react';
-import {View,Text,StyleSheet,Modal,TouchableOpacity,ScrollView} from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  TouchableOpacity,
+  ScrollView,
+  TouchableWithoutFeedback,
+  Animated,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { DateFilter, SortFilter } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
@@ -10,14 +19,65 @@ interface FilterModalProps {
   onClose: () => void;
 }
 
-export const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose }) => {
-  const { theme } = useTheme();
+const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) => {
+  const { theme, isDarkMode } = useTheme();
   const { filters, setFilters, resetFilters, accounts } = useLedger();
 
   const [selectedAccountId, setSelectedAccountId] = useState(filters.accountId);
   const [selectedType, setSelectedType] = useState(filters.type);
   const [selectedDate, setSelectedDate] = useState<DateFilter>(filters.dateRange);
   const [selectedSort, setSelectedSort] = useState<SortFilter>(filters.sortBy);
+  const [showAccountPicker, setShowAccountPicker] = useState(false);
+
+  const slideAnim = useRef(new Animated.Value(400)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      slideAnim.setValue(400);
+      fadeAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 65,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const handleClose = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 400,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+    });
+  };
+
+  React.useEffect(() => {
+    if (visible) {
+      setSelectedAccountId(filters.accountId);
+      setSelectedType(filters.type);
+      setSelectedDate(filters.dateRange);
+      setSelectedSort(filters.sortBy);
+      setShowAccountPicker(false);
+    }
+  }, [visible, filters]);
 
   const handleApply = () => {
     setFilters({
@@ -38,14 +98,11 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose }) =>
     onClose();
   };
 
-  const typeOptions: { label: string; value: string }[] = [
-    { label: 'All Types', value: 'all' },
-    { label: 'Cash Out', value: 'cash_out' },
-    { label: 'Cash In', value: 'receive_money' },
-    { label: 'Send Money', value: 'send_money' },
-    { label: 'B2B Float', value: 'b2b' },
-    { label: 'Adjustment', value: 'adjustment' },
-  ];
+  const selectedAccountLabel = React.useMemo(() => {
+    if (selectedAccountId === 'all') return 'All Accounts';
+    const acc = accounts.find((a) => a.id === selectedAccountId || a.accountNumber === selectedAccountId);
+    return acc ? `${acc.accountNumber} (${acc.name || 'SIM'})` : 'All Accounts';
+  }, [selectedAccountId, accounts]);
 
   const dateOptions: { label: string; value: DateFilter }[] = [
     { label: 'All Dates', value: 'all' },
@@ -55,325 +112,442 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose }) =>
     { label: 'This Month', value: 'this_month' },
   ];
 
+  const typeOptions: { label: string; value: string }[] = [
+    { label: 'All', value: 'all' },
+    { label: 'Send', value: 'sm' },
+    { label: 'Receive', value: 'recev' },
+    { label: 'Adjustment', value: 'adjustment' },
+  ];
+
   const sortOptions: { label: string; value: SortFilter }[] = [
-    { label: 'Newest First (Recent)', value: 'newest' },
-    { label: 'Oldest First', value: 'oldest' },
-    { label: 'Highest Amount First', value: 'amount_high' },
-    { label: 'Lowest Amount First', value: 'amount_low' },
-    { label: 'Highest Profit First', value: 'profit_high' },
+    { label: 'Newest', value: 'newest' },
+    { label: 'Oldest', value: 'oldest' },
+    { label: 'Amount High/Low', value: 'amount_high' },
+    { label: 'Profit High', value: 'profit_high' },
   ];
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <View style={styles.headerTitleGroup}>
-              <Ionicons name="filter" size={20} color={theme.primary} />
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Filter Transactions</Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={22} color={theme.textMuted} />
-            </TouchableOpacity>
-          </View>
+    <Modal visible={visible} animationType="none" transparent onRequestClose={handleClose}>
+      <TouchableWithoutFeedback onPress={handleClose}>
+        <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+            <Animated.View
+              style={[
+                styles.bottomSheet,
+                {
+                  backgroundColor: theme.card,
+                  borderColor: theme.border,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              {/* Drag Handle & Header */}
+              <View style={[styles.sheetHeader, { borderBottomColor: theme.divider }]}>
+                {/* Drag Handle Pill */}
+                <View style={[styles.dragHandle, { backgroundColor: theme.border }]} />
 
-          <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
-            {/* Account Selector */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ACCOUNT</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: selectedAccountId === 'all' ? theme.primary : theme.cardSecondary,
-                      borderColor: selectedAccountId === 'all' ? theme.primary : theme.border,
-                    },
-                  ]}
-                  onPress={() => setSelectedAccountId('all')}
-                >
-                  <Text
+                <View style={styles.headerRow}>
+                  <Text style={[styles.headerTitle, { color: theme.text }]}>Filters</Text>
+                  <TouchableOpacity onPress={handleClose} style={styles.closeBtn} activeOpacity={0.7}>
+                    <Ionicons name="close" size={20} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Scrollable Body */}
+              <ScrollView style={styles.scrollBody} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
+                {/* Section 1: Account */}
+                <View style={styles.section}>
+                  <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ACCOUNT</Text>
+                  <TouchableOpacity
                     style={[
-                      styles.chipText,
-                      { color: selectedAccountId === 'all' ? '#FFFFFF' : theme.text },
+                      styles.dropdownField,
+                      {
+                        backgroundColor: theme.inputBg,
+                        borderBottomColor: showAccountPicker ? theme.primary : theme.border,
+                      },
                     ]}
+                    onPress={() => setShowAccountPicker(!showAccountPicker)}
+                    activeOpacity={0.8}
                   >
-                    All Accounts
-                  </Text>
+                    <Text style={[styles.dropdownText, { color: theme.text }]} numberOfLines={1}>
+                      {selectedAccountLabel}
+                    </Text>
+                    <Ionicons
+                      name={showAccountPicker ? 'chevron-up' : 'chevron-down'}
+                      size={18}
+                      color={theme.textSecondary}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Account Dropdown Options List */}
+                  {showAccountPicker && (
+                    <View style={[styles.accountDropdownList, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}>
+                      <TouchableOpacity
+                        style={[
+                          styles.accountOption,
+                          selectedAccountId === 'all' && { backgroundColor: theme.primaryLight },
+                        ]}
+                        onPress={() => {
+                          setSelectedAccountId('all');
+                          setShowAccountPicker(false);
+                        }}
+                      >
+                        <Text style={[styles.accountOptionText, { color: selectedAccountId === 'all' ? theme.primary : theme.text }]}>
+                          All Accounts
+                        </Text>
+                        {selectedAccountId === 'all' && (
+                          <Ionicons name="checkmark" size={16} color={theme.primary} />
+                        )}
+                      </TouchableOpacity>
+
+                      {accounts.map((acc) => {
+                        const isSelected = selectedAccountId === acc.id || selectedAccountId === acc.accountNumber;
+                        return (
+                          <TouchableOpacity
+                            key={acc.id}
+                            style={[
+                              styles.accountOption,
+                              isSelected && { backgroundColor: theme.primaryLight },
+                            ]}
+                            onPress={() => {
+                              setSelectedAccountId(acc.id);
+                              setShowAccountPicker(false);
+                            }}
+                          >
+                            <Text style={[styles.accountOptionText, { color: isSelected ? theme.primary : theme.text }]}>
+                              {acc.accountNumber} ({acc.name})
+                            </Text>
+                            {isSelected && (
+                              <Ionicons name="checkmark" size={16} color={theme.primary} />
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+
+                {/* Section 2: Date */}
+                <View style={styles.section}>
+                  <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>DATE</Text>
+                  <View style={styles.datePillsWrap}>
+                    {dateOptions.map((opt) => {
+                      const isSelected = selectedDate === opt.value;
+                      return (
+                        <TouchableOpacity
+                          key={opt.value}
+                          style={[
+                            styles.datePill,
+                            {
+                              backgroundColor: isSelected ? theme.primary : theme.card,
+                              borderColor: isSelected ? theme.primary : theme.border,
+                            },
+                          ]}
+                          onPress={() => setSelectedDate(opt.value)}
+                          activeOpacity={0.75}
+                        >
+                          <Text
+                            style={[
+                              styles.datePillText,
+                              { color: isSelected ? '#FFFFFF' : theme.text },
+                              isSelected && styles.datePillTextSelected,
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Section 3: Type */}
+                <View style={styles.section}>
+                  <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>TYPE</Text>
+                  <View style={styles.typeGrid}>
+                    {typeOptions.map((opt) => {
+                      const isSelected = selectedType === opt.value;
+                      return (
+                        <TouchableOpacity
+                          key={opt.value}
+                          style={[
+                            styles.typeCard,
+                            {
+                              backgroundColor: isSelected ? theme.primaryLight : theme.card,
+                              borderColor: isSelected ? theme.primary : theme.border,
+                            },
+                          ]}
+                          onPress={() => setSelectedType(opt.value)}
+                          activeOpacity={0.75}
+                        >
+                          <Text
+                            style={[
+                              styles.typeCardText,
+                              { color: isSelected ? theme.primary : theme.text },
+                              isSelected && styles.typeCardTextSelected,
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Section 4: Sort By */}
+                <View style={styles.section}>
+                  <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>SORT BY</Text>
+                  <View style={styles.sortCardList}>
+                    {sortOptions.map((opt) => {
+                      const isSelected = selectedSort === opt.value;
+                      return (
+                        <TouchableOpacity
+                          key={opt.value}
+                          style={[
+                            styles.sortCard,
+                            {
+                              backgroundColor: isSelected ? (isDarkMode ? 'rgba(26, 115, 232, 0.1)' : '#F5F8FF') : theme.card,
+                              borderColor: isSelected ? theme.primary : theme.border,
+                            },
+                          ]}
+                          onPress={() => setSelectedSort(opt.value)}
+                          activeOpacity={0.75}
+                        >
+                          <Ionicons
+                            name={isSelected ? 'radio-button-on' : 'radio-button-off'}
+                            size={18}
+                            color={isSelected ? theme.primary : theme.textMuted}
+                            style={styles.radioIcon}
+                          />
+                          <Text
+                            style={[
+                              styles.sortCardText,
+                              { color: isSelected ? theme.primary : theme.text },
+                              isSelected && styles.sortCardTextSelected,
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              </ScrollView>
+
+              {/* Sticky Bottom Actions */}
+              <View style={[styles.sheetFooter, { borderTopColor: theme.divider, backgroundColor: theme.card }]}>
+                <TouchableOpacity
+                  style={[styles.resetBtn, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}
+                  onPress={handleReset}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.resetBtnText, { color: theme.textSecondary }]}>Reset</Text>
                 </TouchableOpacity>
 
-                {accounts.map((acc) => {
-                  const isSelected = selectedAccountId === acc.id;
-                  return (
-                    <TouchableOpacity
-                      key={acc.id}
-                      style={[
-                        styles.chip,
-                        {
-                          backgroundColor: isSelected ? theme.primary : theme.cardSecondary,
-                          borderColor: isSelected ? theme.primary : theme.border,
-                        },
-                      ]}
-                      onPress={() => setSelectedAccountId(acc.id)}
-                    >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          { color: isSelected ? '#FFFFFF' : theme.text },
-                        ]}
-                      >
-                        {acc.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            {/* Type Selector */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-                TRANSACTION TYPE
-              </Text>
-              <View style={styles.wrapGrid}>
-                {typeOptions.map((opt) => {
-                  const isSelected = selectedType === opt.value;
-                  return (
-                    <TouchableOpacity
-                      key={opt.value}
-                      style={[
-                        styles.gridChip,
-                        {
-                          backgroundColor: isSelected ? theme.primary : theme.cardSecondary,
-                          borderColor: isSelected ? theme.primary : theme.border,
-                        },
-                      ]}
-                      onPress={() => setSelectedType(opt.value)}
-                    >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          { color: isSelected ? '#FFFFFF' : theme.text },
-                        ]}
-                      >
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                <TouchableOpacity
+                  style={[styles.applyBtn, { backgroundColor: theme.primary }]}
+                  onPress={handleApply}
+                  activeOpacity={0.88}
+                >
+                  <Text style={styles.applyBtnText}>Apply Filters</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-
-            {/* Date Selector */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>DATE RANGE</Text>
-              <View style={styles.wrapGrid}>
-                {dateOptions.map((opt) => {
-                  const isSelected = selectedDate === opt.value;
-                  return (
-                    <TouchableOpacity
-                      key={opt.value}
-                      style={[
-                        styles.gridChip,
-                        {
-                          backgroundColor: isSelected ? theme.primary : theme.cardSecondary,
-                          borderColor: isSelected ? theme.primary : theme.border,
-                        },
-                      ]}
-                      onPress={() => setSelectedDate(opt.value)}
-                    >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          { color: isSelected ? '#FFFFFF' : theme.text },
-                        ]}
-                      >
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Sort Selector */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>SORT BY</Text>
-              <View style={styles.sortList}>
-                {sortOptions.map((opt) => {
-                  const isSelected = selectedSort === opt.value;
-                  return (
-                    <TouchableOpacity
-                      key={opt.value}
-                      style={[
-                        styles.sortRow,
-                        {
-                          backgroundColor: isSelected ? theme.primaryLight : 'transparent',
-                          borderColor: isSelected ? theme.primary : theme.border,
-                        },
-                      ]}
-                      onPress={() => setSelectedSort(opt.value)}
-                    >
-                      <Text
-                        style={[
-                          styles.sortText,
-                          { color: isSelected ? theme.primary : theme.text, fontWeight: isSelected ? '700' : '500' },
-                        ]}
-                      >
-                        {opt.label}
-                      </Text>
-                      <Ionicons
-                        name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-                        size={18}
-                        color={isSelected ? theme.primary : theme.textMuted}
-                      />
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          </ScrollView>
-
-          {/* Action Buttons */}
-          <View style={[styles.buttonRow, { borderTopColor: theme.border }]}>
-            <TouchableOpacity
-              style={[styles.resetBtn, { borderColor: theme.border }]}
-              onPress={handleReset}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.resetBtnText, { color: theme.textSecondary }]}>Reset All</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.applyBtn, { backgroundColor: theme.primary }]}
-              onPress={handleApply}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.applyBtnText}>Apply Filters</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+            </Animated.View>
+          </TouchableWithoutFeedback>
+        </Animated.View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
 
+export const FilterModal = React.memo(FilterModalComponent);
+
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+  bottomSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     borderTopWidth: 1,
-    maxHeight: '85%',
-    paddingBottom: 24,
+    maxHeight: '82%',
+    width: '100%',
+    maxWidth: 540,
+    alignSelf: 'center',
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  sheetHeader: {
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 10,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(150, 150, 150, 0.2)',
   },
-  headerTitleGroup: {
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 10,
+  },
+  headerRow: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
   },
-  modalTitle: {
-    fontSize: 17,
+  headerTitle: {
+    fontSize: 18,
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
   closeBtn: {
-    padding: 4,
+    padding: 6,
+    borderRadius: 16,
   },
   scrollBody: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+  },
+  scrollContent: {
+    paddingTop: 14,
+    paddingBottom: 24,
+    gap: 16,
   },
   section: {
-    marginVertical: 12,
+    gap: 8,
   },
   sectionTitle: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 8,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
-  chipRow: {
+  dropdownField: {
+    height: 46,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomWidth: 2,
     flexDirection: 'row',
-  },
-  chip: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
+  },
+  dropdownText: {
+    fontSize: 13.5,
+    fontWeight: '500',
+    flex: 1,
     marginRight: 8,
   },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '600',
+  accountDropdownList: {
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginTop: 4,
   },
-  wrapGrid: {
+  accountOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  accountOptionText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  datePillsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  gridChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  sortList: {
-    gap: 6,
-  },
-  sortRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  datePill: {
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
     borderWidth: 1,
   },
-  sortText: {
-    fontSize: 13,
+  datePillText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
-  buttonRow: {
+  datePillTextSelected: {
+    fontWeight: '700',
+  },
+  typeGrid: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 12,
-    borderTopWidth: 1,
+    gap: 8,
+  },
+  typeCard: {
+    flex: 1,
+    height: 42,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typeCardText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  typeCardTextSelected: {
+    fontWeight: '700',
+  },
+  sortCardList: {
+    gap: 7,
+  },
+  sortCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+  },
+  radioIcon: {
+    marginRight: 10,
+  },
+  sortCardText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  sortCardTextSelected: {
+    fontWeight: '700',
+  },
+  sheetFooter: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   resetBtn: {
     flex: 1,
-    paddingVertical: 13,
-    borderRadius: 12,
+    height: 46,
+    borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   resetBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   applyBtn: {
     flex: 2,
-    paddingVertical: 13,
-    borderRadius: 12,
+    height: 46,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   applyBtnText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '700',
   },
 });

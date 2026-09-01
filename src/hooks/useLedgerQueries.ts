@@ -95,12 +95,10 @@ export const useAddTransactionMutation = () => {
 
       return { previousTransactions, previousAccounts };
     },
-    onError: (_err, _newTx, context) => {
-      // Rollback on failure
-      if (context) {
-        queryClient.setQueryData(ledgerKeys.transactions(), context.previousTransactions);
-        queryClient.setQueryData(ledgerKeys.accounts(), context.previousAccounts);
-      }
+    onError: () => {
+      // Graceful offline fallback: keep local data without throwing UI crashes
+      queryClient.invalidateQueries({ queryKey: ledgerKeys.transactions() });
+      queryClient.invalidateQueries({ queryKey: ledgerKeys.accounts() });
     },
     onSettled: () => {
       // Re-sync with storage
@@ -111,14 +109,23 @@ export const useAddTransactionMutation = () => {
 };
 
 /**
- * Hook to delete transaction
+ * Hook to delete transaction with instant Optimistic Cache update
  */
 export const useDeleteTransactionMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (id: string) => ledgerApi.deleteTransaction(id),
-    onSuccess: () => {
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ledgerKeys.transactions() });
+      const prevTxs = queryClient.getQueryData<Transaction[]>(ledgerKeys.transactions()) || [];
+      queryClient.setQueryData<Transaction[]>(
+        ledgerKeys.transactions(),
+        prevTxs.filter((t) => t.id !== id)
+      );
+      return { prevTxs };
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ledgerKeys.transactions() });
       queryClient.invalidateQueries({ queryKey: ledgerKeys.accounts() });
     },
@@ -126,38 +133,79 @@ export const useDeleteTransactionMutation = () => {
 };
 
 /**
- * Hook to create a new bKash account
+ * Hook to create a new bKash account with instant Optimistic Cache update
  */
 export const useAddAccountMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (accData: Omit<Account, 'id' | 'createdAt' | 'todaySend' | 'todayReceive' | 'todayProfit'>) => ledgerApi.createAccount(accData),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ledgerKeys.accounts() }); },
+    mutationFn: (accData: Omit<Account, 'id' | 'createdAt' | 'todaySend' | 'todayReceive' | 'todayProfit'>) =>
+      ledgerApi.createAccount(accData),
+    onMutate: async (newAcc) => {
+      await queryClient.cancelQueries({ queryKey: ledgerKeys.accounts() });
+      const prevAccounts = queryClient.getQueryData<Account[]>(ledgerKeys.accounts()) || [];
+      const optimisticAcc: Account = {
+        ...newAcc,
+        id: 'acc_opt_' + Date.now(),
+        monthlyLimit: newAcc.monthlyLimit || 300000,
+        monthlyLimitUsed: 0,
+        remainingLimit: newAcc.monthlyLimit || 300000,
+        todaySend: 0,
+        todayReceive: 0,
+        todayProfit: 0,
+        createdAt: new Date().toISOString(),
+      };
+      queryClient.setQueryData<Account[]>(ledgerKeys.accounts(), [optimisticAcc, ...prevAccounts]);
+      return { prevAccounts };
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ledgerKeys.accounts() });
+    },
   });
 };
 
 /**
- * Hook to update account
+ * Hook to update account with instant Optimistic Cache update
  */
 export const useUpdateAccountMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Account> }) => ledgerApi.updateAccount(id, updates),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ledgerKeys.accounts() }) }
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Account> }) =>
+      ledgerApi.updateAccount(id, updates),
+    onMutate: async ({ id, updates }) => {
+      await queryClient.cancelQueries({ queryKey: ledgerKeys.accounts() });
+      const prevAccounts = queryClient.getQueryData<Account[]>(ledgerKeys.accounts()) || [];
+      queryClient.setQueryData<Account[]>(
+        ledgerKeys.accounts(),
+        prevAccounts.map((a) => (a.id === id ? { ...a, ...updates } : a))
+      );
+      return { prevAccounts };
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ledgerKeys.accounts() });
+    },
   });
 };
 
 /**
- * Hook to delete account
+ * Hook to delete account with instant Optimistic Cache update
  */
 export const useDeleteAccountMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (id: string) => ledgerApi.deleteAccount(id),
-    onSuccess: () => {
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ledgerKeys.accounts() });
+      const prevAccounts = queryClient.getQueryData<Account[]>(ledgerKeys.accounts()) || [];
+      queryClient.setQueryData<Account[]>(
+        ledgerKeys.accounts(),
+        prevAccounts.filter((a) => a.id !== id)
+      );
+      return { prevAccounts };
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ledgerKeys.accounts() });
       queryClient.invalidateQueries({ queryKey: ledgerKeys.transactions() });
     },
@@ -172,6 +220,8 @@ export const useResetDatabaseMutation = () => {
 
   return useMutation({
     mutationFn: () => ledgerApi.resetDatabase(),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ledgerKeys.all })}
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ledgerKeys.all });
+    },
   });
 };

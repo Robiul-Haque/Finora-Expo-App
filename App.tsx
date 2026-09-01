@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar, Animated, ActivityIndicator } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -8,7 +8,7 @@ import { queryClient } from './src/services/queryClient';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { LedgerProvider } from './src/context/LedgerContext';
 import { HomeScreen, TransactionsScreen, AccountsScreen, AnalyticsScreen } from './src/screens';
-import { SplashScreen, AddTransactionModal, AddAccountModal, AccountDetailsModal, ErrorBoundary } from './src/components';
+import { AddTransactionModal, AddAccountModal, AccountDetailsModal, ErrorBoundary, SplashScreen } from './src/components';
 import { Account } from './src/types';
 
 type TabType = 'home' | 'transactions' | 'accounts' | 'analytics';
@@ -22,55 +22,30 @@ interface TabButtonProps {
   onPress: () => void;
   activeColor: string;
   inactiveColor: string;
-  activeBgColor: string;
 }
 
-const AnimatedTabButtonComponent: React.FC<TabButtonProps> = ({ tab, activeTab, label, activeIcon, inactiveIcon, onPress, activeColor, inactiveColor, activeBgColor }) => {
+const TabButtonComponent: React.FC<TabButtonProps> = ({
+  tab,
+  activeTab,
+  label,
+  activeIcon,
+  inactiveIcon,
+  onPress,
+  activeColor,
+  inactiveColor,
+}) => {
   const isActive = activeTab === tab;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    Animated.spring(scaleAnim, {
-      toValue: isActive ? 1.05 : 1,
-      friction: 5,
-      tension: 100,
-      useNativeDriver: true,
-    }).start();
-  }, [isActive]);
-
-  const handlePress = () => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 0.9,
-        duration: 70,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1.05,
-        friction: 4,
-        tension: 110,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    onPress();
-  };
 
   return (
     <TouchableOpacity
       style={styles.tabItem}
-      onPress={handlePress}
-      activeOpacity={0.75}
+      onPress={onPress}
+      activeOpacity={0.7}
     >
-      <Animated.View
-        style={[
-          styles.tabPill,
-          isActive && { backgroundColor: activeBgColor },
-          { transform: [{ scale: scaleAnim }] },
-        ]}
-      >
+      <View style={styles.tabPill}>
         <Ionicons
           name={isActive ? activeIcon : inactiveIcon}
-          size={21}
+          size={20}
           color={isActive ? activeColor : inactiveColor}
         />
         <Text
@@ -84,21 +59,18 @@ const AnimatedTabButtonComponent: React.FC<TabButtonProps> = ({ tab, activeTab, 
         >
           {label}
         </Text>
-      </Animated.View>
+      </View>
     </TouchableOpacity>
   );
 };
 
-const AnimatedTabButton = React.memo(AnimatedTabButtonComponent);
+const TabButton = React.memo(TabButtonComponent);
 
 const MainApp: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const { theme, isDarkMode } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [showSplash, setShowSplash] = useState(true);
-
-  // Screen fade animation on tab switch
-  const screenFadeAnim = useRef(new Animated.Value(1)).current;
-  const addBtnScale = useRef(new Animated.Value(1)).current;
 
   // Modal States
   const [addTxVisible, setAddTxVisible] = useState(false);
@@ -106,40 +78,19 @@ const MainApp: React.FC = () => {
   const [selectedAccountForDetails, setSelectedAccountForDetails] = useState<Account | null>(null);
   const [preselectedAccountIdForTx, setPreselectedAccountIdForTx] = useState<string | undefined>();
 
+  const [visitedTabs, setVisitedTabs] = useState<Record<TabType, boolean>>({
+    home: true,
+    transactions: false,
+    accounts: false,
+    analytics: false,
+  });
+
   const switchTab = React.useCallback((tab: TabType) => {
-    setActiveTab((current) => {
-      if (tab === current) return current;
-      Animated.sequence([
-        Animated.timing(screenFadeAnim, {
-          toValue: 0.85,
-          duration: 70,
-          useNativeDriver: true,
-        }),
-        Animated.timing(screenFadeAnim, {
-          toValue: 1,
-          duration: 120,
-          useNativeDriver: true,
-        }),
-      ]).start();
-      return tab;
-    });
+    setActiveTab(tab);
+    setVisitedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
   }, []);
 
   const handleOpenAddTx = React.useCallback((accountId?: string) => {
-    // Button spring bounce
-    Animated.sequence([
-      Animated.timing(addBtnScale, {
-        toValue: 0.82,
-        duration: 70,
-        useNativeDriver: true,
-      }),
-      Animated.spring(addBtnScale, {
-        toValue: 1,
-        friction: 4,
-        tension: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
     setPreselectedAccountIdForTx(accountId);
     setAddTxVisible(true);
   }, []);
@@ -160,64 +111,77 @@ const MainApp: React.FC = () => {
     setAddAccountVisible(true);
   }, []);
 
+  return (
+    <View style={[styles.rootContainer, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+        animated={false}
+      />
 
-
-  const renderActiveScreen = () => {
-    switch (activeTab) {
-      case 'home':
-        return (
+      {/* Main Content Area: Instant Zero-Lag Lazy-Preserved Tab Views */}
+      <View style={styles.screenContainer}>
+        <View style={[styles.screenPage, { display: activeTab === 'home' ? 'flex' : 'none' }]}>
           <HomeScreen
             onOpenAccountDetails={handleOpenAccountDetails}
             onOpenAddTransaction={handleOpenAddTx}
             onNavigateToTransactions={handleNavigateToTransactions}
             onNavigateToAccounts={handleNavigateToAccounts}
           />
-        );
-      case 'transactions':
-        return (
-          <TransactionsScreen onOpenAddTransaction={() => handleOpenAddTx()} />
-        );
-      case 'accounts':
-        return (
-          <AccountsScreen
-            onOpenAccountDetails={handleOpenAccountDetails}
-            onOpenAddAccount={handleOpenAddAccount}
-            onOpenAddTransaction={handleOpenAddTx}
-          />
-        );
-      case 'analytics':
-        return <AnalyticsScreen />;
-      default:
-        return null;
-    }
-  };
+        </View>
 
-  return (
-    <View style={[styles.rootContainer, { backgroundColor: theme.background }]}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.background}
-        animated={true}
-      />
+        {visitedTabs.transactions && (
+          <View style={[styles.screenPage, { display: activeTab === 'transactions' ? 'flex' : 'none' }]}>
+            <TransactionsScreen onOpenAddTransaction={() => handleOpenAddTx()} />
+          </View>
+        )}
 
-      {/* Main Content Area with Smooth Fast Transitions */}
-      <Animated.View style={[styles.screenContainer, { opacity: screenFadeAnim }]}>
-        {renderActiveScreen()}
-      </Animated.View>
+        {visitedTabs.accounts && (
+          <View style={[styles.screenPage, { display: activeTab === 'accounts' ? 'flex' : 'none' }]}>
+            <AccountsScreen
+              onOpenAccountDetails={handleOpenAccountDetails}
+              onOpenAddAccount={handleOpenAddAccount}
+              onOpenAddTransaction={handleOpenAddTx}
+            />
+          </View>
+        )}
+
+        {visitedTabs.analytics && (
+          <View style={[styles.screenPage, { display: activeTab === 'analytics' ? 'flex' : 'none' }]}>
+            <AnalyticsScreen />
+          </View>
+        )}
+      </View>
+
+      {/* Floating Action Button (FAB) */}
+      <TouchableOpacity
+        style={[
+          styles.fabContainer,
+          {
+            bottom: (insets.bottom > 0 ? insets.bottom : 12) + 84,
+          },
+        ]}
+        onPress={() => handleOpenAddTx()}
+        activeOpacity={0.92}
+      >
+        <View style={[styles.fabButton, { backgroundColor: theme.primary }]}>
+          <Ionicons name="add" size={24} color="#FFFFFF" />
+        </View>
+      </TouchableOpacity>
 
       {/* Modern Floating Island Bottom Navigation Bar */}
-      <View style={styles.floatingBarWrapper}>
+      <View style={[styles.floatingBarWrapper, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View
           style={[
             styles.bottomTabBar,
             {
               backgroundColor: theme.tabBarBg,
-              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.07)',
+              borderColor: theme.border,
             },
           ]}
         >
           {/* Tab 1: Home */}
-          <AnimatedTabButton
+          <TabButton
             tab="home"
             activeTab={activeTab}
             label="Home"
@@ -226,66 +190,30 @@ const MainApp: React.FC = () => {
             onPress={() => switchTab('home')}
             activeColor={theme.tabBarActive}
             inactiveColor={theme.tabBarInactive}
-            activeBgColor={theme.primaryLight}
           />
 
           {/* Tab 2: Transactions */}
-          <AnimatedTabButton
+          <TabButton
             tab="transactions"
             activeTab={activeTab}
-            label="Ledger"
+            label="Transactions"
             activeIcon="receipt"
             inactiveIcon="receipt-outline"
             onPress={() => switchTab('transactions')}
             activeColor={theme.tabBarActive}
             inactiveColor={theme.tabBarInactive}
-            activeBgColor={theme.primaryLight}
           />
 
-          {/* Center Elevated Quick Action (+) Button */}
-          <TouchableOpacity
-            style={styles.centerBtnTouchArea}
-            onPress={() => handleOpenAddTx()}
-            activeOpacity={0.9}
-          >
-            <Animated.View
-              style={[
-                styles.centerAddButton,
-                {
-                  backgroundColor: theme.primary,
-                  borderColor: theme.tabBarBg,
-                  transform: [{ scale: addBtnScale }],
-                },
-              ]}
-            >
-              <Ionicons name="add" size={30} color="#FFFFFF" />
-            </Animated.View>
-          </TouchableOpacity>
-
-          {/* Tab 3: Accounts / Numbers */}
-          <AnimatedTabButton
+          {/* Tab 3: Accounts */}
+          <TabButton
             tab="accounts"
             activeTab={activeTab}
-            label="Numbers"
-            activeIcon="phone-portrait"
-            inactiveIcon="phone-portrait-outline"
+            label="Accounts"
+            activeIcon="card"
+            inactiveIcon="card-outline"
             onPress={() => switchTab('accounts')}
             activeColor={theme.tabBarActive}
             inactiveColor={theme.tabBarInactive}
-            activeBgColor={theme.primaryLight}
-          />
-
-          {/* Tab 4: Analytics */}
-          <AnimatedTabButton
-            tab="analytics"
-            activeTab={activeTab}
-            label="Analytics"
-            activeIcon="pie-chart"
-            inactiveIcon="pie-chart-outline"
-            onPress={() => switchTab('analytics')}
-            activeColor={theme.tabBarActive}
-            inactiveColor={theme.tabBarInactive}
-            activeBgColor={theme.primaryLight}
           />
         </View>
       </View>
@@ -309,31 +237,18 @@ const MainApp: React.FC = () => {
         onAddTransaction={(accId) => handleOpenAddTx(accId)}
       />
 
-      {/* Splash Screen Smooth Overlay */}
-      {showSplash && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <SplashScreen onFinish={() => setShowSplash(false)} />
-        </View>
-      )}
+      {/* Brand Splash Screen on Initial App Startup */}
+      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
     </View>
   );
 };
 
 export default function App() {
-  const [fontsLoaded, fontError] = useFonts({
+  useFonts({
     ...Ionicons.font,
     ionicons: require('./assets/fonts/Ionicons.ttf'),
     Ionicons: require('./assets/fonts/Ionicons.ttf'),
   });
-
-  if (!fontsLoaded && !fontError) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#0B0A12', justifyContent: 'center', alignItems: 'center' }}>
-        <StatusBar barStyle="light-content" backgroundColor="#0B0A12" />
-        <ActivityIndicator size="large" color="#E2136E" />
-      </View>
-    );
-  }
 
   return (
     <ErrorBoundary>
@@ -356,61 +271,70 @@ const styles = StyleSheet.create({
   },
   screenContainer: {
     flex: 1,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+  },
+  screenPage: {
+    flex: 1,
+    width: '100%',
+  },
+  fabContainer: {
+    position: 'absolute',
+    right: 18,
+    zIndex: 99,
+  },
+  fabButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   floatingBarWrapper: {
-    paddingHorizontal: 16,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 14,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
     paddingTop: 4,
+    backgroundColor: 'transparent',
+    zIndex: 90,
+    alignItems: 'center',
   },
   bottomTabBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 7,
-    paddingHorizontal: 8,
-    borderRadius: 28,
-    borderWidth: 1.2,
+    justifyContent: 'space-around',
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    borderRadius: 24,
+    borderWidth: 1,
+    width: '100%',
+    maxWidth: 480,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
   tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    paddingVertical: 2,
   },
   tabPill: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 5,
+    paddingVertical: 4,
     paddingHorizontal: 8,
-    borderRadius: 16,
-    minWidth: 54,
+    borderRadius: 12,
+    width: '100%',
   },
   tabLabel: {
     fontSize: 10.5,
     marginTop: 2,
     letterSpacing: 0.2,
-  },
-  centerBtnTouchArea: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -34,
-    marginHorizontal: 4,
-  },
-  centerAddButton: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    borderWidth: 4.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#E2136E',
-    shadowOffset: { width: 0, height: 7 },
-    shadowOpacity: 0.5,
-    shadowRadius: 14,
-    elevation: 12,
   },
 });

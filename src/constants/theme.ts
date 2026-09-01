@@ -26,55 +26,55 @@ export interface ThemeColors {
 }
 
 export const lightTheme: ThemeColors = {
-  primary: '#E2136E', // Iconic bKash Pink
-  primaryDark: '#B80854',
-  primaryLight: '#FDF2F8', // Soft blush pink background
-  accent: '#F43F5E',
-  background: '#FAF9FB', // Clean soft background
-  card: '#FFFFFF',
-  cardSecondary: '#F5F3F7',
-  text: '#0F172A',
-  textSecondary: '#475569',
-  textMuted: '#94A3B8',
-  border: '#EBE7EF',
-  divider: '#F5F3F7',
-  success: '#059669', // Emerald profit green
-  successLight: '#ECFDF5',
-  danger: '#E11D48', // Cash out / send expense rose
-  dangerLight: '#FFF1F2',
-  warning: '#D97706',
-  warningLight: '#FFFBEB',
-  inputBg: '#FAF9FB',
+  primary: '#1A73E8', // Stitch Precision Blue (#1a73e8 / #005bbf)
+  primaryDark: '#005BBF',
+  primaryLight: '#E8F0FE', // Light blue tint
+  accent: '#005BC0',
+  background: '#F8F9FA', // Stitch warm clean surface background
+  card: '#FFFFFF', // Clean white card surface
+  cardSecondary: '#F3F4F5', // surface-container-low
+  text: '#191C1D', // on-surface deep charcoal
+  textSecondary: '#414754', // on-surface-variant
+  textMuted: '#727785', // outline
+  border: '#E8EAED', // outline-variant
+  divider: '#EDEEEF', // surface-container
+  success: '#006E2C', // Stitch Emerald Green (#006e2c / #34a853)
+  successLight: '#E6F4EA',
+  danger: '#BA1A1A', // Stitch Error Red
+  dangerLight: '#FFDAD6',
+  warning: '#E37400',
+  warningLight: '#FEF7E0',
+  inputBg: '#F1F3F4',
   tabBarBg: '#FFFFFF',
-  tabBarActive: '#E2136E',
-  tabBarInactive: '#94A3B8',
-  progressBarBg: '#EBE7EF',
+  tabBarActive: '#1A73E8',
+  tabBarInactive: '#727785',
+  progressBarBg: '#E1E3E4',
   statusBar: 'dark',
 };
 
 export const darkTheme: ThemeColors = {
-  primary: '#E2136E', // Vibrant bKash Pink
-  primaryDark: '#BE123C',
-  primaryLight: '#2A1320', // Dark rose tint
-  accent: '#F472B6',
-  background: '#0D0A14', // Deep obsidian dark slate
-  card: '#181324',
-  cardSecondary: '#221C33',
-  text: '#F8FAFC',
-  textSecondary: '#94A3B8',
-  textMuted: '#64748B',
-  border: '#2E2642',
-  divider: '#221C33',
-  success: '#10B981', // Neon emerald for profits
-  successLight: 'rgba(16, 185, 129, 0.16)',
-  danger: '#FB7185',
-  dangerLight: 'rgba(251, 113, 133, 0.16)',
-  warning: '#FBBF24',
-  warningLight: 'rgba(251, 191, 36, 0.16)',
-  inputBg: '#130E1F',
-  tabBarBg: '#151020',
-  tabBarActive: '#E2136E',
-  tabBarInactive: '#64748B',
-  progressBarBg: '#2E2642',
+  primary: '#1A73E8', // Vibrant Blue like light mode
+  primaryDark: '#005BBF',
+  primaryLight: 'rgba(26, 115, 232, 0.2)',
+  accent: '#005BC0',
+  background: '#191C1D', // on-surface as dark base
+  card: '#2E3132', // inverse-surface
+  cardSecondary: '#242728',
+  text: '#F0F1F2', // inverse-on-surface
+  textSecondary: '#C1C6D6',
+  textMuted: '#727785',
+  border: '#414754',
+  divider: '#2E3132',
+  success: '#00C853', // vibrant emerald
+  successLight: 'rgba(0, 200, 83, 0.2)',
+  danger: '#FF5252',
+  dangerLight: 'rgba(255, 82, 82, 0.2)',
+  warning: '#FFB300',
+  warningLight: 'rgba(255, 179, 0, 0.2)',
+  inputBg: '#2E3132',
+  tabBarBg: '#1E2122',
+  tabBarActive: '#1A73E8',
+  tabBarInactive: '#727785',
+  progressBarBg: '#414754',
   statusBar: 'light',
 };

@@ -1,190 +1,212 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, StatusBar, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Image, Animated, StatusBar, Easing } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
 interface SplashScreenProps {
-  onFinish?: () => void;
+  onFinish: () => void;
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const { theme, isDarkMode } = useTheme();
+
+  // Opacity & Scale animations for smooth entrance & exit
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.85)).current;
-  const logoScale = useRef(new Animated.Value(0.9)).current;
-  const bottomFade = useRef(new Animated.Value(0)).current;
-  const containerOpacity = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(0.92)).current;
+  const exitFadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Dot pulse animations
+  const dot1Anim = useRef(new Animated.Value(0.3)).current;
+  const dot2Anim = useRef(new Animated.Value(0.3)).current;
+  const dot3Anim = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
-    // Entrance animations
+    // 1. Snappy entrance animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 350,
+        duration: 220,
+        easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
-        friction: 6,
-        tension: 65,
-        useNativeDriver: true,
-      }),
-      Animated.spring(logoScale, {
-        toValue: 1,
-        friction: 5,
-        tension: 80,
-        useNativeDriver: true,
-      }),
-      Animated.timing(bottomFade, {
-        toValue: 1,
-        duration: 400,
-        delay: 100,
+        friction: 8,
+        tension: 70,
         useNativeDriver: true,
       }),
     ]).start();
 
-    // Guaranteed exit animation after 900ms
-    const exitTimer = setTimeout(() => {
-      Animated.timing(containerOpacity, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    }, 900);
+    // 2. Fast continuous Dot pulse animation
+    const createDotLoop = (anim: Animated.Value, delay: number) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim, {
+            toValue: 0.3,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
 
-    // Guaranteed onFinish trigger after 1150ms
-    const finishTimer = setTimeout(() => {
-      if (onFinish) {
+    const loop1 = createDotLoop(dot1Anim, 0);
+    const loop2 = createDotLoop(dot2Anim, 120);
+    const loop3 = createDotLoop(dot3Anim, 240);
+
+    loop1.start();
+    loop2.start();
+    loop3.start();
+
+    // 3. Fast smooth exit after 750ms
+    const timer = setTimeout(() => {
+      Animated.timing(exitFadeAnim, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }).start(() => {
         onFinish();
-      }
-    }, 1150);
+      });
+    }, 750);
 
     return () => {
-      clearTimeout(exitTimer);
-      clearTimeout(finishTimer);
+      clearTimeout(timer);
+      loop1.stop();
+      loop2.stop();
+      loop3.stop();
     };
-  }, [onFinish]);
+  }, [fadeAnim, scaleAnim, exitFadeAnim, dot1Anim, dot2Anim, dot3Anim, onFinish]);
 
   return (
     <Animated.View
       style={[
         styles.container,
         {
-          backgroundColor: isDarkMode ? '#0B0A12' : '#FFFFFF',
-          opacity: containerOpacity,
+          backgroundColor: isDarkMode ? '#191C1D' : '#F8F9FA',
+          opacity: exitFadeAnim,
         },
       ]}
     >
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#0B0A12' : '#FFFFFF'}
-        animated={true}
+        backgroundColor={isDarkMode ? '#191C1D' : '#F8F9FA'}
       />
+
+      {/* Center Brand Identity */}
       <Animated.View
         style={[
-          styles.content,
+          styles.centerContent,
           {
             opacity: fadeAnim,
             transform: [{ scale: scaleAnim }],
           },
         ]}
       >
-        {/* Finora App Icon with Glow Badge */}
-        <Animated.View
-          style={[
-            styles.iconWrapper,
-            {
-              transform: [{ scale: logoScale }],
-              shadowColor: theme.primary,
-              backgroundColor: theme.primary,
-            },
-          ]}
-        >
+        <View style={styles.logoBadge}>
           <Image
             source={require('../../assets/icon.png')}
             style={styles.logoImage}
             resizeMode="contain"
-            fadeDuration={0}
           />
-        </Animated.View>
+        </View>
 
-        {/* Brand Titles */}
-        <Text style={[styles.title, { color: isDarkMode ? '#FFFFFF' : '#0F172A' }]}>
-          Finora <Text style={{ color: theme.primary }}>bKash</Text>
-        </Text>
-        <Text style={[styles.subtitle, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>
-          Smart bKash Business Ledger
+        <Text style={[styles.title, { color: theme.primary }]}>Finora</Text>
+        <Text style={[styles.subtitle, { color: isDarkMode ? '#94A3B8' : '#5F6368' }]}>
+          Smart Business Ledger
         </Text>
       </Animated.View>
 
-      {/* Bottom Syncing Indicator */}
-      <Animated.View style={[styles.bottomContainer, { opacity: bottomFade }]}>
-        <Ionicons name="sparkles" size={15} color={theme.primary} />
-        <Text style={[styles.syncText, { color: isDarkMode ? '#64748B' : '#94A3B8' }]}>
-          FINANCIAL INTELLIGENCE OS
+      {/* Bottom Sync Indicator */}
+      <View style={styles.bottomBar}>
+        <View style={styles.dotsRow}>
+          <Animated.View
+            style={[
+              styles.dot,
+              { backgroundColor: theme.primary, opacity: dot1Anim },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.dot,
+              { backgroundColor: theme.primary, opacity: dot2Anim },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.dot,
+              { backgroundColor: theme.primary, opacity: dot3Anim },
+            ]}
+          />
+        </View>
+        <Text style={[styles.syncText, { color: isDarkMode ? '#94A3B8' : '#80868B' }]}>
+          SYNCING DATA
         </Text>
-      </Animated.View>
+      </View>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 9999,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  content: {
+  centerContent: {
     alignItems: 'center',
-  },
-  iconWrapper: {
-    width: 96,
-    height: 96,
-    borderRadius: 24,
-    marginBottom: 20,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    elevation: 10,
-    overflow: 'hidden',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  fallbackIcon: {
-    position: 'absolute',
-    justifyContent: 'center',
+  logoBadge: {
+    width: 88,
+    height: 88,
     alignItems: 'center',
-    width: '100%',
-    height: '100%',
+    justifyContent: 'center',
+    marginBottom: 16,
+    backgroundColor: 'transparent',
   },
   logoImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 24,
+    width: 88,
+    height: 88,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '900',
-    letterSpacing: -0.5,
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 12.5,
+    fontSize: 14,
     fontWeight: '600',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    marginTop: 5,
+    letterSpacing: 0.1,
   },
-  bottomContainer: {
+  bottomBar: {
     position: 'absolute',
-    bottom: 44,
+    bottom: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    gap: 8,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   syncText: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    letterSpacing: 1.5,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.4,
   },
 });
-

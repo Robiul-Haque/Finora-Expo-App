@@ -3,8 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { Account } from '../types/ledger';
 import { useTheme } from '../context/ThemeContext';
-import { useLedger } from '../context/LedgerContext';
-import { LimitProgressBar } from './LimitProgressBar';
 import { formatCurrency } from '../utils';
 
 interface AccountCardProps {
@@ -13,229 +11,204 @@ interface AccountCardProps {
   onAddTransactionPress?: () => void;
 }
 
-const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress, onAddTransactionPress }) => {
-  const { theme } = useTheme();
-  const { updateAccount } = useLedger();
+const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress }) => {
+  const { theme, isDarkMode } = useTheme();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const getProviderConfig = (type: Account['type']) => {
-    switch (type) {
-      case 'agent':
-        return {
-          name: 'business-outline',
-          label: 'Agent SIM',
-          color: '#E2136E',
-        };
-      case 'merchant':
-        return {
-          name: 'storefront-outline',
-          label: 'Merchant QR',
-          color: '#BE123C',
-        };
-      case 'personal':
-      default:
-        return {
-          name: 'person-outline',
-          label: 'Personal bKash',
-          color: '#0284C7',
-        };
-    }
-  };
+  const monthlyLimit = account.monthlyLimit || 300000;
+  const monthlyLimitUsed = account.monthlyLimitUsed !== undefined ? account.monthlyLimitUsed : account.todaySend;
+  const remainingLimit = account.remainingLimit !== undefined ? account.remainingLimit : Math.max(0, monthlyLimit - monthlyLimitUsed);
+  const totalMargin = account.totalMargin !== undefined ? account.totalMargin : account.todayProfit;
 
-  const provider = getProviderConfig(account.type);
-  const remainingLimit = Math.max(0, account.dailyLimit - account.todaySend);
+  const usageRatio = monthlyLimit > 0 ? monthlyLimitUsed / monthlyLimit : 0;
+  const usagePercentage = Math.min(100, Math.round(usageRatio * 100));
+  const isCritical = usagePercentage >= 90;
 
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.98,
-      friction: 4,
-      tension: 80,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 4,
-      tension: 80,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handleToggleStatus = (e: any) => {
-    e?.stopPropagation?.();
-    updateAccount(account.id, { isActive: !account.isActive });
-  };
+  const indicatorColor = isCritical ? theme.danger : account.isActive ? theme.primary : theme.textMuted;
 
   return (
     <TouchableOpacity
-      activeOpacity={1}
+      activeOpacity={0.7}
       onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
     >
-      <Animated.View
+      <View
         style={[
           styles.card,
           {
-            backgroundColor: theme.card,
-            borderColor: theme.border,
-            opacity: account.isActive ? 1 : 0.65,
-            transform: [{ scale: scaleAnim }],
+            backgroundColor: account.isActive ? theme.card : (isDarkMode ? '#242728' : '#F5F6F8'),
+            borderColor: isCritical ? (isDarkMode ? 'rgba(255, 218, 214, 0.3)' : '#FFDAD6') : theme.border,
+            opacity: account.isActive ? 1 : 0.55,
           },
         ]}
       >
-        {/* Top Header */}
-        <View style={styles.header}>
-          <View style={styles.accountInfo}>
-            <View style={[styles.avatar, { backgroundColor: provider.color + '18' }]}>
-              <Ionicons
-                name={provider.name as any}
-                size={20}
-                color={provider.color}
-              />
-            </View>
-            <View style={styles.accountTextContainer}>
-              <View style={styles.nameRow}>
-                <Text
-                  style={[styles.accountName, { color: theme.text }]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {account.name}
-                </Text>
-                <TouchableOpacity
-                  onPress={handleToggleStatus}
-                  style={[
-                    styles.activeBadge,
-                    {
-                      backgroundColor: account.isActive
-                        ? theme.successLight
-                        : theme.cardSecondary,
-                    },
-                  ]}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Text
-                    style={[
-                      styles.activeBadgeText,
-                      { color: account.isActive ? theme.success : theme.textMuted },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {account.isActive ? 'Active' : 'Inactive'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <Text
-                style={[styles.accountNumber, { color: theme.textSecondary }]}
-                numberOfLines={1}
-              >
+        {/* Left Status 4px Indicator */}
+        <View style={[styles.leftIndicator, { backgroundColor: indicatorColor }]} />
+
+        <View style={styles.contentContainer}>
+          {/* Top Row: Monospace Phone Number & Status / Profit Badge */}
+          <View style={styles.topRow}>
+            <View style={styles.phoneGroup}>
+              <Text style={[styles.phoneNumber, { color: account.isActive ? theme.text : theme.textMuted }]} numberOfLines={1}>
                 {account.accountNumber}
               </Text>
+              {account.name && account.name !== account.accountNumber && (
+                <Text style={[styles.accountSubName, { color: theme.textSecondary }]} numberOfLines={1}>
+                  {account.name} {!account.isActive && '(Inactive)'}
+                </Text>
+              )}
             </View>
-          </View>
 
-          <View style={styles.providerBadgeContainer}>
-            <View style={[styles.providerBadge, { backgroundColor: provider.color + '18' }]}>
-              <Text style={[styles.providerText, { color: provider.color }]} numberOfLines={1}>
-                {provider.label}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Main Balance Display */}
-        <View style={styles.balanceContainer}>
-          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]} numberOfLines={2}>
-            CURRENT FLOAT BALANCE
-          </Text>
-          <View style={styles.balanceRow}>
-            <Text
-              style={[styles.balanceAmount, { color: theme.text }]}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.6}
-            >
-              {formatCurrency(account.balance)}
-            </Text>
-            {account.todayProfit > 0 && (
-              <View style={[styles.profitBadge, { backgroundColor: theme.successLight }]}>
-                <Text style={[styles.profitText, { color: theme.success }]} numberOfLines={2}>
-                  +{formatCurrency(account.todayProfit)} Commission
+            {account.isActive && totalMargin > 0 ? (
+              <View
+                style={[
+                  styles.profitBadge,
+                  {
+                    backgroundColor: isDarkMode ? 'rgba(137, 250, 155, 0.15)' : 'rgba(0, 110, 44, 0.1)',
+                  },
+                ]}
+              >
+                <Ionicons name="trending-up" size={13} color={theme.success} style={styles.profitIcon} />
+                <Text style={[styles.profitText, { color: theme.success }]}>
+                  +{formatCurrency(totalMargin)}
+                </Text>
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.statusPill,
+                  {
+                    backgroundColor: account.isActive
+                      ? (isDarkMode ? 'rgba(26, 115, 232, 0.15)' : '#E8F0FE')
+                      : (isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E5E7EB'),
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusPillText,
+                    { color: account.isActive ? theme.primary : theme.textMuted },
+                  ]}
+                >
+                  {account.isActive ? 'Active' : 'Disabled'}
                 </Text>
               </View>
             )}
           </View>
-        </View>
 
-        {/* Limit Usage Bar */}
-        <LimitProgressBar
-          usedAmount={account.todaySend}
-          totalLimit={account.dailyLimit}
-          label="TODAY'S SEND LIMIT USAGE"
-        />
-
-        {/* Limit Breakdown Stats */}
-        <View style={[styles.statsRow, { backgroundColor: theme.cardSecondary }]}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]} numberOfLines={2}>
-              Today's Send
-            </Text>
+          {/* Current Balance */}
+          <View style={styles.balanceSection}>
+            <Text style={[styles.balanceLabel, { color: theme.textMuted }]}>CURRENT BALANCE</Text>
             <Text
-              style={[styles.statValue, { color: theme.text }]}
+              style={[styles.balanceAmount, { color: account.isActive ? theme.text : theme.textMuted }]}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.7}
             >
-              {formatCurrency(account.todaySend)}
+              {formatCurrency(account.balance)}
             </Text>
           </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]} numberOfLines={2}>
-              Remaining Limit
-            </Text>
-            <Text
-              style={[styles.statValue, { color: theme.primary }]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.7}
-            >
-              {formatCurrency(remainingLimit)}
-            </Text>
-          </View>
-        </View>
 
-        {/* Quick Action Footer */}
-        <View style={styles.footerRow}>
-          <TouchableOpacity
-            style={[styles.actionBtn, { borderColor: theme.border }]}
-            onPress={onPress}
-            activeOpacity={0.7}
+          {/* 2-Column Info Grid (Today Send & Remaining Limit) */}
+          <View
+            style={[
+              styles.infoGrid,
+              {
+                backgroundColor: isCritical
+                  ? (isDarkMode ? 'rgba(255, 218, 214, 0.08)' : '#FFF5F5')
+                  : theme.cardSecondary,
+              },
+            ]}
           >
-            <Ionicons name="stats-chart-outline" size={14} color={theme.textSecondary} />
-            <Text style={[styles.actionBtnText, { color: theme.textSecondary }]} numberOfLines={1}>
-              Details
-            </Text>
-          </TouchableOpacity>
-
-          {onAddTransactionPress && (
-            <TouchableOpacity
-              style={[styles.primaryActionBtn, { backgroundColor: theme.primary }]}
-              onPress={onAddTransactionPress}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="add" size={16} color="#FFFFFF" />
-              <Text style={styles.primaryActionBtnText} numberOfLines={1}>
-                Log bKash Entry
+            <View style={styles.infoCol}>
+              <Text
+                style={[
+                  styles.infoLabel,
+                  { color: isCritical ? theme.danger : theme.textMuted },
+                ]}
+              >
+                TODAY SEND
               </Text>
-            </TouchableOpacity>
-          )}
+              <Text
+                style={[
+                  styles.infoValue,
+                  { color: isCritical ? theme.danger : theme.text },
+                ]}
+                numberOfLines={1}
+              >
+                {formatCurrency(account.todaySend || 0)}
+              </Text>
+            </View>
+
+            <View style={styles.infoCol}>
+              <Text
+                style={[
+                  styles.infoLabel,
+                  { color: isCritical ? theme.danger : theme.textMuted },
+                ]}
+              >
+                REMAINING LIMIT
+              </Text>
+              <Text
+                style={[
+                  styles.infoValue,
+                  { color: isCritical ? theme.danger : theme.text },
+                ]}
+                numberOfLines={1}
+              >
+                {formatCurrency(remainingLimit)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Limit Usage Bar Section */}
+          <View style={styles.limitSection}>
+            <View style={styles.limitHeader}>
+              <Text
+                style={[
+                  styles.limitLabel,
+                  { color: isCritical ? theme.danger : theme.textMuted },
+                ]}
+              >
+                {isCritical ? 'CRITICAL USAGE' : 'LIMIT USAGE'}
+              </Text>
+              <Text
+                style={[
+                  styles.limitPercentage,
+                  { color: isCritical ? theme.danger : theme.textMuted },
+                ]}
+              >
+                {usagePercentage}%
+              </Text>
+            </View>
+
+            {/* Progress Bar Track */}
+            <View
+              style={[
+                styles.progressTrack,
+                {
+                  backgroundColor: isCritical
+                    ? (isDarkMode ? 'rgba(255, 218, 214, 0.2)' : '#FFDAD6')
+                    : theme.progressBarBg,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${Math.min(100, Math.max(0, usagePercentage))}%`,
+                    backgroundColor: isCritical ? theme.danger : theme.primary,
+                  },
+                ]}
+              />
+            </View>
+
+            <Text style={[styles.totalLimitText, { color: theme.textMuted }]}>
+              Total: {formatCurrency(monthlyLimit)}
+            </Text>
+          </View>
         </View>
-      </Animated.View>
+      </View>
     </TouchableOpacity>
   );
 };
@@ -244,188 +217,143 @@ export const AccountCard = React.memo(AccountCardComponent);
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
-    marginBottom: 16,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  header: {
+  leftIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    zIndex: 2,
+  },
+  contentContainer: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingLeft: 18,
+    gap: 10,
+  },
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
   },
-  accountInfo: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+  phoneGroup: {
     flex: 1,
-    marginRight: 6,
+    marginRight: 8,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-    marginTop: 2,
-  },
-  accountTextContainer: {
-    flex: 1,
-    minWidth: 0,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  accountName: {
+  phoneNumber: {
+    fontFamily: 'monospace',
     fontSize: 15,
     fontWeight: '700',
-    flexShrink: 1,
+    letterSpacing: 0.6,
     lineHeight: 20,
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    flexShrink: 0,
-  },
-  accountNumber: {
-    fontSize: 13,
-    fontWeight: '500',
+  accountSubName: {
+    fontSize: 11,
     marginTop: 2,
-    lineHeight: 18,
-  },
-  activeBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 6,
-    flexShrink: 0,
-  },
-  activeBadgeText: {
-    fontSize: 10.5,
-    fontWeight: '700',
-  },
-  providerBadgeContainer: {
-    marginLeft: 8,
-    flexShrink: 0,
-  },
-  providerBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  providerText: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  balanceContainer: {
-    marginVertical: 4,
-  },
-  balanceLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    lineHeight: 16,
-  },
-  balanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 4,
-  },
-  balanceAmount: {
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    flexShrink: 1,
+    fontWeight: '500',
   },
   profitBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
     borderRadius: 8,
-    flexShrink: 1,
+    gap: 3,
+    marginTop: 1,
+  },
+  profitIcon: {
+    marginTop: 0.5,
   },
   profitText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
-    lineHeight: 16,
+    letterSpacing: 0.2,
   },
-  statsRow: {
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    marginTop: 1,
+  },
+  statusPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  balanceSection: {
+    marginTop: 1,
+  },
+  balanceLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  balanceAmount: {
+    fontSize: 21,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  infoGrid: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    gap: 12,
+    marginTop: 1,
+  },
+  infoCol: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  infoValue: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  limitSection: {
+    marginTop: 1,
+  },
+  limitHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginTop: 8,
+    marginBottom: 3.5,
   },
-  statItem: {
-    flex: 1,
-    minWidth: 0,
+  limitLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
-  statLabel: {
-    fontSize: 11,
+  limitPercentage: {
+    fontSize: 9.5,
+    fontWeight: '700',
+  },
+  progressTrack: {
+    height: 5,
+    borderRadius: 2.5,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2.5,
+  },
+  totalLimitText: {
+    fontSize: 9.5,
+    textAlign: 'right',
+    marginTop: 3,
     fontWeight: '500',
-    lineHeight: 15,
-  },
-  statValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 28,
-    marginHorizontal: 8,
-    alignSelf: 'center',
-  },
-  footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(150, 150, 150, 0.15)',
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  actionBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  primaryActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 8,
-  },
-  primaryActionBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
   },
 });

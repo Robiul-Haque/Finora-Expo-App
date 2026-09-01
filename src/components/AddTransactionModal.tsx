@@ -1,10 +1,24 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ActivityIndicator,
+  Animated,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TransactionType } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
-import { validateTransaction, normalizePhoneNumber } from '../utils/validation';
+import { validateTransaction } from '../utils/validation';
+import { formatCurrency } from '../utils';
 
 interface AddTransactionModalProps {
   visible: boolean;
@@ -12,60 +26,141 @@ interface AddTransactionModalProps {
   preselectedAccountId?: string;
 }
 
-export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visible, onClose, preselectedAccountId }) => {
-  const { theme } = useTheme();
+const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
+  visible,
+  onClose,
+  preselectedAccountId,
+}) => {
+  const { theme, isDarkMode } = useTheme();
   const { accounts, addTransaction } = useLedger();
 
   const [accountId, setAccountId] = useState(preselectedAccountId || (accounts.length > 0 ? accounts[0].id : ''));
-  const [type, setType] = useState<TransactionType>('cash_out');
+  const [txType, setTxType] = useState<'send' | 'receive' | 'adjustment'>('send');
   const [amount, setAmount] = useState('');
-  const [targetNumber, setTargetNumber] = useState('');
-  const [cost, setCost] = useState('');
-  const [profit, setProfit] = useState('');
+  const [recipientNumber, setRecipientNumber] = useState('');
+  const [cost, setCost] = useState('0');
+  const [profit, setProfit] = useState('0');
   const [note, setNote] = useState('');
-  const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const scrollViewRef = React.useRef<ScrollView>(null);
+  const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
 
-  // Sync if preselectedAccountId changes
-  React.useEffect(() => {
-    if (preselectedAccountId) {
-      setAccountId(preselectedAccountId);
-    } else if (accounts.length > 0 && !accountId) {
-      setAccountId(accounts[0].id);
+  const slideAnim = useRef(new Animated.Value(400)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      slideAnim.setValue(400);
+      fadeAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 65,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
-  }, [preselectedAccountId, accounts]);
+  }, [visible]);
 
-  const selectedAccount = accounts.find((a) => a.id === accountId) || accounts[0];
-
-  // Real-time validation computation
-  const validation = useMemo(() => {
-    return validateTransaction(selectedAccount, type, amount, targetNumber, cost, profit);
-  }, [selectedAccount, type, amount, targetNumber, cost, profit]);
-
-  const handleBlur = (field: string) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
+  const handleClose = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 400,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+    });
   };
 
-  const handleSave = async () => {
-    // Mark all as touched to display inline errors on invalid fields
-    setTouched({
-      amount: true,
-      targetNumber: true,
-      cost: true,
-      profit: true,
-    });
+  const activeAccounts = useMemo(() => accounts.filter((a) => a.isActive), [accounts]);
 
-    if (!validation.isValid) {
-      // Auto-scroll to top so user sees the inline red fields immediately
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  React.useEffect(() => {
+    if (preselectedAccountId) {
+      const targetAcc = accounts.find((a) => a.id === preselectedAccountId);
+      if (targetAcc && targetAcc.isActive) {
+        setAccountId(preselectedAccountId);
+      } else if (activeAccounts.length > 0) {
+        setAccountId(activeAccounts[0].id);
+      }
+    } else if (activeAccounts.length > 0 && (!accountId || !activeAccounts.some((a) => a.id === accountId))) {
+      setAccountId(activeAccounts[0].id);
+    }
+  }, [preselectedAccountId, accounts, activeAccounts]);
+
+  const selectedAccount = activeAccounts.find((a) => a.id === accountId) || activeAccounts[0];
+
+  // Auto-calculate suggested cost & profit based on business rules for send money
+  const handleAmountChange = (val: string) => {
+    setAmount(val);
+    const num = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
+    if (txType === 'send') {
+      // Standard MFS send cost model (~15tk per 1000 or custom)
+      if (num > 0) {
+        const estimatedCost = Math.round(num * 0.015); // e.g. 150 on 10,000
+        const estimatedProfit = Math.round(num * 0.005); // e.g. 50 on 10,000
+        setCost(String(estimatedCost));
+        setProfit(String(estimatedProfit));
+      } else {
+        setCost('0');
+        setProfit('0');
+      }
+    } else if (txType === 'receive') {
+      if (num > 0) {
+        const estimatedProfit = Math.round(num * 0.02); // 2% commission on cash in/receive
+        setCost('0');
+        setProfit(String(estimatedProfit));
+      } else {
+        setCost('0');
+        setProfit('0');
+      }
+    }
+  };
+
+  const mappedTransactionType: TransactionType = useMemo(() => {
+    if (txType === 'send') return 'sm';
+    if (txType === 'receive') return 'recev';
+    return 'adjustment';
+  }, [txType]);
+
+  const numAmount = parseFloat(amount.trim().replace(/[^0-9.]/g, '')) || 0;
+  const numCost = parseFloat(cost.trim().replace(/[^0-9.]/g, '')) || 0;
+  const numProfit = parseFloat(profit.trim().replace(/[^0-9.]/g, '')) || 0;
+
+  const validation = useMemo(() => {
+    return validateTransaction(selectedAccount, mappedTransactionType, amount, recipientNumber, cost, profit);
+  }, [selectedAccount, mappedTransactionType, amount, recipientNumber, cost, profit]);
+
+  const previewNewBalance = useMemo(() => {
+    if (!selectedAccount) return 0;
+    const current = selectedAccount.balance || 0;
+    if (txType === 'receive') {
+      return current + numAmount;
+    } else if (txType === 'send') {
+      return current - (numAmount + numCost);
+    } else {
+      return numAmount > 0 ? numAmount : current;
+    }
+  }, [selectedAccount, txType, numAmount, numCost]);
+
+  const handleSave = async () => {
+    setTouched({ amount: true, recipientNumber: true });
+
+    if (!selectedAccount || numAmount <= 0 || (txType === 'send' && !recipientNumber.trim())) {
       return;
     }
-
-    const numAmount = parseFloat(amount.trim().replace(/[^0-9.]/g, '')) || 0;
-    const numCost = parseFloat(cost.trim().replace(/[^0-9.]/g, '')) || 0;
-    const numProfit = parseFloat(profit.trim().replace(/[^0-9.]/g, '')) || 0;
-    const cleanTargetNumber = normalizePhoneNumber(targetNumber.trim());
 
     setIsSubmitting(true);
     try {
@@ -73,20 +168,23 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visibl
         accountId: selectedAccount.id,
         accountNumber: selectedAccount.accountNumber,
         accountName: selectedAccount.name,
-        type,
+        type: mappedTransactionType,
         amount: numAmount,
-        recipientNumber: (type === 'send_money' || type === 'cash_out' || type === 'b2b') ? cleanTargetNumber : undefined,
-        senderNumber: (type === 'receive_money' || type === 'cash_in') ? cleanTargetNumber : undefined,
         cost: numCost,
         profit: numProfit,
+        margin: numProfit,
+        counterparty: recipientNumber.trim() || selectedAccount.accountNumber,
+        recipientNumber: txType === 'send' ? recipientNumber.trim() : undefined,
+        senderNumber: txType === 'receive' ? recipientNumber.trim() : undefined,
+        runningBalance: previewNewBalance,
         note: note.trim() || undefined,
       });
 
-      // Reset form
+      // Clear & close
       setAmount('');
-      setTargetNumber('');
-      setCost('');
-      setProfit('');
+      setRecipientNumber('');
+      setCost('0');
+      setProfit('0');
       setNote('');
       setTouched({});
       onClose();
@@ -97,622 +195,546 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ visibl
     }
   };
 
-  const isSend = type === 'send_money' || type === 'cash_out' || type === 'b2b';
+  const currentDateDisplay = useMemo(() => {
+    const d = new Date();
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }, []);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.modalOverlay}
-      >
-        <View style={[styles.modalContent, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <View style={styles.headerLeft}>
-              <TouchableOpacity onPress={onClose} style={styles.backBtn} activeOpacity={0.7}>
+    <Modal visible={visible} animationType="none" transparent onRequestClose={handleClose}>
+      <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}>
+          <Animated.View style={[styles.modalSheet, { backgroundColor: theme.card, borderColor: theme.border, transform: [{ translateY: slideAnim }] }]}>
+            {/* Top Header */}
+            <View style={[styles.header, { borderBottomColor: theme.divider }]}>
+              <TouchableOpacity onPress={handleClose} style={styles.backButton} activeOpacity={0.7}>
                 <Ionicons name="arrow-back" size={22} color={theme.text} />
               </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Add bKash Entry</Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-              <Ionicons name="close" size={22} color={theme.textMuted} />
-            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: theme.text }]}>Add Transaction</Text>
+            <View style={styles.placeholderIcon} />
           </View>
 
-          <ScrollView ref={scrollViewRef} style={styles.formScroll} showsVerticalScrollIndicator={false}>
-            {/* Account Selector */}
+          <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" bounces={false}>
+            {/* Account Selector (bKash Number) */}
             <View style={styles.inputGroup}>
-              <View style={styles.labelRow}>
-                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                  SOURCE BKASH NUMBER
-                </Text>
-                <View style={styles.requiredBadge}>
-                  <Text style={styles.requiredText}>* Required</Text>
-                </View>
-              </View>
-
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accountSelectorRow}>
-                {accounts.map((acc) => {
-                  const isSelected = acc.id === accountId;
-                  return (
-                    <TouchableOpacity
-                      key={acc.id}
-                      style={[
-                        styles.accountPill,
-                        {
-                          backgroundColor: isSelected ? theme.primaryLight : theme.cardSecondary,
-                          borderColor: isSelected ? theme.primary : theme.border,
-                        },
-                      ]}
-                      onPress={() => setAccountId(acc.id)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={acc.type === 'merchant' ? 'qr-code-outline' : 'phone-portrait-outline'}
-                        size={16}
-                        color={isSelected ? theme.primary : theme.textSecondary}
-                      />
-                      <View style={{ flexShrink: 1 }}>
-                        <Text
-                          style={[
-                            styles.accountPillName,
-                            { color: isSelected ? theme.primary : theme.text },
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {acc.name}
-                        </Text>
-                        <Text style={[styles.accountPillNumber, { color: theme.textSecondary }]} numberOfLines={1}>
-                          {acc.accountNumber} (৳{acc.balance.toLocaleString()})
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            {/* Transaction Type Segmented Toggle */}
-            <View style={styles.inputGroup}>
-              <View style={styles.labelRow}>
-                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                  BKASH TRANSACTION TYPE
-                </Text>
-                <View style={styles.requiredBadge}>
-                  <Text style={styles.requiredText}>* Required</Text>
-                </View>
-              </View>
-
-              <View style={[styles.typeSegment, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}>
-                <TouchableOpacity
-                  style={[
-                    styles.typeOption,
-                    (type === 'cash_out' || type === 'send_money') && { backgroundColor: theme.danger, borderRadius: 10 },
-                  ]}
-                  onPress={() => setType('cash_out')}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.typeOptionText,
-                      { color: (type === 'cash_out' || type === 'send_money') ? '#FFFFFF' : theme.textSecondary },
-                    ]}
-                  >
-                    Cash Out
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.typeOption,
-                    (type === 'receive_money' || type === 'cash_in') && { backgroundColor: theme.success, borderRadius: 10 },
-                  ]}
-                  onPress={() => setType('receive_money')}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.typeOptionText,
-                      { color: (type === 'receive_money' || type === 'cash_in') ? '#FFFFFF' : theme.textSecondary },
-                    ]}
-                  >
-                    Cash In
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.typeOption,
-                    type === 'b2b' && { backgroundColor: theme.primary, borderRadius: 10 },
-                  ]}
-                  onPress={() => setType('b2b')}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.typeOptionText,
-                      { color: type === 'b2b' ? '#FFFFFF' : theme.textSecondary },
-                    ]}
-                  >
-                    B2B Float
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.typeOption,
-                    type === 'adjustment' && { backgroundColor: '#64748B', borderRadius: 10 },
-                  ]}
-                  onPress={() => setType('adjustment')}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.typeOptionText,
-                      { color: type === 'adjustment' ? '#FFFFFF' : theme.textSecondary },
-                    ]}
-                  >
-                    Adjust
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Amount Input (Allows 0 and above) */}
-            <View style={styles.inputGroup}>
-              <View style={styles.labelRow}>
-                <View style={styles.labelWithBadge}>
-                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>AMOUNT (৳)</Text>
-                  <View style={styles.requiredBadge}>
-                    <Text style={styles.requiredText}>* Required</Text>
-                  </View>
-                </View>
-                {selectedAccount && isSend && (
-                  <Text style={[styles.balanceHint, { color: theme.textSecondary }]}>
-                    Avail: ৳{selectedAccount.balance.toLocaleString()}
-                  </Text>
-                )}
-              </View>
-
-              <View
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>ACCOUNT / PHONE NUMBER</Text>
+              <TouchableOpacity
                 style={[
-                  styles.inputWrapper,
+                  styles.selectorBox,
                   {
                     backgroundColor: theme.inputBg,
-                    borderColor:
-                      touched.amount && validation.errors.amount
-                        ? theme.danger
-                        : theme.border,
+                    borderBottomColor: showAccountDropdown ? theme.primary : theme.border,
+                  },
+                ]}
+                onPress={() => setShowAccountDropdown(!showAccountDropdown)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.selectorNumberText, { color: theme.text }]}>
+                  {selectedAccount?.accountNumber || 'Select Account'}
+                </Text>
+                <Ionicons
+                  name={showAccountDropdown ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color={theme.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {/* Account Dropdown Options */}
+              {showAccountDropdown && (
+                <View style={[styles.dropdownContainer, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}>
+                  {activeAccounts.length === 0 ? (
+                    <View style={{ padding: 14, alignItems: 'center' }}>
+                      <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+                        No active SIM accounts available. Please activate an account first.
+                      </Text>
+                    </View>
+                  ) : (
+                    activeAccounts.map((acc) => (
+                      <TouchableOpacity
+                        key={acc.id}
+                        style={[
+                          styles.dropdownItem,
+                          acc.id === selectedAccount?.id && { backgroundColor: isDarkMode ? '#1E293B' : '#E8F0FE' },
+                        ]}
+                        onPress={() => {
+                          setAccountId(acc.id);
+                          setShowAccountDropdown(false);
+                        }}
+                      >
+                        <View>
+                          <Text style={[styles.dropdownNumber, { color: theme.text }]}>{acc.accountNumber}</Text>
+                          <Text style={[styles.dropdownName, { color: theme.textSecondary }]}>{acc.name}</Text>
+                        </View>
+                        <Text style={[styles.dropdownBalance, { color: theme.primary }]}>
+                          {formatCurrency(acc.balance)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
+              )}
+            </View>
+
+            {/* Segmented Type Bar: Send Money | Receive Money | Adjustment */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>TYPE</Text>
+              <View style={[styles.segmentedContainer, { backgroundColor: theme.cardSecondary }]}>
+                <TouchableOpacity
+                  style={[
+                    styles.segmentButton,
+                    txType === 'send' && [styles.activeSegment, { backgroundColor: theme.card }],
+                  ]}
+                  onPress={() => {
+                    setTxType('send');
+                    handleAmountChange(amount);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      { color: txType === 'send' ? theme.primary : theme.textSecondary },
+                      txType === 'send' && styles.activeSegmentText,
+                    ]}
+                  >
+                    Send Money
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.segmentButton,
+                    txType === 'receive' && [styles.activeSegment, { backgroundColor: theme.card }],
+                  ]}
+                  onPress={() => {
+                    setTxType('receive');
+                    handleAmountChange(amount);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      { color: txType === 'receive' ? theme.success : theme.textSecondary },
+                      txType === 'receive' && styles.activeSegmentText,
+                    ]}
+                  >
+                    Receive Money
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.segmentButton,
+                    txType === 'adjustment' && [styles.activeSegment, { backgroundColor: theme.card }],
+                  ]}
+                  onPress={() => {
+                    setTxType('adjustment');
+                    setCost('0');
+                    setProfit('0');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      { color: txType === 'adjustment' ? theme.text : theme.textSecondary },
+                      txType === 'adjustment' && styles.activeSegmentText,
+                    ]}
+                  >
+                    Adjustment
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Amount Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>AMOUNT</Text>
+              <View
+                style={[
+                  styles.inputBox,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderBottomColor: touched.amount && validation.errors.amount ? theme.danger : theme.border,
                   },
                 ]}
               >
-                <Text style={[styles.currencyPrefix, { color: theme.primary }]}>৳</Text>
+                <Text style={[styles.currencyPrefix, { color: theme.textSecondary }]}>৳</Text>
                 <TextInput
-                  style={[styles.inputField, { color: theme.text, fontSize: 20, fontWeight: '700' }]}
-                  placeholder="0.00"
+                  style={[styles.numericInput, { color: theme.text }]}
+                  placeholder="0"
                   placeholderTextColor={theme.textMuted}
                   keyboardType="numeric"
                   value={amount}
-                  onChangeText={(val) => {
-                    setAmount(val);
-                    if (!touched.amount) setTouched((prev) => ({ ...prev, amount: true }));
-                  }}
-                  onBlur={() => handleBlur('amount')}
+                  onChangeText={handleAmountChange}
+                  onBlur={() => setTouched((prev) => ({ ...prev, amount: true }))}
                 />
               </View>
-
-              {/* Error Message */}
               {touched.amount && validation.errors.amount && (
-                <View style={styles.errorRow}>
-                  <Ionicons name="alert-circle" size={14} color={theme.danger} />
-                  <Text style={[styles.errorText, { color: theme.danger }]}>
-                    {validation.errors.amount}
-                  </Text>
-                </View>
-              )}
-
-              {/* Warning Message */}
-              {!validation.errors.amount && validation.warnings?.amount && (
-                <View style={styles.warningRow}>
-                  <Ionicons name="warning" size={14} color={theme.warning} />
-                  <Text style={[styles.warningText, { color: theme.warning }]}>
-                    {validation.warnings.amount}
-                  </Text>
-                </View>
+                <Text style={[styles.errorMsg, { color: theme.danger }]}>{validation.errors.amount}</Text>
               )}
             </View>
 
-            {/* Recipient / Sender Number */}
-            <View style={styles.inputGroup}>
-              <View style={styles.labelRow}>
-                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                  {isSend ? 'RECIPIENT BKASH NUMBER' : 'SENDER BKASH NUMBER'}
+            {/* Recipient / Counterparty Number (for Send or Receive) */}
+            {txType !== 'adjustment' && (
+              <View style={styles.inputGroup}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+                  {txType === 'send' ? 'RECIPIENT NUMBER' : 'SENDER / CUSTOMER NUMBER'}
                 </Text>
-                <View style={styles.requiredBadge}>
-                  <Text style={styles.requiredText}>* Required</Text>
-                </View>
-              </View>
-              <View
-                style={[
-                  styles.inputWrapper,
-                  {
-                    backgroundColor: theme.inputBg,
-                    borderColor:
-                      touched.targetNumber && validation.errors.targetNumber
-                        ? theme.danger
-                        : theme.border,
-                  },
-                ]}
-              >
-                <Ionicons name="call-outline" size={18} color={theme.textMuted} />
-                <TextInput
-                  style={[styles.inputField, { color: theme.text }]}
-                  placeholder={isSend ? 'e.g. 01712345678' : 'e.g. 01888111222'}
-                  placeholderTextColor={theme.textMuted}
-                  keyboardType="phone-pad"
-                  maxLength={14}
-                  value={targetNumber}
-                  onChangeText={(val) => {
-                    setTargetNumber(val);
-                    if (!touched.targetNumber) setTouched((prev) => ({ ...prev, targetNumber: true }));
-                  }}
-                  onBlur={() => handleBlur('targetNumber')}
-                />
-              </View>
-
-              {touched.targetNumber && validation.errors.targetNumber && (
-                <View style={styles.errorRow}>
-                  <Ionicons name="alert-circle" size={14} color={theme.danger} />
-                  <Text style={[styles.errorText, { color: theme.danger }]}>
-                    {validation.errors.targetNumber}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* 2-Column Grid: Send Cost & Profit */}
-            <View style={styles.rowGrid}>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <View style={styles.labelRow}>
-                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                    {isSend ? 'FEE' : 'COST'} (৳)
-                  </Text>
-                  <View style={styles.requiredBadge}>
-                    <Text style={styles.requiredText}>* Required</Text>
-                  </View>
-                </View>
                 <View
                   style={[
-                    styles.inputWrapper,
+                    styles.inputBox,
                     {
                       backgroundColor: theme.inputBg,
-                      borderColor:
-                        touched.cost && validation.errors.cost
-                          ? theme.danger
-                          : theme.border,
+                      borderBottomColor: touched.recipientNumber && validation.errors.targetNumber ? theme.danger : theme.border,
                     },
                   ]}
                 >
-                  <Text style={[styles.currencyPrefixSmall, { color: theme.danger }]}>৳</Text>
                   <TextInput
-                    style={[styles.inputField, { color: theme.text }]}
+                    style={[styles.monoInput, { color: theme.text }]}
+                    placeholder="01712 345 678"
+                    placeholderTextColor={theme.textMuted}
+                    keyboardType="phone-pad"
+                    value={recipientNumber}
+                    onChangeText={setRecipientNumber}
+                    onBlur={() => setTouched((prev) => ({ ...prev, recipientNumber: true }))}
+                  />
+                </View>
+                {touched.recipientNumber && validation.errors.targetNumber && (
+                  <Text style={[styles.errorMsg, { color: theme.danger }]}>{validation.errors.targetNumber}</Text>
+                )}
+              </View>
+            )}
+
+            {/* 2-Column: Send Cost & Profit */}
+            <View style={styles.rowInputs}>
+              <View style={[styles.inputGroup, styles.halfCol]}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>SEND COST</Text>
+                <View style={[styles.inputBox, { backgroundColor: theme.inputBg, borderBottomColor: theme.border }]}>
+                  <Text style={[styles.currencyPrefix, { color: theme.textSecondary }]}>৳</Text>
+                  <TextInput
+                    style={[styles.numericInput, { color: theme.text }]}
                     placeholder="0"
                     placeholderTextColor={theme.textMuted}
                     keyboardType="numeric"
                     value={cost}
-                    onChangeText={(val) => {
-                      setCost(val);
-                      if (!touched.cost) setTouched((prev) => ({ ...prev, cost: true }));
-                    }}
-                    onBlur={() => handleBlur('cost')}
+                    onChangeText={setCost}
                   />
                 </View>
-                {touched.cost && validation.errors.cost && (
-                  <View style={styles.errorRow}>
-                    <Ionicons name="alert-circle" size={12} color={theme.danger} />
-                    <Text style={[styles.errorText, { color: theme.danger }]}>
-                      {validation.errors.cost}
-                    </Text>
-                  </View>
-                )}
               </View>
 
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <View style={styles.labelRow}>
-                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>COMMISSION (৳)</Text>
-                  <View style={styles.optionalBadge}>
-                    <Text style={[styles.optionalText, { color: theme.textMuted }]}>Optional</Text>
-                  </View>
-                </View>
+              <View style={[styles.inputGroup, styles.halfCol]}>
+                <Text style={[styles.fieldLabel, { color: theme.success }]}>PROFIT (MARGIN)</Text>
                 <View
                   style={[
-                    styles.inputWrapper,
+                    styles.inputBox,
                     {
                       backgroundColor: theme.inputBg,
-                      borderColor:
-                        touched.profit && validation.errors.profit
-                          ? theme.danger
-                          : theme.border,
+                      borderBottomColor: theme.success,
                     },
                   ]}
                 >
-                  <Text style={[styles.currencyPrefixSmall, { color: theme.success }]}>৳</Text>
+                  <Text style={[styles.currencyPrefix, { color: theme.success }]}>৳</Text>
                   <TextInput
-                    style={[styles.inputField, { color: theme.text }]}
+                    style={[styles.numericInput, { color: theme.success, fontWeight: '700' }]}
                     placeholder="0"
                     placeholderTextColor={theme.textMuted}
                     keyboardType="numeric"
                     value={profit}
-                    onChangeText={(val) => {
-                      setProfit(val);
-                      if (!touched.profit) setTouched((prev) => ({ ...prev, profit: true }));
-                    }}
-                    onBlur={() => handleBlur('profit')}
+                    onChangeText={setProfit}
                   />
                 </View>
-                {touched.profit && validation.errors.profit && (
-                  <View style={styles.errorRow}>
-                    <Ionicons name="alert-circle" size={12} color={theme.danger} />
-                    <Text style={[styles.errorText, { color: theme.danger }]}>
-                      {validation.errors.profit}
-                    </Text>
-                  </View>
-                )}
               </View>
             </View>
 
-            {/* Note Optional */}
+            {/* Date Display */}
             <View style={styles.inputGroup}>
-              <View style={styles.labelRow}>
-                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                  NOTE (DETAILS)
-                </Text>
-                <View style={styles.optionalBadge}>
-                  <Text style={[styles.optionalText, { color: theme.textMuted }]}>Optional</Text>
-                </View>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>DATE</Text>
+              <View style={[styles.inputBox, { backgroundColor: theme.inputBg, borderBottomColor: theme.border }]}>
+                <Ionicons name="calendar-outline" size={18} color={theme.textSecondary} style={{ marginRight: 10 }} />
+                <Text style={[styles.readOnlyText, { color: theme.text }]}>{currentDateDisplay}</Text>
               </View>
-              <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
-                <Ionicons name="document-text-outline" size={18} color={theme.textMuted} />
+            </View>
+
+            {/* Note */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>NOTE</Text>
+              <View style={[styles.textAreaBox, { backgroundColor: theme.inputBg, borderBottomColor: theme.border }]}>
                 <TextInput
-                  style={[styles.inputField, { color: theme.text }]}
-                  placeholder="e.g. Retail purchase settlement"
+                  style={[styles.textAreaInput, { color: theme.text }]}
+                  placeholder="Add details / customer reference..."
                   placeholderTextColor={theme.textMuted}
-                  maxLength={100}
+                  multiline
+                  numberOfLines={3}
                   value={note}
                   onChangeText={setNote}
                 />
               </View>
             </View>
+
+            {/* Balance Impact Preview */}
+            <View style={[styles.previewBox, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}>
+              <Text style={[styles.previewLabel, { color: theme.textSecondary }]}>PROJECTED CLOSING BALANCE</Text>
+              <Text style={[styles.previewValue, { color: theme.primary }]}>
+                {formatCurrency(previewNewBalance)}
+              </Text>
+            </View>
+
+            <View style={{ height: 30 }} />
           </ScrollView>
 
-          {/* Action Buttons */}
-          <View style={[styles.footer, { borderTopColor: theme.border }]}>
+          {/* Sticky Bottom Actions */}
+          <View style={[styles.stickyFooter, { backgroundColor: theme.card, borderTopColor: theme.divider }]}>
             <TouchableOpacity
-              style={[styles.cancelBtn, { borderColor: theme.border }]}
+              style={[styles.cancelBtn, { borderColor: theme.primary }]}
               onPress={onClose}
-              disabled={isSubmitting}
               activeOpacity={0.7}
             >
-              <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
+              <Text style={[styles.cancelBtnText, { color: theme.primary }]}>Cancel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[
-                styles.saveBtn,
-                {
-                  backgroundColor: theme.primary,
-                  opacity: isSubmitting ? 0.7 : 1,
-                },
-              ]}
+              style={[styles.saveBtn, { backgroundColor: theme.primary }]}
               onPress={handleSave}
               disabled={isSubmitting}
-              activeOpacity={0.8}
+              activeOpacity={0.92}
             >
-              <Text style={styles.saveBtnText}>
-                {isSubmitting ? 'Recording...' : 'Record bKash Entry'}
-              </Text>
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.saveBtnText}>Save Transaction</Text>
+              )}
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
+      </Animated.View>
     </Modal>
   );
 };
 
+export const AddTransactionModal = React.memo(AddTransactionModalComponent);
+
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    maxHeight: '90%',
-    paddingBottom: 24,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(150, 150, 150, 0.2)',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  backBtn: {
-    padding: 2,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  closeBtn: {
-    padding: 4,
-  },
-  formScroll: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  labelWithBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  requiredBadge: {
-    backgroundColor: 'rgba(225, 29, 72, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  requiredText: {
-    color: '#E11D48',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  optionalBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  optionalText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  balanceHint: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  inputLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  accountSelectorRow: {
-    flexDirection: 'row',
-  },
-  accountPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '92%',
+    minHeight: '80%',
     borderWidth: 1,
-    marginRight: 10,
+    width: '100%',
+    maxWidth: 540,
+    alignSelf: 'center',
   },
-  accountPillName: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  accountPillNumber: {
-    fontSize: 11,
-  },
-  typeSegment: {
+  header: {
     flexDirection: 'row',
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 4,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
   },
-  typeOption: {
-    flex: 1,
-    paddingVertical: 8,
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  typeOptionText: {
-    fontSize: 12,
+  headerTitle: {
+    fontSize: 18,
     fontWeight: '700',
   },
-  inputWrapper: {
+  placeholderIcon: {
+    width: 36,
+  },
+  formContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  inputGroup: {
+    marginBottom: 14,
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  selectorBox: {
+    height: 52,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomWidth: 2,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+  },
+  selectorNumberText: {
+    fontFamily: 'monospace',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  dropdownContainer: {
+    borderRadius: 8,
     borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 10,
-    gap: 8,
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  dropdownNumber: {
+    fontFamily: 'monospace',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  dropdownName: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  dropdownBalance: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  segmentedContainer: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    padding: 3,
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeSegment: {},
+  segmentText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  activeSegmentText: {
+    fontWeight: '700',
+  },
+  inputBox: {
+    height: 52,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomWidth: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
   },
   currencyPrefix: {
-    fontSize: 20,
-    fontWeight: '900',
+    fontSize: 18,
+    fontWeight: '700',
+    marginRight: 6,
   },
-  currencyPrefixSmall: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  inputField: {
+  numericInput: {
     flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
     padding: 0,
-    fontSize: 14,
   },
-  rowGrid: {
+  monoInput: {
+    flex: 1,
+    fontFamily: 'monospace',
+    fontSize: 15,
+    fontWeight: '600',
+    padding: 0,
+  },
+  readOnlyText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  rowInputs: {
     flexDirection: 'row',
     gap: 12,
   },
-  errorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-    paddingHorizontal: 2,
+  halfCol: {
+    flex: 1,
   },
-  errorText: {
-    fontSize: 11.5,
+  textAreaBox: {
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomWidth: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 70,
+  },
+  textAreaInput: {
+    fontSize: 14,
+    padding: 0,
+    textAlignVertical: 'top',
+  },
+  errorMsg: {
+    fontSize: 11,
     fontWeight: '600',
-  },
-  warningRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
     marginTop: 4,
-    paddingHorizontal: 2,
   },
-  warningText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-  },
-  footer: {
+  previewBox: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  previewLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  previewValue: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  stickyFooter: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    gap: 12,
   },
   cancelBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
+    flex: 1,
+    height: 48,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
   saveBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
+    flex: 2,
+    height: 48,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   saveBtnText: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

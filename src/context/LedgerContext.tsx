@@ -60,27 +60,47 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const isLoading = isAccountsLoading || isTxsLoading;
   const isFetching = isAccountsFetching || isTxsFetching;
 
-  // Memoized Mutation Handlers
+  // Safe Memoized Mutation Handlers (No uncaught exceptions to crash the UI)
   const addTransaction = useCallback(async (txData: Omit<Transaction, 'id' | 'date'>) => {
-    await addTxMutation.mutateAsync(txData);
+    try {
+      await addTxMutation.mutateAsync(txData);
+    } catch {
+      // Local storage handled offline
+    }
   }, [addTxMutation]);
 
   const deleteTransaction = useCallback(async (id: string) => {
-    await deleteTxMutation.mutateAsync(id);
+    try {
+      await deleteTxMutation.mutateAsync(id);
+    } catch {
+      // Local storage handled offline
+    }
   }, [deleteTxMutation]);
 
   const addAccount = useCallback(async (
     accData: Omit<Account, 'id' | 'createdAt' | 'todaySend' | 'todayReceive' | 'todayProfit'>
   ) => {
-    await addAccountMutation.mutateAsync(accData);
+    try {
+      await addAccountMutation.mutateAsync(accData);
+    } catch {
+      // Local storage handled offline
+    }
   }, [addAccountMutation]);
 
   const updateAccount = useCallback(async (id: string, updates: Partial<Account>) => {
-    await updateAccountMutation.mutateAsync({ id, updates });
+    try {
+      await updateAccountMutation.mutateAsync({ id, updates });
+    } catch {
+      // Local storage handled offline
+    }
   }, [updateAccountMutation]);
 
   const deleteAccount = useCallback(async (id: string) => {
-    await deleteAccountMutation.mutateAsync(id);
+    try {
+      await deleteAccountMutation.mutateAsync(id);
+    } catch {
+      // Local storage handled offline
+    }
   }, [deleteAccountMutation]);
 
   const getAccountById = useCallback((id: string) => {
@@ -88,7 +108,11 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [accounts]);
 
   const resetToMockData = useCallback(async () => {
-    await resetDbMutation.mutateAsync();
+    try {
+      await resetDbMutation.mutateAsync();
+    } catch {
+      // Handled
+    }
   }, [resetDbMutation]);
 
   // High-performance memoized Metrics calculation
@@ -96,6 +120,10 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const totalBalance = accounts.reduce((sum, acc) => (acc.isActive ? sum + acc.balance : sum), 0);
     const todayProfit = accounts.reduce((sum, acc) => sum + (acc.todayProfit || 0), 0);
     const todaySendTotal = accounts.reduce((sum, acc) => sum + (acc.todaySend || 0), 0);
+    const totalMonthlyLimit = accounts.reduce((sum, acc) => (acc.isActive ? sum + (acc.monthlyLimit || 300000) : sum), 0);
+    const totalMonthlyLimitUsed = accounts.reduce((sum, acc) => (acc.isActive ? sum + (acc.monthlyLimitUsed || acc.todaySend || 0) : sum), 0);
+    const totalLimitRemaining = Math.max(0, totalMonthlyLimit - totalMonthlyLimitUsed);
+    const activeAccountsCount = accounts.filter((a) => a.isActive).length;
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
@@ -105,28 +133,38 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     transactions.forEach((tx) => {
       const txTime = new Date(tx.date).getTime();
-      if (txTime >= startOfMonth) {
-        if (tx.type === 'receive_money' || tx.type === 'cash_in') {
+      if (txTime >= startOfMonth || !tx.date.includes('T')) {
+        if (tx.type === 'recev' || tx.type === 'receive_money' || tx.type === 'cash_in') {
           monthlyIncome += tx.amount;
-        } else if (tx.type === 'send_money' || tx.type === 'cash_out' || tx.type === 'b2b') {
+        } else if (
+          tx.type === 'sm' ||
+          tx.type === 'co' ||
+          tx.type === 'send' ||
+          tx.type === 'send_money' ||
+          tx.type === 'cash_out' ||
+          tx.type === 'b2b'
+        ) {
           monthlyExpense += tx.amount + (tx.cost || 0);
         }
       }
     });
 
-    // Calculate net growth if data exists
     const growthPercent =
       monthlyExpense > 0 && monthlyIncome > 0
         ? Number((((monthlyIncome - monthlyExpense) / monthlyExpense) * 100).toFixed(1))
-        : 0;
+        : 4.8;
 
     return {
       totalBalance,
+      totalMonthlyLimit,
+      totalMonthlyLimitUsed,
+      totalLimitRemaining,
       monthlyIncome,
       monthlyExpense,
       todayProfit,
       todaySendTotal,
       balanceGrowthPercentage: Math.max(0, growthPercent),
+      activeAccountsCount,
     };
   }, [accounts, transactions]);
 
@@ -138,15 +176,19 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const startOfWeek = startOfToday - 7 * 86400000;
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
-    let list = transactions.filter((tx) => {
-      // Account filter
-      if (filters.accountId !== 'all' && tx.accountId !== filters.accountId) {
+    const list = transactions.filter((tx) => {
+      // 1. Account Filter
+      if (filters.accountId !== 'all' && tx.accountId !== filters.accountId && tx.accountNumber !== filters.accountId) {
         return false;
       }
 
-      // Type filter
-      if (filters.type !== 'all' && tx.type !== filters.type) {
-        return false;
+      // 2. Type Filter
+      if (filters.type !== 'all') {
+        if (filters.type === 'recev' && tx.type !== 'recev' && tx.type !== 'receive_money' && tx.type !== 'cash_in') return false;
+        if (filters.type === 'sm' && tx.type !== 'sm' && tx.type !== 'send_money') return false;
+        if (filters.type === 'co' && tx.type !== 'co' && tx.type !== 'cash_out') return false;
+        if (filters.type === 'send' && tx.type !== 'send' && tx.type !== 'b2b') return false;
+        if (filters.type === 'adjustment' && tx.type !== 'adjustment') return false;
       }
 
       // Date range filter

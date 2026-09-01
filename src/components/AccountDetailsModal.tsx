@@ -1,10 +1,9 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Alert, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Account } from '../types/ledger';
+import { Account, Transaction } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
-import { LimitProgressBar } from './LimitProgressBar';
 import { TransactionItem } from './TransactionItem';
 import { ConfirmationModal } from './ConfirmationModal';
 import { formatCurrency } from '../utils';
@@ -16,19 +15,104 @@ interface AccountDetailsModalProps {
   onAddTransaction: (accId: string) => void;
 }
 
-export const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({ visible, account, onClose, onAddTransaction }) => {
-  const { theme } = useTheme();
-  const { transactions, updateAccount, deleteAccount } = useLedger();
+const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
+  visible,
+  account,
+  onClose,
+  onAddTransaction,
+}) => {
+  const { theme, isDarkMode } = useTheme();
+  const { transactions, deleteAccount, updateAccount } = useLedger();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'send' | 'receive'>('all');
+
+  const slideAnim = useRef(new Animated.Value(400)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      slideAnim.setValue(400);
+      fadeAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 65,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const handleClose = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 400,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+    });
+  };
 
   const accountTransactions = useMemo(() => {
     if (!account) return [];
-    return transactions.filter((t) => t.accountId === account.id);
-  }, [account, transactions]);
+    return transactions.filter(
+      (t) => t.accountId === account.id || t.accountNumber === account.accountNumber
+    );
+  }, [transactions, account]);
+
+  const filteredTransactions = useMemo(() => {
+    if (selectedFilter === 'all') return accountTransactions;
+    return accountTransactions.filter((t) => t.type === selectedFilter);
+  }, [accountTransactions, selectedFilter]);
+
+  const groupedTransactions = useMemo(() => {
+    const today = new Date().toDateString();
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterday = yesterdayDate.toDateString();
+
+    const groups: { TODAY: Transaction[]; YESTERDAY: Transaction[]; EARLIER: Transaction[] } = {
+      TODAY: [],
+      YESTERDAY: [],
+      EARLIER: [],
+    };
+
+    filteredTransactions.forEach((t) => {
+      const txDate = new Date(t.date).toDateString();
+      if (txDate === today) {
+        groups.TODAY.push(t);
+      } else if (txDate === yesterday) {
+        groups.YESTERDAY.push(t);
+      } else {
+        groups.EARLIER.push(t);
+      }
+    });
+
+    return groups;
+  }, [filteredTransactions]);
 
   if (!account) return null;
 
-  const remainingLimit = Math.max(0, account.dailyLimit - account.todaySend);
+  const monthlyLimit = account.monthlyLimit || 300000;
+  const monthlyLimitUsed = account.monthlyLimitUsed !== undefined ? account.monthlyLimitUsed : account.todaySend;
+  const remainingLimit = account.remainingLimit !== undefined ? account.remainingLimit : Math.max(0, monthlyLimit - monthlyLimitUsed);
+  const todayProfit = account.todayProfit || account.totalMargin || 0;
+
+  const usageRatio = monthlyLimit > 0 ? monthlyLimitUsed / monthlyLimit : 0;
+  const usagePercentage = Math.min(100, Math.round(usageRatio * 100));
 
   const handleConfirmDelete = async () => {
     setShowDeleteConfirm(false);
@@ -36,358 +120,417 @@ export const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({ visibl
     onClose();
   };
 
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
-          {/* Header */}
-          <View style={[styles.header, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <TouchableOpacity onPress={onClose} style={styles.iconBtn}>
-              <Ionicons name="arrow-back" size={22} color={theme.text} />
-            </TouchableOpacity>
+  const handleToggleStatus = async () => {
+    try {
+      await updateAccount(account.id, { isActive: !account.isActive });
+    } catch {
+      Alert.alert('Error', 'Failed to update SIM status.');
+    }
+  };
 
-            <View style={styles.headerTitleContainer}>
-              <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
+  return (
+    <Modal visible={visible} animationType="none" transparent onRequestClose={handleClose}>
+      <Animated.View style={[styles.container, { backgroundColor: theme.background, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+        {/* Top App Bar Header */}
+        <View style={[styles.topHeader, { backgroundColor: theme.card, borderBottomColor: theme.divider }]}>
+          <TouchableOpacity onPress={handleClose} style={styles.headerBtn} activeOpacity={0.7}>
+            <Ionicons name="arrow-back" size={22} color={theme.text} />
+          </TouchableOpacity>
+
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerPhoneNumber, { color: theme.text }]}>
+              {account.accountNumber}
+            </Text>
+            {account.name && account.name !== account.accountNumber && (
+              <Text style={[styles.headerAccountName, { color: theme.textSecondary }]}>
                 {account.name}
               </Text>
-              <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-                {account.accountNumber}
-              </Text>
+            )}
+          </View>
+
+          <TouchableOpacity
+            onPress={() => setShowDeleteConfirm(true)}
+            style={styles.headerBtn}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="ellipsis-vertical" size={20} color={theme.text} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          style={styles.scrollBody}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={true}
+          alwaysBounceVertical={true}
+          overScrollMode="always"
+        >
+          {/* Bento Summary Grid */}
+          <View style={styles.bentoSection}>
+            {/* Balance Card (Full Width) */}
+            <View style={[styles.bentoCard, styles.fullWidthCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View style={[styles.leftIndicator, { backgroundColor: account.isActive ? theme.primary : theme.textMuted }]} />
+              <View style={styles.bentoCardInner}>
+                <Text style={[styles.bentoLabel, { color: theme.textSecondary }]}>Current Balance</Text>
+                <Text style={[styles.bentoBigBalance, { color: account.isActive ? theme.text : theme.textMuted }]}>
+                  {formatCurrency(account.balance)}
+                </Text>
+              </View>
             </View>
 
-            <View style={styles.headerActions}>
-              <TouchableOpacity
-                onPress={() => updateAccount(account.id, { isActive: !account.isActive })}
-                style={[
-                  styles.activeBadge,
-                  {
-                    backgroundColor: account.isActive
-                      ? theme.successLight
-                      : theme.cardSecondary,
-                  },
-                ]}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text
-                  style={[
-                    styles.activeBadgeText,
-                    { color: account.isActive ? theme.success : theme.textMuted },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {account.isActive ? 'Active' : 'Inactive'}
-                </Text>
-              </TouchableOpacity>
+            {/* 2-Column: Today's Send & Profit */}
+            <View style={styles.twoColRow}>
+              {/* Today's Send */}
+              <View style={[styles.bentoCard, styles.halfCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={styles.bentoCardInner}>
+                  <Text style={[styles.bentoLabel, { color: theme.textSecondary }]}>Today's Send</Text>
+                  <Text style={[styles.bentoMediumValue, { color: account.isActive ? theme.text : theme.textMuted }]}>
+                    {formatCurrency(account.todaySend || 0)}
+                  </Text>
+                </View>
+              </View>
 
-              <TouchableOpacity onPress={() => setShowDeleteConfirm(true)} style={styles.iconBtn}>
-                <Ionicons name="trash-outline" size={20} color={theme.danger} />
-              </TouchableOpacity>
+              {/* Profit */}
+              <View style={[styles.bentoCard, styles.halfCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={[styles.leftIndicator, { backgroundColor: account.isActive ? theme.success : theme.textMuted }]} />
+                <View style={styles.bentoCardInner}>
+                  <Text style={[styles.bentoLabel, { color: theme.textSecondary }]}>Profit</Text>
+                  <View style={styles.profitValueRow}>
+                    <Ionicons name="trending-up" size={14} color={account.isActive ? theme.success : theme.textMuted} />
+                    <Text style={[styles.bentoMediumValue, { color: account.isActive ? theme.success : theme.textMuted }]}>
+                      +{formatCurrency(todayProfit)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Limits Card (Full Width) */}
+            <View style={[styles.bentoCard, styles.fullWidthCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View style={styles.bentoCardInner}>
+                <View style={styles.limitRow}>
+                  <Text style={[styles.bentoLabel, { color: theme.textSecondary }]}>Limit</Text>
+                  <Text style={[styles.limitValue, { color: theme.text }]}>
+                    {formatCurrency(monthlyLimit)}
+                  </Text>
+                </View>
+
+                {/* Limit Progress Bar */}
+                <View style={[styles.limitTrack, { backgroundColor: theme.progressBarBg }]}>
+                  <View
+                    style={[
+                      styles.limitFill,
+                      {
+                        width: `${Math.min(100, Math.max(0, usagePercentage))}%`,
+                        backgroundColor: !account.isActive ? theme.textMuted : usagePercentage >= 90 ? theme.danger : theme.primary,
+                      },
+                    ]}
+                  />
+                </View>
+
+                <View style={styles.limitRow}>
+                  <Text style={[styles.bentoLabel, { color: theme.textSecondary }]}>Remaining</Text>
+                  <Text style={[styles.limitValue, { color: theme.text }]}>
+                    {formatCurrency(remainingLimit)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* SIM Status Control Card */}
+            <View style={[styles.bentoCard, styles.fullWidthCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View style={[styles.leftIndicator, { backgroundColor: account.isActive ? theme.success : theme.textMuted }]} />
+              <View style={styles.statusCardInner}>
+                <View style={styles.statusInfoGroup}>
+                  <Text style={[styles.bentoLabel, { color: theme.textSecondary }]}>SIM Account Status</Text>
+                  <Text style={[styles.statusValueText, { color: account.isActive ? theme.success : theme.danger }]}>
+                    {account.isActive ? 'Active (Operational)' : 'Disabled / Inactive (Paused)'}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.statusToggleBtn,
+                    {
+                      backgroundColor: account.isActive
+                        ? (isDarkMode ? 'rgba(255, 82, 82, 0.15)' : '#FEE2E2')
+                        : (isDarkMode ? 'rgba(0, 200, 83, 0.15)' : '#DCFCE7'),
+                      borderColor: account.isActive ? theme.danger : theme.success,
+                    },
+                  ]}
+                  onPress={handleToggleStatus}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={account.isActive ? 'pause-circle-outline' : 'play-circle-outline'}
+                    size={16}
+                    color={account.isActive ? theme.danger : theme.success}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={[styles.statusToggleBtnText, { color: account.isActive ? theme.danger : theme.success }]}>
+                    {account.isActive ? 'Disable SIM' : 'Activate SIM'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
-          <ScrollView
-            style={styles.scrollContainer}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
+          {/* Transaction History Section */}
+          <View style={styles.historySection}>
+            <View style={styles.historyHeader}>
+              <Text style={[styles.historyTitle, { color: theme.text }]}>Transaction History</Text>
+              {/* Filter Pills */}
+              <View style={styles.filterPillsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterChip,
+                    selectedFilter === 'all' && { backgroundColor: theme.primary },
+                  ]}
+                  onPress={() => setSelectedFilter('all')}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: selectedFilter === 'all' ? '#FFFFFF' : theme.textSecondary },
+                    ]}
+                  >
+                    All
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.filterChip,
+                    selectedFilter === 'send' && { backgroundColor: theme.primary },
+                  ]}
+                  onPress={() => setSelectedFilter('send')}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: selectedFilter === 'send' ? '#FFFFFF' : theme.textSecondary },
+                    ]}
+                  >
+                    Send
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.filterChip,
+                    selectedFilter === 'receive' && { backgroundColor: theme.success },
+                  ]}
+                  onPress={() => setSelectedFilter('receive')}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: selectedFilter === 'receive' ? '#FFFFFF' : theme.textSecondary },
+                    ]}
+                  >
+                    Receive
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Grouped Lists */}
+            {filteredTransactions.length === 0 ? (
+              <View style={[styles.emptyHistory, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}>
+                <Ionicons name="receipt-outline" size={32} color={theme.textMuted} />
+                <Text style={[styles.emptyHistoryText, { color: theme.textSecondary }]}>
+                  No transactions recorded for this SIM.
+                </Text>
+              </View>
+            ) : (
+              <>
+                {groupedTransactions.TODAY.length > 0 && (
+                  <View style={styles.groupContainer}>
+                    <Text style={[styles.groupHeading, { color: theme.textMuted }]}>TODAY</Text>
+                    {groupedTransactions.TODAY.map((t) => (
+                      <TransactionItem key={t.id} transaction={t} />
+                    ))}
+                  </View>
+                )}
+
+                {groupedTransactions.YESTERDAY.length > 0 && (
+                  <View style={styles.groupContainer}>
+                    <Text style={[styles.groupHeading, { color: theme.textMuted }]}>YESTERDAY</Text>
+                    {groupedTransactions.YESTERDAY.map((t) => (
+                      <TransactionItem key={t.id} transaction={t} />
+                    ))}
+                  </View>
+                )}
+
+                {groupedTransactions.EARLIER.length > 0 && (
+                  <View style={styles.groupContainer}>
+                    <Text style={[styles.groupHeading, { color: theme.textMuted }]}>EARLIER</Text>
+                    {groupedTransactions.EARLIER.map((t) => (
+                      <TransactionItem key={t.id} transaction={t} />
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+
+          <View style={{ height: 80 }} />
+        </ScrollView>
+
+        {/* Quick Add Transaction FAB / Disabled Notice */}
+        {account.isActive ? (
+          <TouchableOpacity
+            style={[styles.accountFab, { backgroundColor: theme.primary }]}
+            onPress={() => {
+              onClose();
+              onAddTransaction(account.id);
+            }}
+            activeOpacity={0.85}
           >
-            {/* Main Balance Card */}
-            <View style={[styles.balanceCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <Text style={[styles.balanceCardLabel, { color: theme.textSecondary }]}>
-                CURRENT FLOAT BALANCE
-              </Text>
-              <Text
-                style={[styles.balanceCardAmount, { color: theme.text }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.65}
-              >
-                {formatCurrency(account.balance)}
-              </Text>
+            <Ionicons name="add" size={24} color="#FFFFFF" />
+            <Text style={styles.fabText}>New Transaction</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.disabledNoticeBar, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}>
+            <Ionicons name="alert-circle-outline" size={18} color={theme.textMuted} style={{ marginRight: 8 }} />
+            <Text style={[styles.disabledNoticeText, { color: theme.textSecondary }]}>
+              SIM is disabled. Activate it above to add transactions.
+            </Text>
+          </View>
+        )}
 
-              <View style={styles.progressBarWrapper}>
-                <LimitProgressBar
-                  usedAmount={account.todaySend}
-                  totalLimit={account.dailyLimit}
-                  label="DAILY LIMIT UTILIZATION"
-                />
-              </View>
-            </View>
-
-            {/* 4-Stat Metric Grid */}
-            <View style={styles.statGrid}>
-              {/* Stat 1: Today's Send */}
-              <View style={[styles.statBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <View style={styles.statBoxHeader}>
-                  <Text style={[styles.statBoxLabel, { color: theme.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
-                    Today's Send
-                  </Text>
-                  <View style={[styles.statIconBadge, { backgroundColor: theme.dangerLight }]}>
-                    <Ionicons name="arrow-up" size={13} color={theme.danger} />
-                  </View>
-                </View>
-                <Text
-                  style={[styles.statBoxValue, { color: theme.text }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.6}
-                >
-                  {formatCurrency(account.todaySend)}
-                </Text>
-              </View>
-
-              {/* Stat 2: Today's Profit */}
-              <View style={[styles.statBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <View style={styles.statBoxHeader}>
-                  <Text style={[styles.statBoxLabel, { color: theme.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
-                    Today's Profit
-                  </Text>
-                  <View style={[styles.statIconBadge, { backgroundColor: theme.successLight }]}>
-                    <Ionicons name="trending-up" size={13} color={theme.success} />
-                  </View>
-                </View>
-                <Text
-                  style={[styles.statBoxValue, { color: theme.success }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.6}
-                >
-                  +{formatCurrency(account.todayProfit)}
-                </Text>
-              </View>
-
-              {/* Stat 3: Daily Limit */}
-              <View style={[styles.statBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <View style={styles.statBoxHeader}>
-                  <Text style={[styles.statBoxLabel, { color: theme.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
-                    Daily Limit
-                  </Text>
-                  <View style={[styles.statIconBadge, { backgroundColor: theme.primaryLight }]}>
-                    <Ionicons name="shield-checkmark-outline" size={13} color={theme.primary} />
-                  </View>
-                </View>
-                <Text
-                  style={[styles.statBoxValue, { color: theme.text }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.6}
-                >
-                  {formatCurrency(account.dailyLimit)}
-                </Text>
-              </View>
-
-              {/* Stat 4: Remaining Limit */}
-              <View style={[styles.statBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <View style={styles.statBoxHeader}>
-                  <Text style={[styles.statBoxLabel, { color: theme.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
-                    Remaining
-                  </Text>
-                  <View style={[styles.statIconBadge, { backgroundColor: theme.warningLight }]}>
-                    <Ionicons name="time-outline" size={13} color={theme.warning} />
-                  </View>
-                </View>
-                <Text
-                  style={[styles.statBoxValue, { color: theme.primary }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.6}
-                >
-                  {formatCurrency(remainingLimit)}
-                </Text>
-              </View>
-            </View>
-
-            {/* Quick Action Button */}
-            <TouchableOpacity
-              style={[styles.addTxButton, { backgroundColor: theme.primary }]}
-              onPress={() => {
-                onClose();
-                onAddTransaction(account.id);
-              }}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.addTxButtonText}>Log bKash Entry on this Number</Text>
-            </TouchableOpacity>
-
-            {/* Account History */}
-            <View style={styles.historySection}>
-              <View style={styles.historyHeader}>
-                <Text style={[styles.historyTitle, { color: theme.text }]}>Transaction History</Text>
-                <Text style={[styles.historyCount, { color: theme.textSecondary }]}>
-                  {accountTransactions.length} records
-                </Text>
-              </View>
-
-              {accountTransactions.length === 0 ? (
-                <View style={[styles.emptyBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                  <Ionicons name="receipt-outline" size={32} color={theme.textMuted} />
-                  <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                    No bKash transactions recorded for this number yet.
-                  </Text>
-                </View>
-              ) : (
-                accountTransactions.map((tx) => (
-                  <TransactionItem key={tx.id} transaction={tx} />
-                ))
-              )}
-            </View>
-          </ScrollView>
-
-          {/* Delete Number Confirmation Modal */}
-          <ConfirmationModal
-            visible={showDeleteConfirm}
-            title="Delete bKash Number"
-            message={`Are you sure you want to remove "${account.name}" (${account.accountNumber})? All associated records will be deleted.`}
-            confirmText="Delete Number"
-            cancelText="Cancel"
-            type="danger"
-            icon="trash-outline"
-            onConfirm={handleConfirmDelete}
-            onCancel={() => setShowDeleteConfirm(false)}
-          />
-        </View>
-      </View>
+        {/* Delete Confirmation Modal */}
+        <ConfirmationModal
+          visible={showDeleteConfirm}
+          title="Delete Account"
+          message={`Are you sure you want to remove account ${account.accountNumber}? This will not delete its past transactions.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          type="danger"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      </Animated.View>
     </Modal>
   );
 };
 
+export const AccountDetailsModal = React.memo(AccountDetailsModalComponent);
+
 const styles = StyleSheet.create({
-  modalOverlay: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
   },
-  modalContent: {
-    height: '92%',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
-  },
-  header: {
+  topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  iconBtn: {
-    padding: 6,
-  },
-  headerActions: {
-    flexDirection: 'row',
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
   },
-  activeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 6,
-    flexShrink: 0,
+  headerCenter: {
+    alignItems: 'center',
+    flex: 1,
   },
-  activeBadgeText: {
-    fontSize: 11,
+  headerPhoneNumber: {
+    fontFamily: 'monospace',
+    fontSize: 16,
     fontWeight: '700',
   },
-  headerTitleContainer: {
-    flex: 1,
-    alignItems: 'center',
-    marginHorizontal: 8,
+  headerAccountName: {
+    fontSize: 11,
+    marginTop: 1,
   },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  scrollContainer: {
+  scrollBody: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 40,
+    padding: 16,
+    gap: 16,
   },
-  balanceCard: {
-    borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 18,
+  bentoSection: {
+    gap: 12,
+  },
+  bentoCard: {
+    borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 14,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  balanceCardLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    marginBottom: 4,
+  fullWidthCard: {
+    width: '100%',
   },
-  balanceCardAmount: {
-    fontSize: 30,
-    fontWeight: '900',
-    marginVertical: 6,
-    letterSpacing: -0.5,
-  },
-  progressBarWrapper: {
-    marginTop: 10,
-  },
-  statGrid: {
+  twoColRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 16,
+    gap: 12,
   },
-  statBox: {
-    width: '48.5%',
-    flexGrow: 1,
-    borderRadius: 16,
-    paddingVertical: 13,
-    paddingHorizontal: 12,
-    borderWidth: 1,
+  halfCard: {
+    flex: 1,
   },
-  statBoxHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
+  leftIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    zIndex: 2,
+  },
+  bentoCardInner: {
+    padding: 16,
+    paddingLeft: 18,
     gap: 4,
   },
-  statIconBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statBoxLabel: {
+  bentoLabel: {
     fontSize: 11,
-    fontWeight: '700',
-    flex: 1,
+    fontWeight: '600',
     letterSpacing: 0.2,
   },
-  statBoxValue: {
+  bentoBigBalance: {
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    marginTop: 2,
+  },
+  bentoMediumValue: {
     fontSize: 17,
-    fontWeight: '900',
-    letterSpacing: -0.3,
+    fontWeight: '700',
+    marginTop: 2,
   },
-  addTxButton: {
+  profitValueRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 15,
-    borderRadius: 14,
-    marginBottom: 20,
+    gap: 4,
   },
-  addTxButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
+  limitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  limitValue: {
+    fontSize: 13,
     fontWeight: '700',
   },
+  limitTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginVertical: 8,
+  },
+  limitFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
   historySection: {
-    marginBottom: 20,
+    marginTop: 4,
   },
   historyHeader: {
     flexDirection: 'row',
@@ -396,25 +539,108 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   historyTitle: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '700',
   },
-  historyCount: {
-    fontSize: 12,
-    fontWeight: '600',
+  filterPillsRow: {
+    flexDirection: 'row',
+    gap: 6,
   },
-  emptyBox: {
-    borderRadius: 16,
-    paddingVertical: 32,
-    paddingHorizontal: 20,
+  filterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  filterChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  groupContainer: {
+    marginBottom: 14,
+  },
+  groupHeading: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginLeft: 2,
+  },
+  emptyHistory: {
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 30,
+    borderRadius: 12,
     borderWidth: 1,
     gap: 8,
   },
-  emptyText: {
+  emptyHistoryText: {
     fontSize: 13,
+    fontWeight: '500',
     textAlign: 'center',
-    lineHeight: 18,
+  },
+  statusCardInner: {
+    padding: 14,
+    paddingLeft: 18,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusInfoGroup: {
+    flex: 1,
+    marginRight: 10,
+    gap: 2,
+  },
+  statusValueText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  statusToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  statusToggleBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  accountFab: {
+    position: 'absolute',
+    bottom: 20,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  fabText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  disabledNoticeBar: {
+    position: 'absolute',
+    bottom: 20,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+  },
+  disabledNoticeText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    textAlign: 'center',
+    flexShrink: 1,
   },
 });

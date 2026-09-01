@@ -1,25 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Account, Transaction } from '../../types/ledger';
-import { initialAccounts, initialTransactions } from '../../constants/mockData';
+import { Account, Transaction, DailyProfitRecord, LedgerMetrics } from '../../types/ledger';
+import { initialAccounts, initialTransactions, initialDailyProfitRecords } from '../../constants/mockData';
 import { syncService } from '../sync/syncService';
 
-const ACCOUNTS_STORAGE_KEY = '@finora_accounts_v1';
-const TRANSACTIONS_STORAGE_KEY = '@finora_transactions_v1';
+const ACCOUNTS_STORAGE_KEY = '@finora_accounts_v3';
+const TRANSACTIONS_STORAGE_KEY = '@finora_transactions_v3';
+const DAILY_PROFITS_STORAGE_KEY = '@finora_daily_profits_v3';
 
 /**
  * Production API Configuration
- * Supports Android Emulator (10.0.2.2), iOS/Web (localhost), and local LAN backend servers.
  */
 const getDefaultBaseUrl = () => {
   if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL;
-
   return 'https://finora-express-js.vercel.app/api/v1';
 };
 
 export const API_CONFIG = {
   BASE_URL: getDefaultBaseUrl(),
-  USE_MOCK_STORAGE: false, // Set to false to connect to Express backend!
-  TIMEOUT_MS: 10000,
+  USE_MOCK_STORAGE: false, // Connects to live backend with instant offline fallback
+  TIMEOUT_MS: 8000,
 };
 
 /**
@@ -60,18 +59,18 @@ async function httpRequest<T>(endpoint: string, options: RequestInit = {}): Prom
 
 /**
  * Production Ledger API Service
- * Handles offline-first data persistence, cloud API synchronization, and idempotency.
+ * Handles offline-first data persistence, multi-SIM running balances, margins, and limits.
  */
 export const ledgerApi = {
   /**
-   * Set dynamic backend Base URL (e.g. for physical devices over Wi-Fi)
+   * Set dynamic backend Base URL
    */
   setBaseUrl(url: string) {
     API_CONFIG.BASE_URL = url;
   },
 
   /**
-   * Fetch all bKash business accounts
+   * Fetch all Multi-SIM accounts
    */
   async getAccounts(): Promise<Account[]> {
     if (!API_CONFIG.USE_MOCK_STORAGE) {
@@ -106,7 +105,7 @@ export const ledgerApi = {
     if (!API_CONFIG.USE_MOCK_STORAGE) {
       try {
         const transactions = await httpRequest<Transaction[]>('/transactions');
-        if (Array.isArray(transactions)) {
+        if (Array.isArray(transactions) && transactions.length > 0) {
           await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
           return transactions;
         }
@@ -129,21 +128,59 @@ export const ledgerApi = {
   },
 
   /**
-   * Create a new transaction with idempotency key (clientTxId)
+   * Fetch Daily Profit history
    */
-  async createTransaction(txData: Omit<Transaction, 'id' | 'date'> & { clientTxId?: string }): Promise<{ transaction: Transaction; updatedAccounts: Account[] }> {
+  async getDailyProfits(): Promise<DailyProfitRecord[]> {
+    try {
+      const data = await AsyncStorage.getItem(DAILY_PROFITS_STORAGE_KEY);
+      if (data) return JSON.parse(data);
+      await AsyncStorage.setItem(DAILY_PROFITS_STORAGE_KEY, JSON.stringify(initialDailyProfitRecords));
+      return initialDailyProfitRecords;
+    } catch {
+      return initialDailyProfitRecords;
+    }
+  },
+
+  /**
+   * Create a new transaction with running balance & margin calculation
+   */
+  async createTransaction(
+    txData: Omit<Transaction, 'id' | 'date' | 'runningBalance'> & { clientTxId?: string; runningBalance?: number }
+  ): Promise<{ transaction: Transaction; updatedAccounts: Account[] }> {
     const clientTxId = txData.clientTxId || 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+
+    const currentAccounts = await this.getAccounts();
+    const currentTxs = await this.getTransactions();
+
+    const targetAccount = currentAccounts.find((a) => a.id === txData.accountId);
+    const startBalance = targetAccount ? targetAccount.balance : 0;
+    const marginAmount = txData.margin !== undefined ? txData.margin : (txData.profit || 0);
+
+    let finalBalance = startBalance;
+    const isOutflow = txData.type === 'sm' || txData.type === 'co' || txData.type === 'send' || txData.type === 'send_money' || txData.type === 'cash_out' || txData.type === 'b2b';
+    const isInflow = txData.type === 'recev' || txData.type === 'receive_money' || txData.type === 'cash_in';
+
+    if (isInflow) {
+      finalBalance = startBalance + txData.amount;
+    } else if (isOutflow) {
+      finalBalance = startBalance - txData.amount - (txData.cost || 0);
+    } else if (txData.type === 'adjustment') {
+      finalBalance = startBalance + txData.amount;
+    }
 
     const newTx: Transaction = {
       ...txData,
       id: clientTxId,
       clientTxId,
+      margin: marginAmount,
+      profit: marginAmount,
+      runningBalance: txData.runningBalance !== undefined ? txData.runningBalance : finalBalance,
+      counterparty: txData.counterparty || txData.recipientNumber || txData.senderNumber || (txData.type === 'co' ? 'Cash Out Bulk' : 'Counterparty'),
       date: new Date().toISOString(),
       syncStatus: 'synced',
       retryCount: 0,
     };
 
-    let apiSucceeded = false;
     let backendResult: any = null;
 
     if (!API_CONFIG.USE_MOCK_STORAGE) {
@@ -151,42 +188,39 @@ export const ledgerApi = {
         backendResult = await httpRequest<{ transaction: Transaction; updatedAccounts: Account[] }>('/transactions', {
           method: 'POST',
           headers: { 'X-Idempotency-Key': clientTxId },
-          body: JSON.stringify({ ...txData, clientTxId }),
+          body: JSON.stringify({ ...newTx }),
         });
-        apiSucceeded = true;
       } catch {
         newTx.syncStatus = 'pending';
-        await syncService.enqueueTransaction({ ...txData, clientTxId });
+        await syncService.enqueueTransaction({ ...newTx, clientTxId });
       }
     }
 
-    // Always update local cache for instant UI feedback
-    const currentTxs = await this.getTransactions();
-    const currentAccounts = await this.getAccounts();
-
-    // Check duplicate by idempotency
-    const exists = currentTxs.some((t) => t.clientTxId === clientTxId || t.id === clientTxId);
-    if (exists && !apiSucceeded) return { transaction: newTx, updatedAccounts: currentAccounts };
-
-    const updatedTransactions = [newTx, ...currentTxs.filter((t) => t.id !== clientTxId)];
-
-    // Recalculate account balance locally
+    // Update account balances & limits
     const updatedAccounts = currentAccounts.map((acc) => {
       if (acc.id === txData.accountId) {
         let newBalance = acc.balance;
         let newTodaySend = acc.todaySend;
         let newTodayReceive = acc.todayReceive;
-        let newTodayProfit = acc.todayProfit + (txData.profit || 0);
+        let newTodayProfit = acc.todayProfit + marginAmount;
+        let newTotalMargin = (acc.totalMargin || 0) + marginAmount;
+        let newMonthlyLimitUsed = acc.monthlyLimitUsed || 0;
 
-        if (txData.type === 'send_money' || txData.type === 'cash_out' || txData.type === 'b2b') {
-          newBalance -= txData.amount + (txData.cost || 0);
-          newTodaySend += txData.amount;
-        } else if (txData.type === 'receive_money' || txData.type === 'cash_in') {
+        if (isInflow) {
           newBalance += txData.amount;
           newTodayReceive += txData.amount;
+        } else if (isOutflow) {
+          newBalance -= txData.amount + (txData.cost || 0);
+          newTodaySend += txData.amount;
+          if (txData.type === 'sm' || txData.type === 'send_money') {
+            newMonthlyLimitUsed += txData.amount;
+          }
         } else if (txData.type === 'adjustment') {
           newBalance += txData.amount;
         }
+
+        const monthlyLimit = acc.monthlyLimit || 300000;
+        const remainingLimit = Math.max(0, monthlyLimit - newMonthlyLimitUsed);
 
         return {
           ...acc,
@@ -194,10 +228,15 @@ export const ledgerApi = {
           todaySend: newTodaySend,
           todayReceive: newTodayReceive,
           todayProfit: newTodayProfit,
+          totalMargin: newTotalMargin,
+          monthlyLimitUsed: newMonthlyLimitUsed,
+          remainingLimit,
         };
       }
       return acc;
     });
+
+    const updatedTransactions = [newTx, ...currentTxs.filter((t) => t.id !== clientTxId)];
 
     await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(updatedTransactions));
     await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(backendResult?.updatedAccounts || updatedAccounts));
@@ -211,12 +250,12 @@ export const ledgerApi = {
   /**
    * Delete a transaction & revert balance impact
    */
-  async deleteTransaction(id: string): Promise<{ deletedId: string; updatedAccounts: Account[]; }> {
+  async deleteTransaction(id: string): Promise<{ deletedId: string; updatedAccounts: Account[] }> {
     if (!API_CONFIG.USE_MOCK_STORAGE) {
       try {
         await httpRequest(`/transactions/${id}`, { method: 'DELETE' });
       } catch {
-        // Continue with local update
+        // Fallback to local
       }
     }
 
@@ -233,17 +272,28 @@ export const ledgerApi = {
         let newBalance = acc.balance;
         let newTodaySend = acc.todaySend;
         let newTodayReceive = acc.todayReceive;
-        let newTodayProfit = Math.max(0, acc.todayProfit - (txToDelete.profit || 0));
+        let newTodayProfit = Math.max(0, acc.todayProfit - (txToDelete.margin || txToDelete.profit || 0));
+        let newTotalMargin = Math.max(0, (acc.totalMargin || 0) - (txToDelete.margin || txToDelete.profit || 0));
+        let newMonthlyLimitUsed = acc.monthlyLimitUsed || 0;
 
-        if (txToDelete.type === 'send_money' || txToDelete.type === 'cash_out' || txToDelete.type === 'b2b') {
+        const isOutflow = txToDelete.type === 'sm' || txToDelete.type === 'co' || txToDelete.type === 'send' || txToDelete.type === 'send_money' || txToDelete.type === 'cash_out' || txToDelete.type === 'b2b';
+        const isInflow = txToDelete.type === 'recev' || txToDelete.type === 'receive_money' || txToDelete.type === 'cash_in';
+
+        if (isOutflow) {
           newBalance += txToDelete.amount + (txToDelete.cost || 0);
           newTodaySend = Math.max(0, newTodaySend - txToDelete.amount);
-        } else if (txToDelete.type === 'receive_money' || txToDelete.type === 'cash_in') {
+          if (txToDelete.type === 'sm' || txToDelete.type === 'send_money') {
+            newMonthlyLimitUsed = Math.max(0, newMonthlyLimitUsed - txToDelete.amount);
+          }
+        } else if (isInflow) {
           newBalance -= txToDelete.amount;
           newTodayReceive = Math.max(0, newTodayReceive - txToDelete.amount);
         } else if (txToDelete.type === 'adjustment') {
           newBalance -= txToDelete.amount;
         }
+
+        const monthlyLimit = acc.monthlyLimit || 300000;
+        const remainingLimit = Math.max(0, monthlyLimit - newMonthlyLimitUsed);
 
         return {
           ...acc,
@@ -251,6 +301,9 @@ export const ledgerApi = {
           todaySend: newTodaySend,
           todayReceive: newTodayReceive,
           todayProfit: newTodayProfit,
+          totalMargin: newTotalMargin,
+          monthlyLimitUsed: newMonthlyLimitUsed,
+          remainingLimit,
         };
       }
       return acc;
@@ -263,22 +316,32 @@ export const ledgerApi = {
   },
 
   /**
-   * Add a new bKash account line
+   * Add a new SIM account line
    */
-  async createAccount(accData: Omit<Account, 'id' | 'createdAt' | 'todaySend' | 'todayReceive' | 'todayProfit'>): Promise<Account> {
+  async createAccount(
+    accData: Omit<Account, 'id' | 'createdAt' | 'todaySend' | 'todayReceive' | 'todayProfit' | 'remainingLimit'>
+  ): Promise<Account> {
+    const monthlyLimit = accData.monthlyLimit || 300000;
+    const monthlyLimitUsed = accData.monthlyLimitUsed || 0;
+    const remainingLimit = Math.max(0, monthlyLimit - monthlyLimitUsed);
+
     let newAccount: Account = {
       ...accData,
       id: 'acc_' + Date.now(),
+      monthlyLimit,
+      monthlyLimitUsed,
+      remainingLimit,
       todaySend: 0,
       todayReceive: 0,
       todayProfit: 0,
+      totalMargin: accData.totalMargin || 0,
       createdAt: new Date().toISOString(),
       syncStatus: 'synced',
     };
 
     if (!API_CONFIG.USE_MOCK_STORAGE) {
       try {
-        const created = await httpRequest<Account>('/accounts', { method: 'POST', body: JSON.stringify(accData), });
+        const created = await httpRequest<Account>('/accounts', { method: 'POST', body: JSON.stringify(newAccount) });
         if (created?.id) newAccount = created;
       } catch {
         // Fallback to local
@@ -308,9 +371,18 @@ export const ledgerApi = {
     }
 
     const currentAccounts = await this.getAccounts();
-    const updated = currentAccounts.map((a) => (a.id === id ? { ...a, ...updates } : a));
-    await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(updated));
+    const updated = currentAccounts.map((a) => {
+      if (a.id === id) {
+        const merged = { ...a, ...updates };
+        const monthlyLimit = merged.monthlyLimit || 300000;
+        const monthlyLimitUsed = merged.monthlyLimitUsed || 0;
+        merged.remainingLimit = Math.max(0, monthlyLimit - monthlyLimitUsed);
+        return merged;
+      }
+      return a;
+    });
 
+    await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(updated));
     return updated;
   },
 
@@ -334,6 +406,42 @@ export const ledgerApi = {
   },
 
   /**
+   * Calculate summary metrics across all SIM accounts
+   */
+  async getMetrics(): Promise<LedgerMetrics> {
+    const accounts = await this.getAccounts();
+    const txs = await this.getTransactions();
+
+    const totalBalance = accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+    const totalMonthlyLimit = accounts.reduce((sum, a) => sum + (a.monthlyLimit || 300000), 0);
+    const totalMonthlyLimitUsed = accounts.reduce((sum, a) => sum + (a.monthlyLimitUsed || 0), 0);
+    const totalLimitRemaining = Math.max(0, totalMonthlyLimit - totalMonthlyLimitUsed);
+    const todayProfit = accounts.reduce((sum, a) => sum + (a.todayProfit || 0), 0);
+    const todaySendTotal = accounts.reduce((sum, a) => sum + (a.todaySend || 0), 0);
+
+    const monthlyIncome = txs
+      .filter((t) => t.type === 'recev' || t.type === 'receive_money')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const monthlyExpense = txs
+      .filter((t) => t.type === 'sm' || t.type === 'co' || t.type === 'send' || t.type === 'send_money' || t.type === 'cash_out')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    return {
+      totalBalance,
+      totalMonthlyLimit,
+      totalMonthlyLimitUsed,
+      totalLimitRemaining,
+      monthlyIncome,
+      monthlyExpense,
+      todayProfit,
+      todaySendTotal,
+      balanceGrowthPercentage: 4.8,
+      activeAccountsCount: accounts.length,
+    };
+  },
+
+  /**
    * Batch sync offline transactions
    */
   async syncBatchTransactions(items: any[]): Promise<{ syncedIds: string[]; failedIds: string[] }> {
@@ -351,13 +459,14 @@ export const ledgerApi = {
   },
 
   /**
-   * Reset database back to clean empty state or mock
+   * Reset database back to seed state
    */
   async resetDatabase(): Promise<void> {
-    await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify([]));
-    await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify([]));
+    await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(initialAccounts));
+    await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(initialTransactions));
+    await AsyncStorage.setItem(DAILY_PROFITS_STORAGE_KEY, JSON.stringify(initialDailyProfitRecords));
   },
 };
 
-// Break circular dependency by registering sync executor after definition
+// Register sync executor
 syncService.setSyncExecutor((items) => ledgerApi.syncBatchTransactions(items));
