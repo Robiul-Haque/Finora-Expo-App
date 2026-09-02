@@ -19,7 +19,6 @@ interface LedgerContextType {
   transactions: Transaction[];
   metrics: LedgerMetrics;
   filters: FilterOptions;
-  filteredTransactions: Transaction[];
   setFilters: (newFilters: Partial<FilterOptions>) => void;
   resetFilters: () => void;
   addTransaction: (tx: Omit<Transaction, 'id' | 'date'> & { date?: string }) => Promise<void>;
@@ -180,86 +179,12 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [accounts, transactions]);
 
-  // High-performance memoized Filtered Transactions
-  const filteredTransactions = useMemo(() => {
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const startOfYesterday = startOfToday - 86400000;
-    const startOfWeek = startOfToday - 7 * 86400000;
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-
-    const list = transactions.filter((tx) => {
-      // 1. Account Filter
-      if (filters.accountId !== 'all' && tx.accountId !== filters.accountId && tx.accountNumber !== filters.accountId) {
-        return false;
-      }
-
-      // 2. Type Filter
-      if (filters.type !== 'all') {
-        if (filters.type === 'recev' && tx.type !== 'recev' && tx.type !== 'receive_money' && tx.type !== 'cash_in') return false;
-        if (filters.type === 'sm' && tx.type !== 'sm' && tx.type !== 'send_money') return false;
-        if (filters.type === 'co' && tx.type !== 'co' && tx.type !== 'cash_out') return false;
-        if (filters.type === 'send' && tx.type !== 'send' && tx.type !== 'b2b') return false;
-        if (filters.type === 'adjustment' && tx.type !== 'adjustment') return false;
-      }
-
-      // Date range filter
-      const txTime = parseDate(tx.date).getTime();
-      if (filters.dateRange === 'today' && txTime < startOfToday) {
-        return false;
-      }
-      if (filters.dateRange === 'yesterday' && (txTime < startOfYesterday || txTime >= startOfToday)) {
-        return false;
-      }
-      if (filters.dateRange === 'this_week' && txTime < startOfWeek) {
-        return false;
-      }
-      if (filters.dateRange === 'this_month' && txTime < startOfMonth) {
-        return false;
-      }
-
-      // Search query filter
-      if (filters.searchQuery.trim()) {
-        const query = filters.searchQuery.toLowerCase().trim();
-        const matchesAccount =
-          tx.accountNumber?.toLowerCase().includes(query) ||
-          tx.accountName?.toLowerCase().includes(query);
-        const matchesRecipient = tx.recipientNumber?.toLowerCase().includes(query);
-        const matchesSender = tx.senderNumber?.toLowerCase().includes(query);
-        const matchesNote = tx.note?.toLowerCase().includes(query);
-        const matchesAmount = tx.amount.toString().includes(query);
-
-        if (!matchesAccount && !matchesRecipient && !matchesSender && !matchesNote && !matchesAmount) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-
-    // Fast sorting with zero Date heap allocation overhead
-    if (filters.sortBy === 'newest') {
-      list.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
-    } else if (filters.sortBy === 'oldest') {
-      list.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
-    } else if (filters.sortBy === 'amount_high') {
-      list.sort((a, b) => b.amount - a.amount);
-    } else if (filters.sortBy === 'amount_low') {
-      list.sort((a, b) => a.amount - b.amount);
-    } else if (filters.sortBy === 'profit_high') {
-      list.sort((a, b) => (b.profit || 0) - (a.profit || 0));
-    }
-
-    return list;
-  }, [transactions, filters]);
-
   // Context value memoized to eliminate unnecessary child re-renders
   const contextValue = useMemo<LedgerContextType>(() => ({
     accounts,
     transactions,
     metrics,
     filters,
-    filteredTransactions,
     setFilters,
     resetFilters,
     addTransaction,
@@ -278,7 +203,6 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     transactions,
     metrics,
     filters,
-    filteredTransactions,
     setFilters,
     resetFilters,
     addTransaction,

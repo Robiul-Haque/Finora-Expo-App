@@ -77,7 +77,7 @@ export const SearchBar = React.memo(SearchBarComponent);
 
 const styles = StyleSheet.create({
   container: {
-    height: 44,
+    height: 48,
     borderTopLeftRadius: 6,
     borderTopRightRadius: 6,
     borderBottomWidth: 2,

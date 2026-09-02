@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -34,10 +34,13 @@ const ConfirmationModalComponent: React.FC<ConfirmationModalProps> = ({
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
+  const [shouldRender, setShouldRender] = useState(visible);
+
   const effectiveType = isDestructive ? 'danger' : type;
 
   useEffect(() => {
     if (visible) {
+      setShouldRender(true);
       Animated.parallel([
         Animated.timing(opacityAnim, {
           toValue: 1,
@@ -65,11 +68,15 @@ const ConfirmationModalComponent: React.FC<ConfirmationModalProps> = ({
           duration: 120,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(({ finished }) => {
+        if (finished) {
+          setShouldRender(false);
+        }
+      });
     }
   }, [visible]);
 
-  if (!visible) return null;
+  if (!shouldRender) return null;
 
   const getThemeColors = () => {
     switch (effectiveType) {

@@ -5,24 +5,37 @@ import { useTheme } from '../context/ThemeContext';
 // Shared native driver pulse value
 const sharedPulseAnim = new Animated.Value(0.5);
 
-let isPulseRunning = false;
-const startSharedPulse = () => {
-  if (isPulseRunning) return;
-  isPulseRunning = true;
-  Animated.loop(
-    Animated.sequence([
-      Animated.timing(sharedPulseAnim, {
-        toValue: 0.9,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(sharedPulseAnim, {
-        toValue: 0.45,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ])
-  ).start();
+let activeSkeletonCount = 0;
+let pulseAnimation: Animated.CompositeAnimation | null = null;
+
+const registerSkeleton = () => {
+  activeSkeletonCount++;
+  if (activeSkeletonCount === 1) {
+    pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sharedPulseAnim, {
+          toValue: 0.9,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(sharedPulseAnim, {
+          toValue: 0.45,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseAnimation.start();
+  }
+};
+
+const unregisterSkeleton = () => {
+  activeSkeletonCount = Math.max(0, activeSkeletonCount - 1);
+  if (activeSkeletonCount === 0 && pulseAnimation) {
+    pulseAnimation.stop();
+    pulseAnimation = null;
+    sharedPulseAnim.setValue(0.5);
+  }
 };
 
 export const SkeletonBox: React.FC<{
@@ -34,7 +47,10 @@ export const SkeletonBox: React.FC<{
   const { isDarkMode } = useTheme();
 
   useEffect(() => {
-    startSharedPulse();
+    registerSkeleton();
+    return () => {
+      unregisterSkeleton();
+    };
   }, []);
 
   return (

@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Account } from '../types/ledger';
 import { useTheme } from '../context/ThemeContext';
@@ -7,13 +7,12 @@ import { formatCurrency } from '../utils';
 
 interface AccountCardProps {
   account: Account;
-  onPress: () => void;
-  onAddTransactionPress?: () => void;
+  onPress: (account: Account) => void;
+  onAddTransactionPress?: (accountId: string) => void;
 }
 
-const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress }) => {
+const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress, onAddTransactionPress }) => {
   const { theme, isDarkMode } = useTheme();
-  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const monthlyLimit = account.monthlyLimit || 300000;
   const monthlyLimitUsed = account.monthlyLimitUsed !== undefined ? account.monthlyLimitUsed : account.todaySend;
@@ -29,7 +28,7 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress }) 
   return (
     <TouchableOpacity
       activeOpacity={0.7}
-      onPress={onPress}
+      onPress={() => onPress(account)}
     >
       <View
         style={[

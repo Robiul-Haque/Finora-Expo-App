@@ -67,6 +67,8 @@ export const validateTransaction = (
   // 2. Amount validation
   const cleanedAmount = amountStr.trim().replace(/[^0-9.]/g, '');
   const numAmount = parseFloat(cleanedAmount);
+  const cleanedCost = costStr ? costStr.trim().replace(/[^0-9.]/g, '') : '0';
+  const numCost = parseFloat(cleanedCost) || 0;
 
   if (cleanedAmount === '' || isNaN(numAmount)) {
     errors.amount = 'Amount is required';
@@ -81,9 +83,13 @@ export const validateTransaction = (
       type === 'cash_out' ||
       type === 'b2b';
 
-    // Balance check for outflows
-    if (isOutflow && numAmount > account.balance) {
-      errors.amount = `Insufficient balance! Available: ৳${account.balance.toLocaleString('en-US')}`;
+    // Balance check for outflows (amount + fee)
+    const totalOutflow = numAmount + numCost;
+    if (isOutflow && totalOutflow > account.balance) {
+      errors.amount =
+        numCost > 0
+          ? `Insufficient balance with fee! Needed: ৳${totalOutflow.toLocaleString('en-US')}, Available: ৳${account.balance.toLocaleString('en-US')}`
+          : `Insufficient balance! Available: ৳${account.balance.toLocaleString('en-US')}`;
     }
 
     // Limit check for Send Money (Sm)

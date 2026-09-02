@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ledgerApi } from '../services/api/ledgerApi';
 import { Account, Transaction } from '../types/ledger';
+import { isSameDay, isSameMonth } from '../utils/formatters';
 
 /**
  * Standard Query Keys Factory for TanStack Query
@@ -75,24 +76,27 @@ export const useAddTransactionMutation = () => {
         newTxData.type === 'receive_money' ||
         newTxData.type === 'cash_in';
 
+      const isTxToday = isSameDay(newTxData.date || new Date());
+      const isTxThisMonth = isSameMonth(newTxData.date || new Date());
+
       const updatedAccounts = previousAccounts.map((acc) => {
         if (acc.id === newTxData.accountId) {
           let newBalance = acc.balance;
           let newTodaySend = acc.todaySend;
           let newTodayReceive = acc.todayReceive;
-          let newTodayProfit = acc.todayProfit + (newTxData.profit || 0);
+          let newTodayProfit = acc.todayProfit + (isTxToday ? (newTxData.profit || 0) : 0);
           let newTotalMargin = (acc.totalMargin || 0) + (newTxData.profit || 0);
           let newMonthlyLimitUsed = acc.monthlyLimitUsed || 0;
 
           if (isOutflow) {
             newBalance -= newTxData.amount + (newTxData.cost || 0);
-            newTodaySend += newTxData.amount;
-            if (newTxData.type === 'sm' || newTxData.type === 'send_money') {
+            if (isTxToday) newTodaySend += newTxData.amount;
+            if (isTxThisMonth && (newTxData.type === 'sm' || newTxData.type === 'send_money')) {
               newMonthlyLimitUsed += newTxData.amount;
             }
           } else if (isInflow) {
             newBalance += newTxData.amount;
-            newTodayReceive += newTxData.amount;
+            if (isTxToday) newTodayReceive += newTxData.amount;
           } else if (newTxData.type === 'adjustment') {
             newBalance += newTxData.amount;
           }
@@ -153,6 +157,9 @@ export const useDeleteTransactionMutation = () => {
       );
 
       if (txToDelete) {
+        const isTxToday = isSameDay(txToDelete.date);
+        const isTxThisMonth = isSameMonth(txToDelete.date);
+
         const isOutflow =
           txToDelete.type === 'sm' ||
           txToDelete.type === 'co' ||
@@ -170,21 +177,25 @@ export const useDeleteTransactionMutation = () => {
             let newBalance = acc.balance;
             let newTodaySend = acc.todaySend;
             let newTodayReceive = acc.todayReceive;
-            let newTodayProfit = Math.max(0, acc.todayProfit - (txToDelete.profit || 0));
+            let newTodayProfit = acc.todayProfit;
             let newTotalMargin = Math.max(0, (acc.totalMargin || 0) - (txToDelete.profit || 0));
             let newMonthlyLimitUsed = acc.monthlyLimitUsed || 0;
 
             if (isOutflow) {
               newBalance += txToDelete.amount + (txToDelete.cost || 0);
-              newTodaySend = Math.max(0, newTodaySend - txToDelete.amount);
-              if (txToDelete.type === 'sm' || txToDelete.type === 'send_money') {
+              if (isTxToday) newTodaySend = Math.max(0, newTodaySend - txToDelete.amount);
+              if (isTxThisMonth && (txToDelete.type === 'sm' || txToDelete.type === 'send_money')) {
                 newMonthlyLimitUsed = Math.max(0, newMonthlyLimitUsed - txToDelete.amount);
               }
             } else if (isInflow) {
               newBalance -= txToDelete.amount;
-              newTodayReceive = Math.max(0, newTodayReceive - txToDelete.amount);
+              if (isTxToday) newTodayReceive = Math.max(0, newTodayReceive - txToDelete.amount);
             } else if (txToDelete.type === 'adjustment') {
               newBalance -= txToDelete.amount;
+            }
+
+            if (isTxToday) {
+              newTodayProfit = Math.max(0, acc.todayProfit - (txToDelete.profit || 0));
             }
 
             const monthlyLimit = acc.monthlyLimit || 300000;
@@ -249,55 +260,62 @@ export const useUpdateTransactionMutation = () => {
       const oldOutflow = oldTx.type === 'sm' || oldTx.type === 'co' || oldTx.type === 'send' || oldTx.type === 'send_money' || oldTx.type === 'cash_out' || oldTx.type === 'b2b';
       const oldInflow = oldTx.type === 'recev' || oldTx.type === 'receive_money' || oldTx.type === 'cash_in';
       const oldProfit = oldTx.margin || oldTx.profit || 0;
+      const isOldToday = isSameDay(oldTx.date);
+      const isOldThisMonth = isSameMonth(oldTx.date);
 
       const newOutflow = updatedTx.type === 'sm' || updatedTx.type === 'co' || updatedTx.type === 'send' || updatedTx.type === 'send_money' || updatedTx.type === 'cash_out' || updatedTx.type === 'b2b';
       const newInflow = updatedTx.type === 'recev' || updatedTx.type === 'receive_money' || updatedTx.type === 'cash_in';
       const newProfit = updatedTx.margin || updatedTx.profit || 0;
+      const isNewToday = isSameDay(updatedTx.date);
+      const isNewThisMonth = isSameMonth(updatedTx.date);
 
       const updatedAccounts = prevAccounts.map((acc) => {
-        if (acc.id === updatedTx.accountId) {
-          let balance = acc.balance;
-          let todaySend = acc.todaySend;
-          let todayReceive = acc.todayReceive;
-          let todayProfit = acc.todayProfit;
-          let totalMargin = acc.totalMargin || 0;
-          let monthlyLimitUsed = acc.monthlyLimitUsed || 0;
+        let balance = acc.balance;
+        let todaySend = acc.todaySend;
+        let todayReceive = acc.todayReceive;
+        let todayProfit = acc.todayProfit;
+        let totalMargin = acc.totalMargin || 0;
+        let monthlyLimitUsed = acc.monthlyLimitUsed || 0;
 
-          // Revert old
+        // 1. Revert old transaction if this account was the source
+        if (acc.id === oldTx.accountId) {
           if (oldOutflow) {
             balance += oldTx.amount + (oldTx.cost || 0);
-            todaySend = Math.max(0, todaySend - oldTx.amount);
-            if (oldTx.type === 'sm' || oldTx.type === 'send_money') {
+            if (isOldToday) todaySend = Math.max(0, todaySend - oldTx.amount);
+            if (isOldThisMonth && (oldTx.type === 'sm' || oldTx.type === 'send_money')) {
               monthlyLimitUsed = Math.max(0, monthlyLimitUsed - oldTx.amount);
             }
           } else if (oldInflow) {
             balance -= oldTx.amount;
-            todayReceive = Math.max(0, todayReceive - oldTx.amount);
+            if (isOldToday) todayReceive = Math.max(0, todayReceive - oldTx.amount);
           } else if (oldTx.type === 'adjustment') {
             balance -= oldTx.amount;
           }
-          todayProfit = Math.max(0, todayProfit - oldProfit);
+          if (isOldToday) todayProfit = Math.max(0, todayProfit - oldProfit);
           totalMargin = Math.max(0, totalMargin - oldProfit);
+        }
 
-          // Apply new
+        // 2. Apply updated transaction if this account is the target
+        if (acc.id === updatedTx.accountId) {
           if (newOutflow) {
             balance -= updatedTx.amount + (updatedTx.cost || 0);
-            todaySend += updatedTx.amount;
-            if (updatedTx.type === 'sm' || updatedTx.type === 'send_money') {
+            if (isNewToday) todaySend += updatedTx.amount;
+            if (isNewThisMonth && (updatedTx.type === 'sm' || updatedTx.type === 'send_money')) {
               monthlyLimitUsed += updatedTx.amount;
             }
           } else if (newInflow) {
             balance += updatedTx.amount;
-            todayReceive += updatedTx.amount;
+            if (isNewToday) todayReceive += updatedTx.amount;
           } else if (updatedTx.type === 'adjustment') {
             balance += updatedTx.amount;
           }
-          todayProfit += newProfit;
+          if (isNewToday) todayProfit += newProfit;
           totalMargin += newProfit;
+        }
 
+        if (acc.id === oldTx.accountId || acc.id === updatedTx.accountId) {
           const monthlyLimit = acc.monthlyLimit || 300000;
           const remainingLimit = Math.max(0, monthlyLimit - monthlyLimitUsed);
-
           return {
             ...acc,
             balance,
@@ -389,12 +407,32 @@ export const useDeleteAccountMutation = () => {
     mutationFn: (id: string) => ledgerApi.deleteAccount(id),
     onMutate: async (id: string) => {
       await queryClient.cancelQueries({ queryKey: ledgerKeys.accounts() });
+      await queryClient.cancelQueries({ queryKey: ledgerKeys.transactions() });
+
       const prevAccounts = queryClient.getQueryData<Account[]>(ledgerKeys.accounts()) || [];
+      const prevTransactions = queryClient.getQueryData<Transaction[]>(ledgerKeys.transactions()) || [];
+
+      // Optimistically remove account
       queryClient.setQueryData<Account[]>(
         ledgerKeys.accounts(),
         prevAccounts.filter((a) => a.id !== id)
       );
-      return { prevAccounts };
+
+      // Optimistically remove all transactions belonging to this account
+      queryClient.setQueryData<Transaction[]>(
+        ledgerKeys.transactions(),
+        prevTransactions.filter((t) => t.accountId !== id)
+      );
+
+      return { prevAccounts, prevTransactions };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.prevAccounts) {
+        queryClient.setQueryData(ledgerKeys.accounts(), context.prevAccounts);
+      }
+      if (context?.prevTransactions) {
+        queryClient.setQueryData(ledgerKeys.transactions(), context.prevTransactions);
+      }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ledgerKeys.accounts() });

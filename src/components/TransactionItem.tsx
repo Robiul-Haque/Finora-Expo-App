@@ -66,8 +66,6 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction,
   const handleItemPress = () => {
     if (onPress) {
       onPress();
-    } else if (onOptionsPress) {
-      onOptionsPress(transaction);
     }
   };
 
@@ -90,8 +88,9 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction,
           {/* Left Column: Type + Number Flow */}
           <TouchableOpacity
             style={styles.typeFlowCol}
-            activeOpacity={0.7}
+            activeOpacity={onPress ? 0.7 : 1}
             onPress={handleItemPress}
+            disabled={!onPress}
           >
             <View style={styles.typeLabelRow}>
               <Ionicons name={typeConfig.iconName} size={14} color={typeConfig.indicatorColor} />
@@ -126,8 +125,9 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction,
           <View style={styles.rightGroup}>
             <TouchableOpacity
               style={styles.amountCol}
-              activeOpacity={0.7}
+              activeOpacity={onPress ? 0.7 : 1}
               onPress={handleItemPress}
+              disabled={!onPress}
             >
               <Text
                 style={[
@@ -143,7 +143,7 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction,
               </Text>
             </TouchableOpacity>
 
-            {(onOptionsPress || onPress) && (
+            {onOptionsPress && (
               <TouchableOpacity
                 style={[
                   styles.optionsBtn,
@@ -152,14 +152,11 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction,
                   },
                 ]}
                 onPress={() => {
-                  if (onOptionsPress) {
-                    onOptionsPress(transaction);
-                  } else if (onPress) {
-                    onPress();
-                  }
+                  onOptionsPress(transaction);
                 }}
                 activeOpacity={0.6}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityLabel="Transaction options"
               >
                 <Ionicons name="ellipsis-vertical" size={15} color={theme.textMuted} />
               </TouchableOpacity>
@@ -171,8 +168,9 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction,
         {(cost > 0 || profit > 0 || (transaction.runningBalance !== undefined && transaction.runningBalance !== null)) && (
           <TouchableOpacity
             style={[styles.bottomStrip, { borderTopColor: theme.divider }]}
-            activeOpacity={0.7}
+            activeOpacity={onPress ? 0.7 : 1}
             onPress={handleItemPress}
+            disabled={!onPress}
           >
             <View style={styles.breakdownGroup}>
               {cost > 0 && (

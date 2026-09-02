@@ -74,6 +74,14 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.bounceContainer}>
+          {/* Search Header */}
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search phone numbers..."
+            style={styles.searchBox}
+          />
+
           {/* Large Section Title */}
           <View style={styles.titleRow}>
             <Text style={[styles.screenHeading, { color: theme.text }]}>Accounts</Text>
@@ -86,14 +94,6 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
               <Text style={styles.addAccountBtnText}>Add SIM</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Search Header */}
-          <SearchBar
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search phone numbers..."
-            style={styles.searchBox}
-          />
 
         {/* Accounts List */}
         <View style={styles.accountsGrid}>
@@ -116,8 +116,8 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
               <AccountCard
                 key={account.id}
                 account={account}
-                onPress={() => onOpenAccountDetails(account)}
-                onAddTransactionPress={() => onOpenAddTransaction(account.id)}
+                onPress={onOpenAccountDetails}
+                onAddTransactionPress={onOpenAddTransaction}
               />
             ))
           )}
@@ -131,7 +131,7 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
       <ConfirmationModal
         visible={!!accountToDelete}
         title="Delete Account"
-        message={`Delete account ${accountToDelete?.accountNumber}? Past transactions will be preserved.`}
+        message={`Delete account ${accountToDelete?.accountNumber}? All transaction history under this account will also be permanently deleted.`}
         confirmText="Delete"
         cancelText="Cancel"
         type="danger"
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: 0,
   },
   screenHeading: {
     fontSize: 22,

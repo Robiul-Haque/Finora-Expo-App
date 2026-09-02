@@ -119,3 +119,29 @@ export const formatDateTime = (dateVal: string | number | Date | undefined | nul
     return 'Today';
   }
 };
+
+/**
+ * Checks if two dates fall on the exact same calendar day
+ */
+export const isSameDay = (date1: Date | string | number, date2: Date | string | number = new Date()): boolean => {
+  const d1 = parseDate(date1);
+  const d2 = parseDate(date2);
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
+};
+
+/**
+ * Checks if two dates fall on the exact same calendar month and year
+ */
+export const isSameMonth = (date1: Date | string | number, date2: Date | string | number = new Date()): boolean => {
+  const d1 = parseDate(date1);
+  const d2 = parseDate(date2);
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth()
+  );
+};
+

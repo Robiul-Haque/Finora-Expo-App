@@ -182,16 +182,25 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpen
     }
   };
 
+  const handleOpenOptions = useCallback((tx: Transaction) => {
+    setSelectedTxForAction(tx);
+    setShowOptionsMenu(true);
+  }, []);
+
   const renderItem = useCallback(
     ({ item }: { item: Transaction }) => (
       <TransactionItem
         transaction={item}
-        onOptionsPress={(tx) => {
-          setSelectedTxForAction(tx);
-          setShowOptionsMenu(true);
-        }}
+        onOptionsPress={handleOpenOptions}
       />
     ),
+    [handleOpenOptions]
+  );
+
+  const renderItemSeparator = useCallback(() => <View style={styles.itemSeparator} />, []);
+
+  const keyExtractor = useCallback(
+    (item: Transaction, index: number) => item.id || item.clientTxId || `tx_${index}`,
     []
   );
 
@@ -234,6 +243,7 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpen
           }}
           placeholder="Search phone number, note, amount..."
           onClear={() => setDisplayedCount(PAGE_SIZE)}
+          style={styles.searchBox}
         />
       </View>
 
@@ -241,9 +251,9 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpen
       <FlatList
         data={visibleTransactions}
         renderItem={renderItem}
-        keyExtractor={(item, index) => item.id || item.clientTxId || `tx_${index}`}
+        keyExtractor={keyExtractor}
         contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
+        ItemSeparatorComponent={renderItemSeparator}
         showsVerticalScrollIndicator={false}
         initialNumToRender={10}
         maxToRenderPerBatch={8}
@@ -412,10 +422,10 @@ const styles = StyleSheet.create({
   filterContainer: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 4,
+    paddingBottom: 16,
   },
   searchBox: {
-    height: 44,
+    height: 48,
     borderTopLeftRadius: 6,
     borderTopRightRadius: 6,
     borderBottomWidth: 2,
@@ -434,7 +444,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 0,
     paddingBottom: 105,
   },
   itemSeparator: {

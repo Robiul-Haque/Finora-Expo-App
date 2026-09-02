@@ -125,8 +125,8 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
               <AccountCard
                 key={account.id}
                 account={account}
-                onPress={() => onOpenAccountDetails(account)}
-                onAddTransactionPress={() => onOpenAddTransaction(account.id)}
+                onPress={onOpenAccountDetails}
+                onAddTransactionPress={onOpenAddTransaction}
               />
             ))
           )}

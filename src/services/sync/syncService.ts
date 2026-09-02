@@ -163,8 +163,12 @@ class SyncService {
     return this.enqueueItem('DELETE_ACCOUNT', id, { id });
   }
 
+  private getBackoffDelay(retryCount: number): number {
+    return Math.min(60000, 1000 * Math.pow(2, retryCount));
+  }
+
   /**
-   * Process all pending items in the offline queue with Batch Sync & Backoff
+   * Process all pending items in the offline queue with Batch Sync & Exponential Backoff
    */
   public async processQueue(): Promise<{ successCount: number; failedCount: number }> {
     if (this.isSyncing) return { successCount: 0, failedCount: 0 };
@@ -189,14 +193,28 @@ class SyncService {
         return { successCount: 0, failedCount: 0 };
       }
 
-      const remainingQueue: SyncQueueItem[] = [];
+      const now = Date.now();
+      const readyToSync: SyncQueueItem[] = [];
+      const backingOff: SyncQueueItem[] = [];
 
-      if (this.syncExecutor) {
+      for (const item of queue) {
+        const lastAttemptTime = item.lastAttempt ? new Date(item.lastAttempt).getTime() : 0;
+        const requiredDelay = this.getBackoffDelay(item.retryCount);
+        if (now - lastAttemptTime >= requiredDelay) {
+          readyToSync.push(item);
+        } else {
+          backingOff.push(item);
+        }
+      }
+
+      const remainingQueue: SyncQueueItem[] = [...backingOff];
+
+      if (readyToSync.length > 0 && this.syncExecutor) {
         try {
-          const syncResult = await this.syncExecutor(queue);
+          const syncResult = await this.syncExecutor(readyToSync);
           const syncedSet = new Set(syncResult.syncedIds || []);
 
-          for (const item of queue) {
+          for (const item of readyToSync) {
             if (syncedSet.has(item.clientTxId) || syncedSet.has(item.id)) {
               successCount++;
             } else {
@@ -210,11 +228,19 @@ class SyncService {
             }
           }
         } catch {
-          // Retry on next connection
-          remainingQueue.push(...queue);
+          // Retry with incremented count on next attempt
+          for (const item of readyToSync) {
+            item.retryCount += 1;
+            item.lastAttempt = new Date().toISOString();
+            if (item.retryCount < MAX_RETRIES) {
+              remainingQueue.push(item);
+            } else {
+              failedCount++;
+            }
+          }
         }
       } else {
-        remainingQueue.push(...queue);
+        remainingQueue.push(...readyToSync);
       }
 
       await this.saveQueue(remainingQueue);
@@ -252,3 +278,4 @@ class SyncService {
 }
 
 export const syncService = new SyncService();
+export default syncService;

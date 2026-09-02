@@ -425,7 +425,7 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
                     styles.textInput,
                     { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text },
                   ]}
-                  placeholder="0.00"
+                  placeholder="Enter amount"
                   placeholderTextColor={theme.textMuted}
                   value={amount}
                   onChangeText={setAmount}

@@ -6,15 +6,25 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#F8F9FA"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.finora.ledger"
+      "bundleIdentifier": "com.finora.ledger",
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.finora.ledger",
+      "versionCode": 1,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "VIBRATE"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#FFFFFF"

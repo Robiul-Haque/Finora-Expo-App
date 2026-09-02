@@ -97,6 +97,12 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
       dropdownAnim.setValue(0);
       slideAnim.setValue(400);
       fadeAnim.setValue(0);
+      setAmount('');
+      setCost('0');
+      setProfit('0');
+      setRecipientNumber('');
+      setNote('');
+      setTouched({});
       setSelectedDate(new Date());
       setPickerViewMonth(new Date());
       Animated.parallel([
@@ -149,30 +155,29 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
 
   const selectedAccount = activeAccounts.find((a) => a.id === accountId) || activeAccounts[0];
 
-  // Auto-calculate suggested cost & profit based on business rules for send money / cash out
+  // Pure fee calculator based on business rules for send money / cash out / receive
+  const calculateDefaultFees = (val: string, targetType: 'send' | 'receive' | 'cash_out' | 'adjustment') => {
+    const num = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
+    if (num <= 0 || targetType === 'adjustment') {
+      return { cost: '0', profit: '0' };
+    }
+    if (targetType === 'send' || targetType === 'cash_out') {
+      const estimatedCost = Math.round(num * 0.015);
+      const estimatedProfit = Math.round(num * 0.005);
+      return { cost: String(estimatedCost), profit: String(estimatedProfit) };
+    }
+    if (targetType === 'receive') {
+      const estimatedProfit = Math.round(num * 0.02);
+      return { cost: '0', profit: String(estimatedProfit) };
+    }
+    return { cost: '0', profit: '0' };
+  };
+
   const handleAmountChange = (val: string) => {
     setAmount(val);
-    const num = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
-    if (txType === 'send' || txType === 'cash_out') {
-      if (num > 0) {
-        const estimatedCost = Math.round(num * 0.015);
-        const estimatedProfit = Math.round(num * 0.005);
-        setCost(String(estimatedCost));
-        setProfit(String(estimatedProfit));
-      } else {
-        setCost('0');
-        setProfit('0');
-      }
-    } else if (txType === 'receive') {
-      if (num > 0) {
-        const estimatedProfit = Math.round(num * 0.02);
-        setCost('0');
-        setProfit(String(estimatedProfit));
-      } else {
-        setCost('0');
-        setProfit('0');
-      }
-    }
+    const { cost: newCost, profit: newProfit } = calculateDefaultFees(val, txType);
+    setCost(newCost);
+    setProfit(newProfit);
   };
 
   const mappedTransactionType: TransactionType = useMemo(() => {
@@ -198,7 +203,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
     } else if (txType === 'send' || txType === 'cash_out') {
       return current - (numAmount + numCost);
     } else {
-      return numAmount > 0 ? numAmount : current;
+      return current + numAmount;
     }
   }, [selectedAccount, txType, numAmount, numCost]);
 
@@ -446,12 +451,9 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                 selectedType={txType}
                 onSelectType={(newType) => {
                   setTxType(newType);
-                  if (newType === 'adjustment') {
-                    setCost('0');
-                    setProfit('0');
-                  } else {
-                    handleAmountChange(amount);
-                  }
+                  const { cost: newCost, profit: newProfit } = calculateDefaultFees(amount, newType);
+                  setCost(newCost);
+                  setProfit(newProfit);
                 }}
               />
             </View>
@@ -474,7 +476,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                 <TextInput
                   ref={amountInputRef}
                   style={[styles.numericInput, { color: theme.text }]}
-                  placeholder="0"
+                  placeholder="Enter amount"
                   placeholderTextColor={theme.textMuted}
                   keyboardType="numeric"
                   value={amount}
@@ -714,7 +716,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                       ? 'NEW BALANCE AFTER SEND'
                       : txType === 'receive'
                       ? 'NEW BALANCE AFTER RECEIVE'
-                      : 'NEW ADJUSTED BALANCE'}
+                      : 'NEW BALANCE AFTER ADJUSTMENT'}
                   </Text>
                 </View>
 
@@ -724,7 +726,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                       ? `Current ${formatCurrency(selectedAccount.balance)}  -  ${formatCurrency(numAmount + numCost)}`
                       : txType === 'receive'
                       ? `Current ${formatCurrency(selectedAccount.balance)}  +  ${formatCurrency(numAmount)}`
-                      : `Updated to ${formatCurrency(previewNewBalance)}`}
+                      : `Current ${formatCurrency(selectedAccount.balance)}  +  ${formatCurrency(numAmount)}`}
                   </Text>
                 )}
               </View>
