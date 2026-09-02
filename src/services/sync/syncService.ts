@@ -7,10 +7,18 @@ const MAX_RETRIES = 5;
 
 export type BatchSyncExecutor = (items: any[]) => Promise<{ syncedIds: string[]; failedIds: string[] }>;
 
+export type SyncOperationType =
+  | 'CREATE_TRANSACTION'
+  | 'UPDATE_TRANSACTION'
+  | 'DELETE_TRANSACTION'
+  | 'CREATE_ACCOUNT'
+  | 'UPDATE_ACCOUNT'
+  | 'DELETE_ACCOUNT';
+
 export interface SyncQueueItem {
   id: string;
   clientTxId: string;
-  type: 'CREATE_TRANSACTION' | 'DELETE_TRANSACTION' | 'UPDATE_ACCOUNT';
+  type: SyncOperationType;
   payload: any;
   createdAt: string;
   retryCount: number;
@@ -68,22 +76,28 @@ class SyncService {
   }
 
   /**
-   * Enqueue a transaction for background/offline synchronization
+   * Generic enqueue for any offline mutation
    */
-  public async enqueueTransaction(txData: Omit<Transaction, 'id' | 'date'> & { clientTxId: string }): Promise<SyncQueueItem> {
+  public async enqueueItem(
+    type: SyncOperationType,
+    clientTxId: string,
+    payload: any
+  ): Promise<SyncQueueItem> {
     const queue = await this.getQueue();
 
-    // Prevent duplicate enqueue of identical clientTxId
-    const existingIndex = queue.findIndex((item) => item.clientTxId === txData.clientTxId);
+    // Prevent duplicate enqueue of identical operation
+    const existingIndex = queue.findIndex(
+      (item) => item.clientTxId === clientTxId && item.type === type
+    );
     if (existingIndex !== -1) {
       return queue[existingIndex];
     }
 
     const item: SyncQueueItem = {
-      id: 'sync_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      clientTxId: txData.clientTxId,
-      type: 'CREATE_TRANSACTION',
-      payload: txData,
+      id: 'sync_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8),
+      clientTxId,
+      type,
+      payload,
       createdAt: new Date().toISOString(),
       retryCount: 0,
     };
@@ -99,6 +113,54 @@ class SyncService {
     }
 
     return item;
+  }
+
+  /**
+   * Enqueue a transaction creation for offline synchronization
+   */
+  public async enqueueTransaction(
+    txData: Omit<Transaction, 'id' | 'date'> & { clientTxId: string }
+  ): Promise<SyncQueueItem> {
+    return this.enqueueItem('CREATE_TRANSACTION', txData.clientTxId, txData);
+  }
+
+  /**
+   * Enqueue a transaction update for offline synchronization
+   */
+  public async enqueueUpdateTransaction(
+    id: string,
+    updates: Partial<Transaction>
+  ): Promise<SyncQueueItem> {
+    return this.enqueueItem('UPDATE_TRANSACTION', id, { id, updates });
+  }
+
+  /**
+   * Enqueue a transaction deletion for offline synchronization
+   */
+  public async enqueueDeleteTransaction(id: string): Promise<SyncQueueItem> {
+    return this.enqueueItem('DELETE_TRANSACTION', id, { id });
+  }
+
+  /**
+   * Enqueue an account creation for offline synchronization
+   */
+  public async enqueueCreateAccount(accountData: any): Promise<SyncQueueItem> {
+    const key = accountData.id || ('acc_' + Date.now());
+    return this.enqueueItem('CREATE_ACCOUNT', key, accountData);
+  }
+
+  /**
+   * Enqueue an account update for offline synchronization
+   */
+  public async enqueueUpdateAccount(id: string, updates: any): Promise<SyncQueueItem> {
+    return this.enqueueItem('UPDATE_ACCOUNT', id, { id, updates });
+  }
+
+  /**
+   * Enqueue an account deletion for offline synchronization
+   */
+  public async enqueueDeleteAccount(id: string): Promise<SyncQueueItem> {
+    return this.enqueueItem('DELETE_ACCOUNT', id, { id });
   }
 
   /**
@@ -127,20 +189,15 @@ class SyncService {
         return { successCount: 0, failedCount: 0 };
       }
 
-      // Collect CREATE_TRANSACTION items for batch sync
-      const createTxItems = queue.filter((q) => q.type === 'CREATE_TRANSACTION');
-      const otherItems = queue.filter((q) => q.type !== 'CREATE_TRANSACTION');
-
       const remainingQueue: SyncQueueItem[] = [];
 
-      if (createTxItems.length > 0 && this.syncExecutor) {
+      if (this.syncExecutor) {
         try {
-          const payloadList = createTxItems.map((i) => i.payload);
-          const syncResult = await this.syncExecutor(payloadList);
+          const syncResult = await this.syncExecutor(queue);
           const syncedSet = new Set(syncResult.syncedIds || []);
 
-          for (const item of createTxItems) {
-            if (syncedSet.has(item.clientTxId)) {
+          for (const item of queue) {
+            if (syncedSet.has(item.clientTxId) || syncedSet.has(item.id)) {
               successCount++;
             } else {
               item.retryCount += 1;
@@ -154,13 +211,10 @@ class SyncService {
           }
         } catch {
           // Retry on next connection
-          remainingQueue.push(...createTxItems);
+          remainingQueue.push(...queue);
         }
-      }
-
-      // Process other items (if any)
-      for (const item of otherItems) {
-        remainingQueue.push(item);
+      } else {
+        remainingQueue.push(...queue);
       }
 
       await this.saveQueue(remainingQueue);

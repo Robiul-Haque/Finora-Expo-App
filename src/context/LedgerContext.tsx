@@ -4,6 +4,7 @@ import {
   useAccountsQuery,
   useTransactionsQuery,
   useAddTransactionMutation,
+  useUpdateTransactionMutation,
   useDeleteTransactionMutation,
   useAddAccountMutation,
   useUpdateAccountMutation,
@@ -11,6 +12,7 @@ import {
   useResetDatabaseMutation,
 } from '../hooks/useLedgerQueries';
 import { useFilterStore } from '../store/useFilterStore';
+import { parseDate } from '../utils/formatters';
 
 interface LedgerContextType {
   accounts: Account[];
@@ -20,7 +22,8 @@ interface LedgerContextType {
   filteredTransactions: Transaction[];
   setFilters: (newFilters: Partial<FilterOptions>) => void;
   resetFilters: () => void;
-  addTransaction: (tx: Omit<Transaction, 'id' | 'date'>) => Promise<void>;
+  addTransaction: (tx: Omit<Transaction, 'id' | 'date'> & { date?: string }) => Promise<void>;
+  updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   addAccount: (acc: Omit<Account, 'id' | 'createdAt' | 'todaySend' | 'todayReceive' | 'todayProfit'>) => Promise<void>;
   updateAccount: (id: string, updates: Partial<Account>) => Promise<void>;
@@ -46,6 +49,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // TanStack Mutations
   const addTxMutation = useAddTransactionMutation();
+  const updateTxMutation = useUpdateTransactionMutation();
   const deleteTxMutation = useDeleteTransactionMutation();
   const addAccountMutation = useAddAccountMutation();
   const updateAccountMutation = useUpdateAccountMutation();
@@ -61,13 +65,21 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const isFetching = isAccountsFetching || isTxsFetching;
 
   // Safe Memoized Mutation Handlers (No uncaught exceptions to crash the UI)
-  const addTransaction = useCallback(async (txData: Omit<Transaction, 'id' | 'date'>) => {
+  const addTransaction = useCallback(async (txData: Omit<Transaction, 'id' | 'date'> & { date?: string }) => {
     try {
       await addTxMutation.mutateAsync(txData);
     } catch {
       // Local storage handled offline
     }
   }, [addTxMutation]);
+
+  const updateTransaction = useCallback(async (id: string, updates: Partial<Transaction>) => {
+    try {
+      await updateTxMutation.mutateAsync({ id, updates });
+    } catch {
+      // Local storage handled offline
+    }
+  }, [updateTxMutation]);
 
   const deleteTransaction = useCallback(async (id: string) => {
     try {
@@ -192,7 +204,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       // Date range filter
-      const txTime = new Date(tx.date).getTime();
+      const txTime = parseDate(tx.date).getTime();
       if (filters.dateRange === 'today' && txTime < startOfToday) {
         return false;
       }
@@ -251,6 +263,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setFilters,
     resetFilters,
     addTransaction,
+    updateTransaction,
     deleteTransaction,
     addAccount,
     updateAccount,
@@ -269,6 +282,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setFilters,
     resetFilters,
     addTransaction,
+    updateTransaction,
     deleteTransaction,
     addAccount,
     updateAccount,

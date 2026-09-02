@@ -58,23 +58,56 @@ export const darkTheme: ThemeColors = {
   primaryLight: 'rgba(26, 115, 232, 0.2)',
   accent: '#005BC0',
   background: '#191C1D', // on-surface as dark base
-  card: '#2E3132', // inverse-surface
-  cardSecondary: '#242728',
+  card: '#26292B', // inverse-surface refined
+  cardSecondary: '#1E2122',
   text: '#F0F1F2', // inverse-on-surface
   textSecondary: '#C1C6D6',
-  textMuted: '#727785',
-  border: '#414754',
-  divider: '#2E3132',
+  textMuted: '#8A909E',
+  border: '#3E4347',
+  divider: '#2C3032',
   success: '#00C853', // vibrant emerald
   successLight: 'rgba(0, 200, 83, 0.2)',
   danger: '#FF5252',
   dangerLight: 'rgba(255, 82, 82, 0.2)',
   warning: '#FFB300',
   warningLight: 'rgba(255, 179, 0, 0.2)',
-  inputBg: '#2E3132',
+  inputBg: '#2A2E30',
   tabBarBg: '#1E2122',
   tabBarActive: '#1A73E8',
-  tabBarInactive: '#727785',
-  progressBarBg: '#414754',
+  tabBarInactive: '#8A909E',
+  progressBarBg: '#3E4347',
   statusBar: 'light',
 };
+
+/**
+ * Standard Design System Scale Tokens
+ */
+export const typography = {
+  xs: 10,
+  sm: 11,
+  md: 13,
+  base: 14,
+  lg: 16,
+  xl: 18,
+  xxl: 22,
+  display: 28,
+} as const;
+
+export const radii = {
+  xs: 4,
+  sm: 6,
+  md: 8,
+  lg: 12,
+  xl: 16,
+  full: 9999,
+} as const;
+
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+} as const;

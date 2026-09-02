@@ -13,8 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
-import { AccountCard, AccountCardSkeleton } from '../components';
-import { useBounceScroll } from '../hooks';
+import { AccountCard, AccountCardSkeleton, SearchBar, AppHeader, ActionSheetModal } from '../components';
 import { Account } from '../types';
 
 interface HomeScreenProps {
@@ -30,13 +29,14 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
   onOpenAccountDetails,
   onOpenAddTransaction,
 }) => {
-  const { theme, isDarkMode, toggleTheme } = useTheme();
+  const { theme, isDarkMode } = useTheme();
   const { accounts, isLoading, refetch } = useLedger();
-  const { scrollProps, bounceStyle } = useBounceScroll();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState<SortOption>('balance_desc');
-  const [showSortPicker, setShowSortPicker] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
+
+  const isCustomSorted = sortOption !== 'balance_desc';
 
   const filteredAccounts = useMemo(() => {
     let result = accounts.filter((acc) => {
@@ -60,179 +60,53 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
     }
   }, [accounts, searchQuery, sortOption]);
 
-  const sortLabel = useMemo(() => {
-    switch (sortOption) {
-      case 'balance_desc':
-        return 'Balance: High -> Low';
-      case 'balance_asc':
-        return 'Balance: Low -> High';
-      case 'limit_asc':
-        return 'Limit Remaining: Low -> High';
-    }
-  }, [sortOption]);
-
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Stitch Top App Bar */}
-      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.divider }]}>
-        <View style={styles.headerLeft}>
-          <Image
-            source={require('../../assets/icon.png')}
-            style={styles.logoBadgeImage}
-            resizeMode="contain"
-          />
-          <View style={styles.headerTitleGroup}>
-            <Text style={[styles.appTitle, { color: theme.primary }]}>Finora</Text>
-            <Text style={[styles.appSubtitle, { color: theme.textSecondary }]}>Smart Business Ledger</Text>
-          </View>
-        </View>
-
-        <View style={styles.headerRight}>
+      <AppHeader
+        rightContent={
           <TouchableOpacity
-            style={[styles.iconButton, { backgroundColor: theme.cardSecondary }]}
-            onPress={toggleTheme}
+            style={[
+              styles.iconButton,
+              { backgroundColor: theme.cardSecondary },
+              isCustomSorted && { borderColor: theme.primary, borderWidth: 1.5 },
+            ]}
+            onPress={() => setShowSortModal(true)}
             activeOpacity={0.7}
+            accessibilityLabel="Sort and Filter SIMs"
           >
             <Ionicons
-              name={isDarkMode ? 'sunny-outline' : 'moon-outline'}
+              name={isCustomSorted ? 'options' : 'options-outline'}
               size={18}
-              color={theme.textSecondary}
+              color={isCustomSorted ? theme.primary : theme.textSecondary}
             />
+            {isCustomSorted && (
+              <View style={[styles.filterBadge, { backgroundColor: theme.primary }]}>
+                <Text style={styles.filterBadgeText}>1</Text>
+              </View>
+            )}
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.iconButton, { backgroundColor: theme.cardSecondary }]}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="settings-outline"
-              size={18}
-              color={theme.textSecondary}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
+        }
+      />
 
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
-        {...scrollProps}
       >
-        <Animated.View style={[bounceStyle, styles.bounceContainer]}>
-          {/* Controls Section: Search & Sort */}
+        <View style={styles.bounceContainer}>
+          {/* Controls Section: Clean Search */}
           <View style={styles.controlsSection}>
-          {/* Search Box */}
-          <View
-            style={[
-              styles.searchBox,
-              {
-                backgroundColor: theme.inputBg,
-                borderBottomColor: theme.border,
-              },
-            ]}
-          >
-            <Ionicons name="search" size={18} color={theme.textMuted} style={styles.searchIcon} />
-            <TextInput
-              style={[styles.searchInput, { color: theme.text }]}
-              placeholder="Search phone numbers..."
-              placeholderTextColor={theme.textMuted}
+            <SearchBar
               value={searchQuery}
               onChangeText={setSearchQuery}
-              autoCapitalize="none"
-              clearButtonMode="while-editing"
+              placeholder="Search phone numbers..."
+              style={styles.searchBox}
             />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={16} color={theme.textMuted} />
-              </TouchableOpacity>
-            )}
           </View>
 
-          {/* Sort Selector */}
-          <TouchableOpacity
-            style={[
-              styles.sortBox,
-              {
-                backgroundColor: theme.cardSecondary,
-                borderColor: theme.border,
-              },
-            ]}
-            onPress={() => setShowSortPicker(!showSortPicker)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.sortText, { color: theme.text }]}>{sortLabel}</Text>
-            <Ionicons name="chevron-down" size={16} color={theme.textMuted} />
-          </TouchableOpacity>
-
-          {/* Sort Dropdown */}
-          {showSortPicker && (
-            <View style={[styles.sortDropdown, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <TouchableOpacity
-                style={[
-                  styles.sortItem,
-                  sortOption === 'balance_desc' && { backgroundColor: theme.primaryLight },
-                ]}
-                onPress={() => {
-                  setSortOption('balance_desc');
-                  setShowSortPicker(false);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.sortItemText,
-                    { color: sortOption === 'balance_desc' ? theme.primary : theme.text },
-                  ]}
-                >
-                  Balance: High -&gt; Low
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.sortItem,
-                  sortOption === 'balance_asc' && { backgroundColor: theme.primaryLight },
-                ]}
-                onPress={() => {
-                  setSortOption('balance_asc');
-                  setShowSortPicker(false);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.sortItemText,
-                    { color: sortOption === 'balance_asc' ? theme.primary : theme.text },
-                  ]}
-                >
-                  Balance: Low -&gt; High
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.sortItem,
-                  sortOption === 'limit_asc' && { backgroundColor: theme.primaryLight },
-                ]}
-                onPress={() => {
-                  setSortOption('limit_asc');
-                  setShowSortPicker(false);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.sortItemText,
-                    { color: sortOption === 'limit_asc' ? theme.primary : theme.text },
-                  ]}
-                >
-                  Limit Remaining: Low -&gt; High
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* Account Cards Grid */}
-        <View style={styles.accountsGrid}>
+          {/* Account Cards Grid */}
+          <View style={styles.accountsGrid}>
           {isLoading && accounts.length === 0 ? (
             <>
               <AccountCardSkeleton />
@@ -259,8 +133,59 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
         </View>
 
         <View style={{ height: 80 }} />
-        </Animated.View>
+        </View>
       </ScrollView>
+
+      {/* Sort & Filter SIMs Bottom Sheet Modal */}
+      <ActionSheetModal
+        visible={showSortModal}
+        title="Sort Options"
+        actions={[
+          {
+            id: 'balance_desc',
+            title: 'Balance: High -> Low',
+            icon: 'arrow-down-circle-outline',
+            badge:
+              sortOption === 'balance_desc'
+                ? {
+                    text: 'Active',
+                    color: theme.primary,
+                    bg: isDarkMode ? 'rgba(26, 115, 232, 0.2)' : theme.primaryLight,
+                  }
+                : undefined,
+            onPress: () => setSortOption('balance_desc'),
+          },
+          {
+            id: 'balance_asc',
+            title: 'Balance: Low -> High',
+            icon: 'arrow-up-circle-outline',
+            badge:
+              sortOption === 'balance_asc'
+                ? {
+                    text: 'Active',
+                    color: theme.primary,
+                    bg: isDarkMode ? 'rgba(26, 115, 232, 0.2)' : theme.primaryLight,
+                  }
+                : undefined,
+            onPress: () => setSortOption('balance_asc'),
+          },
+          {
+            id: 'limit_asc',
+            title: 'Limit Remaining: Low -> High',
+            icon: 'speedometer-outline',
+            badge:
+              sortOption === 'limit_asc'
+                ? {
+                    text: 'Active',
+                    color: theme.primary,
+                    bg: isDarkMode ? 'rgba(26, 115, 232, 0.2)' : theme.primaryLight,
+                  }
+                : undefined,
+            onPress: () => setSortOption('limit_asc'),
+          },
+        ]}
+        onClose={() => setShowSortModal(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -271,46 +196,29 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  logoBadgeImage: {
-    width: 36,
-    height: 36,
-  },
-  headerTitleGroup: {
-    gap: 1,
-  },
-  appTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-  },
-  appSubtitle: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   iconButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  filterBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   container: {
     flex: 1,
@@ -324,7 +232,6 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   controlsSection: {
-    gap: 10,
     position: 'relative',
     zIndex: 10,
   },
@@ -336,44 +243,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    padding: 0,
-  },
-  sortBox: {
-    height: 44,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-  },
-  sortText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  sortDropdown: {
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: 'hidden',
-    marginTop: -4,
-  },
-  sortItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0, 0, 0, 0.06)',
-  },
-  sortItemText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   accountsGrid: {
     gap: 12,

@@ -13,8 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
-import { AccountCard, AccountCardSkeleton, ConfirmationModal } from '../components';
-import { useBounceScroll } from '../hooks';
+import { AccountCard, AccountCardSkeleton, ConfirmationModal, SearchBar, AppHeader } from '../components';
 import { Account } from '../types';
 
 interface AccountsScreenProps {
@@ -28,9 +27,8 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
   onOpenAddAccount,
   onOpenAddTransaction,
 }) => {
-  const { theme, isDarkMode, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const { accounts, isLoading, deleteAccount, refetch } = useLedger();
-  const { scrollProps, bounceStyle } = useBounceScroll();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -68,40 +66,14 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Top App Bar */}
-      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.divider }]}>
-        <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
-          <Ionicons name="menu" size={22} color={theme.text} />
-        </TouchableOpacity>
-
-        <View style={styles.headerCenterBrand}>
-          <Image
-            source={require('../../assets/icon.png')}
-            style={styles.logoBadgeImage}
-            resizeMode="contain"
-          />
-          <Text style={[styles.brandTitle, { color: theme.primary }]}>Finora</Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.iconButton, { backgroundColor: theme.cardSecondary }]}
-          onPress={toggleTheme}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={isDarkMode ? 'sunny-outline' : 'moon-outline'}
-            size={18}
-            color={theme.textSecondary}
-          />
-        </TouchableOpacity>
-      </View>
+      <AppHeader />
 
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
-        {...scrollProps}
       >
-        <Animated.View style={[bounceStyle, styles.bounceContainer]}>
+        <View style={styles.bounceContainer}>
           {/* Large Section Title */}
           <View style={styles.titleRow}>
             <Text style={[styles.screenHeading, { color: theme.text }]}>Accounts</Text>
@@ -116,22 +88,12 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
           </View>
 
           {/* Search Header */}
-          <View style={[styles.searchBox, { backgroundColor: theme.inputBg, borderBottomColor: theme.border }]}>
-          <Ionicons name="search" size={18} color={theme.textMuted} style={styles.searchIcon} />
-          <TextInput
-            style={[styles.searchInput, { color: theme.text }]}
-            placeholder="Search phone numbers..."
-            placeholderTextColor={theme.textMuted}
+          <SearchBar
             value={searchQuery}
             onChangeText={setSearchQuery}
-            clearButtonMode="while-editing"
+            placeholder="Search phone numbers..."
+            style={styles.searchBox}
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={16} color={theme.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
 
         {/* Accounts List */}
         <View style={styles.accountsGrid}>
@@ -162,7 +124,7 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
         </View>
 
         <View style={{ height: 80 }} />
-        </Animated.View>
+        </View>
       </ScrollView>
 
       {/* Delete Confirmation Modal */}

@@ -9,79 +9,34 @@ interface SplashScreenProps {
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const { theme, isDarkMode } = useTheme();
 
-  // Opacity & Scale animations for smooth entrance & exit
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.92)).current;
   const exitFadeAnim = useRef(new Animated.Value(1)).current;
 
-  // Dot pulse animations
-  const dot1Anim = useRef(new Animated.Value(0.3)).current;
-  const dot2Anim = useRef(new Animated.Value(0.3)).current;
-  const dot3Anim = useRef(new Animated.Value(0.3)).current;
-
   useEffect(() => {
-    // 1. Snappy entrance animation
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 220,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 8,
-        tension: 70,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // 1. Instant 120ms fade entrance
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 120,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
 
-    // 2. Fast continuous Dot pulse animation
-    const createDotLoop = (anim: Animated.Value, delay: number) => {
-      return Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(anim, {
-            toValue: 1,
-            duration: 250,
-            useNativeDriver: true,
-          }),
-          Animated.timing(anim, {
-            toValue: 0.3,
-            duration: 250,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-    };
-
-    const loop1 = createDotLoop(dot1Anim, 0);
-    const loop2 = createDotLoop(dot2Anim, 120);
-    const loop3 = createDotLoop(dot3Anim, 240);
-
-    loop1.start();
-    loop2.start();
-    loop3.start();
-
-    // 3. Fast smooth exit after 750ms
+    // 2. Fast smooth exit after 350ms (Zero startup lag)
     const timer = setTimeout(() => {
       Animated.timing(exitFadeAnim, {
         toValue: 0,
-        duration: 200,
+        duration: 160,
         easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }).start(() => {
         onFinish();
       });
-    }, 750);
+    }, 350);
 
     return () => {
       clearTimeout(timer);
-      loop1.stop();
-      loop2.stop();
-      loop3.stop();
     };
-  }, [fadeAnim, scaleAnim, exitFadeAnim, dot1Anim, dot2Anim, dot3Anim, onFinish]);
+  }, [fadeAnim, exitFadeAnim, onFinish]);
 
   return (
     <Animated.View
@@ -104,7 +59,6 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           styles.centerContent,
           {
             opacity: fadeAnim,
-            transform: [{ scale: scaleAnim }],
           },
         ]}
       >
@@ -125,24 +79,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       {/* Bottom Sync Indicator */}
       <View style={styles.bottomBar}>
         <View style={styles.dotsRow}>
-          <Animated.View
-            style={[
-              styles.dot,
-              { backgroundColor: theme.primary, opacity: dot1Anim },
-            ]}
-          />
-          <Animated.View
-            style={[
-              styles.dot,
-              { backgroundColor: theme.primary, opacity: dot2Anim },
-            ]}
-          />
-          <Animated.View
-            style={[
-              styles.dot,
-              { backgroundColor: theme.primary, opacity: dot3Anim },
-            ]}
-          />
+          <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+          <View style={[styles.dot, { backgroundColor: theme.primary, opacity: 0.6 }]} />
+          <View style={[styles.dot, { backgroundColor: theme.primary, opacity: 0.3 }]} />
         </View>
         <Text style={[styles.syncText, { color: isDarkMode ? '#94A3B8' : '#80868B' }]}>
           SYNCING DATA

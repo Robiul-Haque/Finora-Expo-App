@@ -27,12 +27,17 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
   const { accounts, addAccount } = useLedger();
 
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [dailyLimit, setDailyLimit] = useState('300000');
-  const [openingBalance, setOpeningBalance] = useState('25000');
+  const [dailyLimit, setDailyLimit] = useState('');
+  const [openingBalance, setOpeningBalance] = useState('');
   const [accountLabel, setAccountLabel] = useState('');
   const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollViewRef = React.useRef<ScrollView>(null);
+
+  const phoneRef = useRef<TextInput>(null);
+  const dailyLimitRef = useRef<TextInput>(null);
+  const openingBalanceRef = useRef<TextInput>(null);
+  const accountLabelRef = useRef<TextInput>(null);
 
   const slideAnim = useRef(new Animated.Value(400)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -70,6 +75,11 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
         useNativeDriver: true,
       }),
     ]).start(() => {
+      setPhoneNumber('');
+      setDailyLimit('');
+      setOpeningBalance('');
+      setAccountLabel('');
+      setTouched({});
       onClose();
     });
   };
@@ -114,8 +124,8 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
 
       // Reset
       setPhoneNumber('');
-      setDailyLimit('300000');
-      setOpeningBalance('25000');
+      setDailyLimit('');
+      setOpeningBalance('');
       setAccountLabel('');
       setTouched({});
       onClose();
@@ -127,7 +137,7 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
   };
 
   return (
-    <Modal visible={visible} animationType="none" transparent onRequestClose={handleClose}>
+    <Modal visible={visible} animationType="none" transparent statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -136,18 +146,33 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
           <Animated.View style={[styles.modalContent, { backgroundColor: theme.card, borderColor: theme.border, transform: [{ translateY: slideAnim }] }]}>
             {/* Top Navigation Header */}
             <View style={[styles.modalHeader, { borderBottomColor: theme.divider }]}>
-              <TouchableOpacity onPress={handleClose} style={styles.backBtn} activeOpacity={0.7}>
+              <TouchableOpacity
+                onPress={handleClose}
+                style={styles.backBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <Ionicons name="arrow-back" size={20} color={theme.text} />
               </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: theme.text }]}>Add bKash Number</Text>
             <View style={styles.placeholderBack} />
           </View>
 
-          <ScrollView ref={scrollViewRef} style={styles.formScroll} contentContainerStyle={styles.formScrollContent} showsVerticalScrollIndicator={false} bounces={false}>
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.formScroll}
+            contentContainerStyle={styles.formScrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            bounces={false}
+          >
             {/* Field 1: Phone Number */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone Number</Text>
-              <View
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => phoneRef.current?.focus()}
                 style={[
                   styles.inputBox,
                   {
@@ -158,6 +183,7 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
               >
                 <Ionicons name="phone-portrait-outline" size={18} color={theme.textMuted} style={styles.inputIcon} />
                 <TextInput
+                  ref={phoneRef}
                   style={[styles.inputField, { color: theme.text }]}
                   placeholder="e.g. 01716 553 880"
                   placeholderTextColor={theme.textMuted}
@@ -170,7 +196,7 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
                   }}
                   onBlur={() => handleBlur('phoneNumber')}
                 />
-              </View>
+              </TouchableOpacity>
               {touched.phoneNumber && !phoneNumber.trim() && (
                 <Text style={[styles.inlineWarning, { color: theme.danger }]}>
                   Please enter a valid bKash number
@@ -181,9 +207,14 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
             {/* Field 2: Daily Send Limit */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Daily Send Limit</Text>
-              <View style={[styles.inputBox, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => dailyLimitRef.current?.focus()}
+                style={[styles.inputBox, { backgroundColor: theme.inputBg, borderColor: theme.border }]}
+              >
                 <Text style={[styles.currencyPrefix, { color: theme.textSecondary }]}>৳</Text>
                 <TextInput
+                  ref={dailyLimitRef}
                   style={[styles.inputFieldRight, { color: theme.text }]}
                   placeholder="300,000"
                   placeholderTextColor={theme.textMuted}
@@ -192,15 +223,20 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
                   onChangeText={setDailyLimit}
                   onBlur={() => handleBlur('dailyLimit')}
                 />
-              </View>
+              </TouchableOpacity>
             </View>
 
             {/* Field 3: Opening Balance */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Opening Balance</Text>
-              <View style={[styles.inputBox, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => openingBalanceRef.current?.focus()}
+                style={[styles.inputBox, { backgroundColor: theme.inputBg, borderColor: theme.border }]}
+              >
                 <Text style={[styles.currencyPrefix, { color: theme.textSecondary }]}>৳</Text>
                 <TextInput
+                  ref={openingBalanceRef}
                   style={[styles.inputFieldRight, { color: theme.text }]}
                   placeholder="25,000"
                   placeholderTextColor={theme.textMuted}
@@ -209,22 +245,27 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
                   onChangeText={setOpeningBalance}
                   onBlur={() => handleBlur('openingBalance')}
                 />
-              </View>
+              </TouchableOpacity>
             </View>
 
             {/* Field 4: Account Label (Optional) */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Account Label (Optional)</Text>
-              <View style={[styles.inputBox, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => accountLabelRef.current?.focus()}
+                style={[styles.inputBox, { backgroundColor: theme.inputBg, borderColor: theme.border }]}
+              >
                 <Ionicons name="bookmark-outline" size={18} color={theme.textMuted} style={styles.inputIcon} />
                 <TextInput
+                  ref={accountLabelRef}
                   style={[styles.inputField, { color: theme.text }]}
                   placeholder="e.g. Personal, Shop 1"
                   placeholderTextColor={theme.textMuted}
                   value={accountLabel}
                   onChangeText={setAccountLabel}
                 />
-              </View>
+              </TouchableOpacity>
             </View>
           </ScrollView>
 
@@ -336,16 +377,20 @@ const styles = StyleSheet.create({
   },
   inputField: {
     flex: 1,
+    height: '100%',
     fontSize: 14,
     fontWeight: '500',
-    padding: 0,
+    paddingVertical: 0,
+    textAlignVertical: 'center',
   },
   inputFieldRight: {
     flex: 1,
+    height: '100%',
     fontSize: 14.5,
     fontWeight: '600',
     textAlign: 'right',
-    padding: 0,
+    paddingVertical: 0,
+    textAlignVertical: 'center',
   },
   footerActions: {
     paddingHorizontal: 16,

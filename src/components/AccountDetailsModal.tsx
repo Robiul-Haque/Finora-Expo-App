@@ -6,6 +6,8 @@ import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
 import { TransactionItem } from './TransactionItem';
 import { ConfirmationModal } from './ConfirmationModal';
+import { EditTransactionModal } from './EditTransactionModal';
+import { ActionSheetModal } from './ActionSheetModal';
 import { formatCurrency } from '../utils';
 
 interface AccountDetailsModalProps {
@@ -22,9 +24,31 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
   onAddTransaction,
 }) => {
   const { theme, isDarkMode } = useTheme();
-  const { transactions, deleteAccount, updateAccount } = useLedger();
+  const { transactions, deleteAccount, updateAccount, deleteTransaction } = useLedger();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'send' | 'receive'>('all');
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showHistoryFilterModal, setShowHistoryFilterModal] = useState(false);
+  const [selectedTxForAction, setSelectedTxForAction] = useState<Transaction | null>(null);
+  const [showTxOptionsMenu, setShowTxOptionsMenu] = useState(false);
+  const [showTxDeleteConfirm, setShowTxDeleteConfirm] = useState(false);
+  const [showEditTxModal, setShowEditTxModal] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'send' | 'receive' | 'cash_out' | 'adjustment'>('all');
+
+  const historyFilterOptions: { label: string; value: 'all' | 'send' | 'receive' | 'cash_out' | 'adjustment' }[] = useMemo(
+    () => [
+      { label: 'All', value: 'all' },
+      { label: 'Send Money', value: 'send' },
+      { label: 'Receive Money', value: 'receive' },
+      { label: 'Cash Out', value: 'cash_out' },
+      { label: 'Adjustment', value: 'adjustment' },
+    ],
+    []
+  );
+
+  const currentHistoryFilterLabel = useMemo(() => {
+    const found = historyFilterOptions.find((o) => o.value === selectedFilter);
+    return found ? found.label : 'All';
+  }, [selectedFilter, historyFilterOptions]);
 
   const slideAnim = useRef(new Animated.Value(400)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -33,6 +57,9 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
     if (visible) {
       slideAnim.setValue(400);
       fadeAnim.setValue(0);
+      setShowOptionsMenu(false);
+      setShowDeleteConfirm(false);
+      setShowHistoryFilterModal(false);
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -75,7 +102,18 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
 
   const filteredTransactions = useMemo(() => {
     if (selectedFilter === 'all') return accountTransactions;
-    return accountTransactions.filter((t) => t.type === selectedFilter);
+    return accountTransactions.filter((t) => {
+      const isSend = t.type === 'sm' || t.type === 'send' || t.type === 'send_money' || t.type === 'b2b';
+      const isReceive = t.type === 'recev' || t.type === 'receive_money' || t.type === 'cash_in';
+      const isCashOut = t.type === 'co' || t.type === 'cash_out';
+      const isAdjustment = t.type === 'adjustment';
+
+      if (selectedFilter === 'send') return isSend;
+      if (selectedFilter === 'receive') return isReceive;
+      if (selectedFilter === 'cash_out') return isCashOut;
+      if (selectedFilter === 'adjustment') return isAdjustment;
+      return true;
+    });
   }, [accountTransactions, selectedFilter]);
 
   const groupedTransactions = useMemo(() => {
@@ -148,8 +186,9 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
             )}
           </View>
 
+          {/* 3-Dot Options Menu Button */}
           <TouchableOpacity
-            onPress={() => setShowDeleteConfirm(true)}
+            onPress={() => setShowOptionsMenu(true)}
             style={styles.headerBtn}
             activeOpacity={0.7}
           >
@@ -236,102 +275,45 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
                 </View>
               </View>
             </View>
-
-            {/* SIM Status Control Card */}
-            <View style={[styles.bentoCard, styles.fullWidthCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <View style={[styles.leftIndicator, { backgroundColor: account.isActive ? theme.success : theme.textMuted }]} />
-              <View style={styles.statusCardInner}>
-                <View style={styles.statusInfoGroup}>
-                  <Text style={[styles.bentoLabel, { color: theme.textSecondary }]}>SIM Account Status</Text>
-                  <Text style={[styles.statusValueText, { color: account.isActive ? theme.success : theme.danger }]}>
-                    {account.isActive ? 'Active (Operational)' : 'Disabled / Inactive (Paused)'}
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.statusToggleBtn,
-                    {
-                      backgroundColor: account.isActive
-                        ? (isDarkMode ? 'rgba(255, 82, 82, 0.15)' : '#FEE2E2')
-                        : (isDarkMode ? 'rgba(0, 200, 83, 0.15)' : '#DCFCE7'),
-                      borderColor: account.isActive ? theme.danger : theme.success,
-                    },
-                  ]}
-                  onPress={handleToggleStatus}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name={account.isActive ? 'pause-circle-outline' : 'play-circle-outline'}
-                    size={16}
-                    color={account.isActive ? theme.danger : theme.success}
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text style={[styles.statusToggleBtnText, { color: account.isActive ? theme.danger : theme.success }]}>
-                    {account.isActive ? 'Disable SIM' : 'Activate SIM'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
           </View>
 
           {/* Transaction History Section */}
           <View style={styles.historySection}>
             <View style={styles.historyHeader}>
               <Text style={[styles.historyTitle, { color: theme.text }]}>Transaction History</Text>
-              {/* Filter Pills */}
-              <View style={styles.filterPillsRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.filterChip,
-                    selectedFilter === 'all' && { backgroundColor: theme.primary },
-                  ]}
-                  onPress={() => setSelectedFilter('all')}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      { color: selectedFilter === 'all' ? '#FFFFFF' : theme.textSecondary },
-                    ]}
-                  >
-                    All
-                  </Text>
-                </TouchableOpacity>
 
-                <TouchableOpacity
+              {/* Compact Filter Dropdown Button */}
+              <TouchableOpacity
+                style={[
+                  styles.historyFilterBtn,
+                  {
+                    backgroundColor:
+                      selectedFilter !== 'all'
+                        ? isDarkMode
+                          ? 'rgba(26, 115, 232, 0.15)'
+                          : '#F0F6FF'
+                        : theme.cardSecondary,
+                    borderColor: selectedFilter !== 'all' ? theme.primary : theme.border,
+                  },
+                ]}
+                onPress={() => setShowHistoryFilterModal(true)}
+                activeOpacity={0.75}
+              >
+                <Text
                   style={[
-                    styles.filterChip,
-                    selectedFilter === 'send' && { backgroundColor: theme.primary },
+                    styles.historyFilterBtnText,
+                    { color: selectedFilter !== 'all' ? theme.primary : theme.textSecondary },
                   ]}
-                  onPress={() => setSelectedFilter('send')}
+                  numberOfLines={1}
                 >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      { color: selectedFilter === 'send' ? '#FFFFFF' : theme.textSecondary },
-                    ]}
-                  >
-                    Send
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.filterChip,
-                    selectedFilter === 'receive' && { backgroundColor: theme.success },
-                  ]}
-                  onPress={() => setSelectedFilter('receive')}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      { color: selectedFilter === 'receive' ? '#FFFFFF' : theme.textSecondary },
-                    ]}
-                  >
-                    Receive
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                  {currentHistoryFilterLabel}
+                </Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={14}
+                  color={selectedFilter !== 'all' ? theme.primary : theme.textSecondary}
+                />
+              </TouchableOpacity>
             </View>
 
             {/* Grouped Lists */}
@@ -348,7 +330,14 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
                   <View style={styles.groupContainer}>
                     <Text style={[styles.groupHeading, { color: theme.textMuted }]}>TODAY</Text>
                     {groupedTransactions.TODAY.map((t) => (
-                      <TransactionItem key={t.id} transaction={t} />
+                      <TransactionItem
+                        key={t.id}
+                        transaction={t}
+                        onOptionsPress={(tx) => {
+                          setSelectedTxForAction(tx);
+                          setShowTxOptionsMenu(true);
+                        }}
+                      />
                     ))}
                   </View>
                 )}
@@ -357,7 +346,14 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
                   <View style={styles.groupContainer}>
                     <Text style={[styles.groupHeading, { color: theme.textMuted }]}>YESTERDAY</Text>
                     {groupedTransactions.YESTERDAY.map((t) => (
-                      <TransactionItem key={t.id} transaction={t} />
+                      <TransactionItem
+                        key={t.id}
+                        transaction={t}
+                        onOptionsPress={(tx) => {
+                          setSelectedTxForAction(tx);
+                          setShowTxOptionsMenu(true);
+                        }}
+                      />
                     ))}
                   </View>
                 )}
@@ -366,7 +362,14 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
                   <View style={styles.groupContainer}>
                     <Text style={[styles.groupHeading, { color: theme.textMuted }]}>EARLIER</Text>
                     {groupedTransactions.EARLIER.map((t) => (
-                      <TransactionItem key={t.id} transaction={t} />
+                      <TransactionItem
+                        key={t.id}
+                        transaction={t}
+                        onOptionsPress={(tx) => {
+                          setSelectedTxForAction(tx);
+                          setShowTxOptionsMenu(true);
+                        }}
+                      />
                     ))}
                   </View>
                 )}
@@ -409,6 +412,184 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
           type="danger"
           onConfirm={handleConfirmDelete}
           onCancel={() => setShowDeleteConfirm(false)}
+        />
+
+        {/* 3-Dot Account Options Action Sheet Modal */}
+        <ActionSheetModal
+          visible={showOptionsMenu}
+          title="Manage SIM Account"
+          subtitle={`${account.accountNumber}${account.name ? ` • ${account.name}` : ''}`}
+          actions={[
+            {
+              id: 'toggle_status',
+              title: account.isActive ? 'Deactivate SIM (Pause)' : 'Activate SIM Account',
+              subtitle: account.isActive
+                ? 'Mark as inactive and pause operations'
+                : 'Mark as active for transactions',
+              icon: account.isActive ? 'pause-circle-outline' : 'checkmark-circle-outline',
+              iconColor: account.isActive ? theme.warning : theme.success,
+              iconBgColor: account.isActive
+                ? isDarkMode
+                  ? 'rgba(227, 116, 0, 0.18)'
+                  : '#FEF3C7'
+                : isDarkMode
+                ? 'rgba(0, 200, 83, 0.18)'
+                : '#DCFCE7',
+              badge: {
+                text: account.isActive ? 'Active' : 'Disabled',
+                color: account.isActive ? theme.success : theme.danger,
+                bg: account.isActive
+                  ? isDarkMode
+                    ? 'rgba(0, 200, 83, 0.15)'
+                    : '#DCFCE7'
+                  : isDarkMode
+                  ? 'rgba(255, 82, 82, 0.15)'
+                  : '#FEE2E2',
+              },
+              onPress: handleToggleStatus,
+            },
+            {
+              id: 'delete_account',
+              title: 'Delete SIM Account',
+              subtitle: 'Permanently remove this SIM from ledger',
+              icon: 'trash-outline',
+              isDestructive: true,
+              onPress: () => setShowDeleteConfirm(true),
+            },
+          ]}
+          onClose={() => setShowOptionsMenu(false)}
+        />
+
+        {/* History Type Filter Dropdown Modal */}
+        <Modal
+          visible={showHistoryFilterModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowHistoryFilterModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownModalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowHistoryFilterModal(false)}
+          >
+            <View
+              style={[
+                styles.dropdownModalCard,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+              onStartShouldSetResponder={() => true}
+            >
+              <View style={[styles.dropdownModalHeader, { borderBottomColor: theme.divider }]}>
+                <Text style={[styles.dropdownModalTitle, { color: theme.text }]}>
+                  Filter History
+                </Text>
+              </View>
+
+              {historyFilterOptions.map((opt) => {
+                const isSelected = selectedFilter === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.dropdownModalItem,
+                      { borderBottomColor: theme.divider },
+                      isSelected && {
+                        backgroundColor: isDarkMode ? 'rgba(26, 115, 232, 0.15)' : '#F0F6FF',
+                      },
+                    ]}
+                    onPress={() => {
+                      setSelectedFilter(opt.value);
+                      setShowHistoryFilterModal(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownModalItemText,
+                        { color: isSelected ? theme.primary : theme.text },
+                        isSelected && { fontWeight: '700' },
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={18} color={theme.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+
+              <TouchableOpacity
+                style={[styles.dropdownCancelBtn, { backgroundColor: theme.cardSecondary }]}
+                onPress={() => setShowHistoryFilterModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.dropdownCancelBtnText, { color: theme.textSecondary }]}>
+                  Close
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* 3-Dot Transaction Options Action Sheet Modal */}
+        <ActionSheetModal
+          visible={showTxOptionsMenu}
+          title="Transaction Options"
+          subtitle={
+            selectedTxForAction
+              ? `৳${selectedTxForAction.amount.toLocaleString()} • ${selectedTxForAction.type.toUpperCase()}`
+              : undefined
+          }
+          actions={[
+            {
+              id: 'edit_tx',
+              title: 'Edit Transaction',
+              subtitle: 'Modify amount, number, cost, margin or date',
+              icon: 'create-outline',
+              onPress: () => setShowEditTxModal(true),
+            },
+            {
+              id: 'delete_tx',
+              title: 'Delete Transaction',
+              subtitle: 'Permanently delete and revert balance impact',
+              icon: 'trash-outline',
+              isDestructive: true,
+              onPress: () => setShowTxDeleteConfirm(true),
+            },
+          ]}
+          onClose={() => setShowTxOptionsMenu(false)}
+        />
+
+        {/* Edit Transaction Modal */}
+        <EditTransactionModal
+          visible={showEditTxModal}
+          transaction={selectedTxForAction}
+          onClose={() => {
+            setShowEditTxModal(false);
+            setSelectedTxForAction(null);
+          }}
+        />
+
+        {/* Delete Transaction Confirmation Modal */}
+        <ConfirmationModal
+          visible={showTxDeleteConfirm}
+          title="Delete Transaction"
+          message={`Are you sure you want to delete this transaction of ৳${selectedTxForAction?.amount?.toLocaleString()}? Account balance will be restored.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          type="danger"
+          onConfirm={async () => {
+            if (selectedTxForAction) {
+              await deleteTransaction(selectedTxForAction.id);
+              setShowTxDeleteConfirm(false);
+              setSelectedTxForAction(null);
+            }
+          }}
+          onCancel={() => {
+            setShowTxDeleteConfirm(false);
+            setSelectedTxForAction(null);
+          }}
         />
       </Animated.View>
     </Modal>
@@ -642,5 +823,165 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     flexShrink: 1,
+  },
+  /* 3-Dot Options Action Sheet Styles */
+  optionsModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  optionsSheetCard: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 28,
+    width: '100%',
+    maxWidth: 540,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(128, 128, 128, 0.35)',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  optionsSheetHeader: {
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    marginBottom: 6,
+    alignItems: 'center',
+  },
+  optionsSheetTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  optionsSheetSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  optionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  optionItemLast: {
+    borderBottomWidth: 0,
+  },
+  optionIconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  optionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  optionDescription: {
+    fontSize: 11.5,
+    fontWeight: '500',
+  },
+  statusBadgeSmall: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  optionsCancelBtn: {
+    marginTop: 14,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionsCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  /* Compact History Filter Button */
+  historyFilterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  historyFilterBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  /* History Filter Modal Overlay Styles */
+  dropdownModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    zIndex: 9999,
+  },
+  dropdownModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 24,
+  },
+  dropdownModalHeader: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  dropdownModalTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  dropdownModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  dropdownModalItemText: {
+    fontSize: 13.5,
+    fontWeight: '500',
+  },
+  dropdownCancelBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dropdownCancelBtnText: {
+    fontSize: 13.5,
+    fontWeight: '600',
   },
 });

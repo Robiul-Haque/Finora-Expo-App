@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFonts } from 'expo-font';
+import * as Font from 'expo-font';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './src/services/queryClient';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
-import { LedgerProvider } from './src/context/LedgerContext';
-import { HomeScreen, TransactionsScreen, AccountsScreen, AnalyticsScreen } from './src/screens';
+import { LedgerProvider, useLedger } from './src/context/LedgerContext';
+import { HomeScreen, TransactionsScreen, AccountsScreen } from './src/screens';
 import { AddTransactionModal, AddAccountModal, AccountDetailsModal, ErrorBoundary, SplashScreen } from './src/components';
 import { Account } from './src/types';
 
-type TabType = 'home' | 'transactions' | 'accounts' | 'analytics';
+type TabType = 'home' | 'transactions' | 'accounts';
 
 interface TabButtonProps {
   tab: TabType;
@@ -69,20 +69,25 @@ const TabButton = React.memo(TabButtonComponent);
 const MainApp: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { theme, isDarkMode } = useTheme();
+  const { accounts } = useLedger();
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [showSplash, setShowSplash] = useState(true);
 
   // Modal States
   const [addTxVisible, setAddTxVisible] = useState(false);
   const [addAccountVisible, setAddAccountVisible] = useState(false);
-  const [selectedAccountForDetails, setSelectedAccountForDetails] = useState<Account | null>(null);
+  const [selectedAccountIdForDetails, setSelectedAccountIdForDetails] = useState<string | null>(null);
   const [preselectedAccountIdForTx, setPreselectedAccountIdForTx] = useState<string | undefined>();
+
+  const selectedAccountForDetails = React.useMemo(() => {
+    if (!selectedAccountIdForDetails) return null;
+    return accounts.find((a) => a.id === selectedAccountIdForDetails) || null;
+  }, [accounts, selectedAccountIdForDetails]);
 
   const [visitedTabs, setVisitedTabs] = useState<Record<TabType, boolean>>({
     home: true,
     transactions: false,
     accounts: false,
-    analytics: false,
   });
 
   const switchTab = React.useCallback((tab: TabType) => {
@@ -96,7 +101,7 @@ const MainApp: React.FC = () => {
   }, []);
 
   const handleOpenAccountDetails = React.useCallback((acc: Account) => {
-    setSelectedAccountForDetails(acc);
+    setSelectedAccountIdForDetails(acc.id);
   }, []);
 
   const handleNavigateToTransactions = React.useCallback(() => {
@@ -145,12 +150,6 @@ const MainApp: React.FC = () => {
             />
           </View>
         )}
-
-        {visitedTabs.analytics && (
-          <View style={[styles.screenPage, { display: activeTab === 'analytics' ? 'flex' : 'none' }]}>
-            <AnalyticsScreen />
-          </View>
-        )}
       </View>
 
       {/* Floating Action Button (FAB) */}
@@ -170,7 +169,10 @@ const MainApp: React.FC = () => {
       </TouchableOpacity>
 
       {/* Modern Floating Island Bottom Navigation Bar */}
-      <View style={[styles.floatingBarWrapper, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <View
+        style={[styles.floatingBarWrapper, { paddingBottom: Math.max(insets.bottom, 12) }]}
+        pointerEvents="box-none"
+      >
         <View
           style={[
             styles.bottomTabBar,
@@ -233,7 +235,7 @@ const MainApp: React.FC = () => {
       <AccountDetailsModal
         account={selectedAccountForDetails}
         visible={!!selectedAccountForDetails}
-        onClose={() => setSelectedAccountForDetails(null)}
+        onClose={() => setSelectedAccountIdForDetails(null)}
         onAddTransaction={(accId) => handleOpenAddTx(accId)}
       />
 
@@ -244,11 +246,22 @@ const MainApp: React.FC = () => {
 };
 
 export default function App() {
-  useFonts({
-    ...Ionicons.font,
-    ionicons: require('./assets/fonts/Ionicons.ttf'),
-    Ionicons: require('./assets/fonts/Ionicons.ttf'),
-  });
+  const [appReady, setAppReady] = useState(true);
+
+  useEffect(() => {
+    async function loadFonts() {
+      try {
+        await Font.loadAsync({
+          ...Ionicons.font,
+          Ionicons: require('./assets/fonts/Ionicons.ttf'),
+          ionicons: require('./assets/fonts/Ionicons.ttf'),
+        });
+      } catch (e) {
+        console.warn('Font loading error:', e);
+      }
+    }
+    loadFonts();
+  }, []);
 
   return (
     <ErrorBoundary>
@@ -282,7 +295,8 @@ const styles = StyleSheet.create({
   fabContainer: {
     position: 'absolute',
     right: 18,
-    zIndex: 99,
+    zIndex: 100,
+    elevation: 15,
   },
   fabButton: {
     width: 48,

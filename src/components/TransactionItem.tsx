@@ -8,9 +8,10 @@ import { formatCurrency, formatDateTime } from '../utils';
 interface TransactionItemProps {
   transaction: Transaction;
   onPress?: () => void;
+  onOptionsPress?: (tx: Transaction) => void;
 }
 
-const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction, onPress }) => {
+const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction, onPress, onOptionsPress }) => {
   const { theme, isDarkMode } = useTheme();
 
   const isSend =
@@ -62,122 +63,142 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction,
   const cost = transaction.cost || 0;
   const profit = transaction.profit !== undefined ? transaction.profit : (transaction.margin || 0);
 
+  const handleItemPress = () => {
+    if (onPress) {
+      onPress();
+    } else if (onOptionsPress) {
+      onOptionsPress(transaction);
+    }
+  };
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={onPress}
-      disabled={!onPress}
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        },
+      ]}
     >
-      <View
-        style={[
-          styles.container,
-          {
-            backgroundColor: theme.card,
-            borderColor: theme.border,
-          },
-        ]}
-      >
-        {/* Left 4px Status Indicator Bar */}
-        <View style={[styles.leftIndicator, { backgroundColor: typeConfig.indicatorColor }]} />
+      {/* Left 4px Status Indicator Bar */}
+      <View style={[styles.leftIndicator, { backgroundColor: typeConfig.indicatorColor }]} />
 
-        <View style={styles.innerContent}>
-          {/* Top Row: Type & Flow vs Amount & Date */}
-          <View style={styles.topRow}>
-            {/* Left Column: Type + Number Flow */}
-            <View style={styles.typeFlowCol}>
-              <View style={styles.typeLabelRow}>
-                <Ionicons name={typeConfig.iconName} size={14} color={typeConfig.indicatorColor} />
-                <Text style={[styles.typeLabel, { color: theme.textSecondary }]}>
-                  {typeConfig.label}
-                </Text>
-                {transaction.syncStatus === 'pending' && (
-                  <View style={[styles.offlinePill, { backgroundColor: isDarkMode ? '#4A3B18' : '#FEF3C7' }]}>
-                    <Text style={[styles.offlineText, { color: isDarkMode ? '#FBBF24' : '#92400E' }]}>
-                      Offline
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.flowRow}>
-                <Text style={[styles.monoNumber, { color: theme.text }]} numberOfLines={1}>
-                  {sourceNumber}
-                </Text>
-                {targetNumber && targetNumber !== '—' && (
-                  <>
-                    <Ionicons name={typeConfig.flowIcon} size={11} color={theme.textMuted} style={styles.flowArrow} />
-                    <Text style={[styles.monoNumber, { color: theme.text }]} numberOfLines={1}>
-                      {targetNumber}
-                    </Text>
-                  </>
-                )}
-              </View>
-            </View>
-
-            {/* Right Group: Amount, Timestamp & Delete Action */}
-            <View style={styles.rightGroup}>
-              <View style={styles.amountCol}>
-                <Text
-                  style={[
-                    styles.amountText,
-                    { color: isReceive ? theme.success : theme.text },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {isReceive ? '+' : isSend ? '-' : ''}{formatCurrency(transaction.amount)}
-                </Text>
-                <Text style={[styles.dateText, { color: theme.textMuted }]} numberOfLines={1}>
-                  {formatDateTime(transaction.date)}
-                </Text>
-              </View>
-
-              {onPress && (
-                <TouchableOpacity
-                  style={[
-                    styles.deleteBtn,
-                    {
-                      backgroundColor: isDarkMode ? 'rgba(255, 82, 82, 0.12)' : 'rgba(186, 26, 26, 0.07)',
-                    },
-                  ]}
-                  onPress={onPress}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                >
-                  <Ionicons name="trash-outline" size={15} color={theme.danger} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-
-          {/* Bottom Strip: Cost & Profit Breakdown */}
-          {(cost > 0 || profit > 0 || (transaction.runningBalance !== undefined && transaction.runningBalance !== null)) && (
-            <View style={[styles.bottomStrip, { borderTopColor: theme.divider }]}>
-              <View style={styles.breakdownGroup}>
-                {cost > 0 && (
-                  <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-                    Cost <Text style={[styles.metaBold, { color: theme.text }]}>{formatCurrency(cost)}</Text>
+      <View style={styles.innerContent}>
+        {/* Top Row: Type & Flow vs Amount & Date */}
+        <View style={styles.topRow}>
+          {/* Left Column: Type + Number Flow */}
+          <TouchableOpacity
+            style={styles.typeFlowCol}
+            activeOpacity={0.7}
+            onPress={handleItemPress}
+          >
+            <View style={styles.typeLabelRow}>
+              <Ionicons name={typeConfig.iconName} size={14} color={typeConfig.indicatorColor} />
+              <Text style={[styles.typeLabel, { color: theme.textSecondary }]}>
+                {typeConfig.label}
+              </Text>
+              {transaction.syncStatus === 'pending' && (
+                <View style={[styles.offlinePill, { backgroundColor: isDarkMode ? '#4A3B18' : '#FEF3C7' }]}>
+                  <Text style={[styles.offlineText, { color: isDarkMode ? '#FBBF24' : '#92400E' }]}>
+                    Offline
                   </Text>
-                )}
-                {profit > 0 && (
-                  <View style={styles.profitGroup}>
-                    <Ionicons name="trending-up" size={12} color={theme.success} />
-                    <Text style={[styles.metaProfit, { color: theme.success }]}>
-                      Profit <Text style={styles.metaProfitBold}>+{formatCurrency(profit)}</Text>
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {transaction.runningBalance !== undefined && (
-                <Text style={[styles.runningBalanceText, { color: theme.textMuted }]}>
-                  b/l: {formatCurrency(transaction.runningBalance)}
-                </Text>
+                </View>
               )}
             </View>
-          )}
+
+            <View style={styles.flowRow}>
+              <Text style={[styles.monoNumber, { color: theme.text }]} numberOfLines={1}>
+                {sourceNumber}
+              </Text>
+              {targetNumber && targetNumber !== '—' && (
+                <>
+                  <Ionicons name={typeConfig.flowIcon} size={11} color={theme.textMuted} style={styles.flowArrow} />
+                  <Text style={[styles.monoNumber, { color: theme.text }]} numberOfLines={1}>
+                    {targetNumber}
+                  </Text>
+                </>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          {/* Right Group: Amount, Timestamp & Options Action */}
+          <View style={styles.rightGroup}>
+            <TouchableOpacity
+              style={styles.amountCol}
+              activeOpacity={0.7}
+              onPress={handleItemPress}
+            >
+              <Text
+                style={[
+                  styles.amountText,
+                  { color: isReceive ? theme.success : theme.text },
+                ]}
+                numberOfLines={1}
+              >
+                {isReceive ? '+' : isSend ? '-' : ''}{formatCurrency(transaction.amount)}
+              </Text>
+              <Text style={[styles.dateText, { color: theme.textMuted }]} numberOfLines={1}>
+                {formatDateTime(transaction.date)}
+              </Text>
+            </TouchableOpacity>
+
+            {(onOptionsPress || onPress) && (
+              <TouchableOpacity
+                style={[
+                  styles.optionsBtn,
+                  {
+                    backgroundColor: theme.cardSecondary,
+                  },
+                ]}
+                onPress={() => {
+                  if (onOptionsPress) {
+                    onOptionsPress(transaction);
+                  } else if (onPress) {
+                    onPress();
+                  }
+                }}
+                activeOpacity={0.6}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="ellipsis-vertical" size={15} color={theme.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
+
+        {/* Bottom Strip: Cost & Profit Breakdown */}
+        {(cost > 0 || profit > 0 || (transaction.runningBalance !== undefined && transaction.runningBalance !== null)) && (
+          <TouchableOpacity
+            style={[styles.bottomStrip, { borderTopColor: theme.divider }]}
+            activeOpacity={0.7}
+            onPress={handleItemPress}
+          >
+            <View style={styles.breakdownGroup}>
+              {cost > 0 && (
+                <Text style={[styles.metaText, { color: theme.textSecondary }]}>
+                  Cost <Text style={[styles.metaBold, { color: theme.text }]}>{formatCurrency(cost)}</Text>
+                </Text>
+              )}
+              {profit > 0 && (
+                <View style={styles.profitGroup}>
+                  <Ionicons name="trending-up" size={12} color={theme.success} />
+                  <Text style={[styles.metaProfit, { color: theme.success }]}>
+                    Profit <Text style={styles.metaProfitBold}>+{formatCurrency(profit)}</Text>
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {transaction.runningBalance !== undefined && (
+              <Text style={[styles.runningBalanceText, { color: theme.textMuted }]}>
+                b/l: {formatCurrency(transaction.runningBalance)}
+              </Text>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
-    </TouchableOpacity>
+    </View>
   );
 };
 
@@ -260,10 +281,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 1.5,
   },
-  deleteBtn: {
+  optionsBtn: {
     width: 28,
     height: 28,
-    borderRadius: 7,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },

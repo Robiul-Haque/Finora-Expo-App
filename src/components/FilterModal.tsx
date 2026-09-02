@@ -105,7 +105,6 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
   }, [selectedAccountId, accounts]);
 
   const dateOptions: { label: string; value: DateFilter }[] = [
-    { label: 'All Dates', value: 'all' },
     { label: 'Today', value: 'today' },
     { label: 'Yesterday', value: 'yesterday' },
     { label: 'This Week', value: 'this_week' },
@@ -113,9 +112,9 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
   ];
 
   const typeOptions: { label: string; value: string }[] = [
-    { label: 'All', value: 'all' },
-    { label: 'Send', value: 'sm' },
-    { label: 'Receive', value: 'recev' },
+    { label: 'Send Money', value: 'sm' },
+    { label: 'Receive Money', value: 'recev' },
+    { label: 'Cash Out', value: 'co' },
     { label: 'Adjustment', value: 'adjustment' },
   ];
 
@@ -155,7 +154,12 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
               </View>
 
               {/* Scrollable Body */}
-              <ScrollView style={styles.scrollBody} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
+              <ScrollView
+                style={styles.scrollBody}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              >
                 {/* Section 1: Account */}
                 <View style={styles.section}>
                   <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ACCOUNT</Text>
@@ -163,8 +167,8 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
                     style={[
                       styles.dropdownField,
                       {
-                        backgroundColor: theme.inputBg,
-                        borderBottomColor: showAccountPicker ? theme.primary : theme.border,
+                        backgroundColor: theme.card,
+                        borderColor: showAccountPicker ? theme.primary : theme.border,
                       },
                     ]}
                     onPress={() => setShowAccountPicker(!showAccountPicker)}
@@ -180,50 +184,72 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
                     />
                   </TouchableOpacity>
 
-                  {/* Account Dropdown Options List */}
+                  {/* Account Dropdown Options List with fixed scrollable height */}
                   {showAccountPicker && (
-                    <View style={[styles.accountDropdownList, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}>
-                      <TouchableOpacity
-                        style={[
-                          styles.accountOption,
-                          selectedAccountId === 'all' && { backgroundColor: theme.primaryLight },
-                        ]}
-                        onPress={() => {
-                          setSelectedAccountId('all');
-                          setShowAccountPicker(false);
-                        }}
+                    <View
+                      style={[
+                        styles.accountDropdownList,
+                        { backgroundColor: theme.cardSecondary, borderColor: theme.border },
+                      ]}
+                    >
+                      <ScrollView
+                        style={styles.accountDropdownScroll}
+                        nestedScrollEnabled={true}
+                        showsVerticalScrollIndicator={true}
                       >
-                        <Text style={[styles.accountOptionText, { color: selectedAccountId === 'all' ? theme.primary : theme.text }]}>
-                          All Accounts
-                        </Text>
-                        {selectedAccountId === 'all' && (
-                          <Ionicons name="checkmark" size={16} color={theme.primary} />
-                        )}
-                      </TouchableOpacity>
-
-                      {accounts.map((acc) => {
-                        const isSelected = selectedAccountId === acc.id || selectedAccountId === acc.accountNumber;
-                        return (
-                          <TouchableOpacity
-                            key={acc.id}
+                        <TouchableOpacity
+                          style={[
+                            styles.accountOption,
+                            selectedAccountId === 'all' && { backgroundColor: theme.primaryLight },
+                          ]}
+                          onPress={() => {
+                            setSelectedAccountId('all');
+                            setShowAccountPicker(false);
+                          }}
+                        >
+                          <Text
                             style={[
-                              styles.accountOption,
-                              isSelected && { backgroundColor: theme.primaryLight },
+                              styles.accountOptionText,
+                              { color: selectedAccountId === 'all' ? theme.primary : theme.text },
                             ]}
-                            onPress={() => {
-                              setSelectedAccountId(acc.id);
-                              setShowAccountPicker(false);
-                            }}
                           >
-                            <Text style={[styles.accountOptionText, { color: isSelected ? theme.primary : theme.text }]}>
-                              {acc.accountNumber} ({acc.name})
-                            </Text>
-                            {isSelected && (
-                              <Ionicons name="checkmark" size={16} color={theme.primary} />
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
+                            All Accounts
+                          </Text>
+                          {selectedAccountId === 'all' && (
+                            <Ionicons name="checkmark" size={16} color={theme.primary} />
+                          )}
+                        </TouchableOpacity>
+
+                        {accounts.map((acc) => {
+                          const isSelected =
+                            selectedAccountId === acc.id || selectedAccountId === acc.accountNumber;
+                          return (
+                            <TouchableOpacity
+                              key={acc.id}
+                              style={[
+                                styles.accountOption,
+                                isSelected && { backgroundColor: theme.primaryLight },
+                              ]}
+                              onPress={() => {
+                                setSelectedAccountId(acc.id);
+                                setShowAccountPicker(false);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.accountOptionText,
+                                  { color: isSelected ? theme.primary : theme.text },
+                                ]}
+                              >
+                                {acc.accountNumber} ({acc.name})
+                              </Text>
+                              {isSelected && (
+                                <Ionicons name="checkmark" size={16} color={theme.primary} />
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
                     </View>
                   )}
                 </View>
@@ -240,17 +266,17 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
                           style={[
                             styles.datePill,
                             {
-                              backgroundColor: isSelected ? theme.primary : theme.card,
+                              backgroundColor: isSelected ? (isDarkMode ? 'rgba(26, 115, 232, 0.15)' : '#F0F6FF') : theme.card,
                               borderColor: isSelected ? theme.primary : theme.border,
                             },
                           ]}
-                          onPress={() => setSelectedDate(opt.value)}
+                          onPress={() => setSelectedDate(isSelected ? 'all' : opt.value)}
                           activeOpacity={0.75}
                         >
                           <Text
                             style={[
                               styles.datePillText,
-                              { color: isSelected ? '#FFFFFF' : theme.text },
+                              { color: isSelected ? theme.primary : theme.text },
                               isSelected && styles.datePillTextSelected,
                             ]}
                           >
@@ -274,11 +300,13 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
                           style={[
                             styles.typeCard,
                             {
-                              backgroundColor: isSelected ? theme.primaryLight : theme.card,
+                              backgroundColor: isSelected
+                                ? (isDarkMode ? 'rgba(26, 115, 232, 0.15)' : '#F0F6FF')
+                                : theme.card,
                               borderColor: isSelected ? theme.primary : theme.border,
                             },
                           ]}
-                          onPress={() => setSelectedType(opt.value)}
+                          onPress={() => setSelectedType(isSelected ? 'all' : opt.value)}
                           activeOpacity={0.75}
                         >
                           <Text
@@ -308,7 +336,9 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
                           style={[
                             styles.sortCard,
                             {
-                              backgroundColor: isSelected ? (isDarkMode ? 'rgba(26, 115, 232, 0.1)' : '#F5F8FF') : theme.card,
+                              backgroundColor: isSelected
+                                ? (isDarkMode ? 'rgba(26, 115, 232, 0.08)' : '#F8FAFC')
+                                : theme.card,
                               borderColor: isSelected ? theme.primary : theme.border,
                             },
                           ]}
@@ -338,15 +368,12 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
               </ScrollView>
 
               {/* Sticky Bottom Actions */}
-              <View style={[styles.sheetFooter, { borderTopColor: theme.divider, backgroundColor: theme.card }]}>
-                <TouchableOpacity
-                  style={[styles.resetBtn, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}
-                  onPress={handleReset}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.resetBtnText, { color: theme.textSecondary }]}>Reset</Text>
-                </TouchableOpacity>
-
+              <View
+                style={[
+                  styles.sheetFooter,
+                  { borderTopColor: theme.divider, backgroundColor: theme.card },
+                ]}
+              >
                 <TouchableOpacity
                   style={[styles.applyBtn, { backgroundColor: theme.primary }]}
                   onPress={handleApply}
@@ -427,9 +454,8 @@ const styles = StyleSheet.create({
   },
   dropdownField: {
     height: 46,
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
-    borderBottomWidth: 2,
+    borderRadius: 8,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -446,6 +472,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
     marginTop: 4,
+    maxHeight: 180,
+  },
+  accountDropdownScroll: {
+    maxHeight: 180,
   },
   accountOption: {
     flexDirection: 'row',
@@ -480,10 +510,11 @@ const styles = StyleSheet.create({
   },
   typeGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   typeCard: {
-    flex: 1,
+    width: '48.5%',
     height: 42,
     borderRadius: 8,
     borderWidth: 1,

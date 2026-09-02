@@ -2,10 +2,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Account, Transaction, DailyProfitRecord, LedgerMetrics } from '../../types/ledger';
 import { initialAccounts, initialTransactions, initialDailyProfitRecords } from '../../constants/mockData';
 import { syncService } from '../sync/syncService';
+import { parseDate } from '../../utils/formatters';
 
 const ACCOUNTS_STORAGE_KEY = '@finora_accounts_v3';
 const TRANSACTIONS_STORAGE_KEY = '@finora_transactions_v3';
 const DAILY_PROFITS_STORAGE_KEY = '@finora_daily_profits_v3';
+
+const sanitizeTransactions = (txList: Transaction[]): Transaction[] => {
+  return txList.map((t) => {
+    const d = parseDate(t.date);
+    return {
+      ...t,
+      date: isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString(),
+    };
+  });
+};
 
 /**
  * Production API Configuration
@@ -21,8 +32,17 @@ export const API_CONFIG = {
   TIMEOUT_MS: 8000,
 };
 
+let currentAuthToken: string | null = null;
+
 /**
- * Robust HTTP client wrapper with timeout & AbortController
+ * Set or clear session authorization token for API requests
+ */
+export const setAuthToken = (token: string | null) => {
+  currentAuthToken = token;
+};
+
+/**
+ * Robust HTTP client wrapper with timeout, AbortController & Bearer Auth injection
  */
 async function httpRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
@@ -36,6 +56,7 @@ async function httpRequest<T>(endpoint: string, options: RequestInit = {}): Prom
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(currentAuthToken ? { Authorization: `Bearer ${currentAuthToken}` } : {}),
         ...(options.headers || {}),
       },
     });
@@ -70,6 +91,13 @@ export const ledgerApi = {
   },
 
   /**
+   * Set dynamic authorization token
+   */
+  setAuth(token: string | null) {
+    setAuthToken(token);
+  },
+
+  /**
    * Fetch all Multi-SIM accounts
    */
   async getAccounts(): Promise<Account[]> {
@@ -99,13 +127,15 @@ export const ledgerApi = {
   },
 
   /**
-   * Fetch all recorded transactions
+   * Fetch all recorded transactions with optional pagination
    */
-  async getTransactions(): Promise<Transaction[]> {
+  async getTransactions(options?: { page?: number; limit?: number }): Promise<Transaction[]> {
     if (!API_CONFIG.USE_MOCK_STORAGE) {
       try {
-        const transactions = await httpRequest<Transaction[]>('/transactions');
-        if (Array.isArray(transactions) && transactions.length > 0) {
+        const queryParams = options ? `?page=${options.page || 1}&limit=${options.limit || 50}` : '';
+        const rawTxs = await httpRequest<Transaction[]>(`/transactions${queryParams}`);
+        if (Array.isArray(rawTxs) && rawTxs.length > 0) {
+          const transactions = sanitizeTransactions(rawTxs);
           await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
           return transactions;
         }
@@ -118,12 +148,14 @@ export const ledgerApi = {
     try {
       const data = await AsyncStorage.getItem(TRANSACTIONS_STORAGE_KEY);
       if (data) {
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        return sanitizeTransactions(parsed);
       }
-      await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(initialTransactions));
-      return initialTransactions;
+      const sanitizedInitial = sanitizeTransactions(initialTransactions);
+      await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(sanitizedInitial));
+      return sanitizedInitial;
     } catch {
-      return initialTransactions;
+      return sanitizeTransactions(initialTransactions);
     }
   },
 
@@ -145,9 +177,11 @@ export const ledgerApi = {
    * Create a new transaction with running balance & margin calculation
    */
   async createTransaction(
-    txData: Omit<Transaction, 'id' | 'date' | 'runningBalance'> & { clientTxId?: string; runningBalance?: number }
+    txData: Omit<Transaction, 'id' | 'date' | 'runningBalance'> & { clientTxId?: string; runningBalance?: number; date?: string }
   ): Promise<{ transaction: Transaction; updatedAccounts: Account[] }> {
-    const clientTxId = txData.clientTxId || 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const clientTxId =
+      txData.clientTxId ||
+      `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}_${Math.floor(Math.random() * 10000)}`;
 
     const currentAccounts = await this.getAccounts();
     const currentTxs = await this.getTransactions();
@@ -176,7 +210,7 @@ export const ledgerApi = {
       profit: marginAmount,
       runningBalance: txData.runningBalance !== undefined ? txData.runningBalance : finalBalance,
       counterparty: txData.counterparty || txData.recipientNumber || txData.senderNumber || (txData.type === 'co' ? 'Cash Out Bulk' : 'Counterparty'),
-      date: new Date().toISOString(),
+      date: txData.date || new Date().toISOString(),
       syncStatus: 'synced',
       retryCount: 0,
     };
@@ -248,6 +282,115 @@ export const ledgerApi = {
   },
 
   /**
+   * Update an existing transaction & re-adjust account balances
+   */
+  async updateTransaction(
+    id: string,
+    updates: Partial<Transaction>
+  ): Promise<{ transaction: Transaction; updatedAccounts: Account[] }> {
+    if (!API_CONFIG.USE_MOCK_STORAGE) {
+      try {
+        await httpRequest(`/transactions/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(updates),
+        });
+      } catch {
+        // Enqueue offline update mutation
+        await syncService.enqueueUpdateTransaction(id, updates);
+      }
+    }
+
+    const currentTxs = await this.getTransactions();
+    const currentAccounts = await this.getAccounts();
+
+    const oldTx = currentTxs.find((t) => t.id === id);
+    if (!oldTx) throw new Error('Transaction not found');
+
+    const updatedTx: Transaction = {
+      ...oldTx,
+      ...updates,
+      id: oldTx.id,
+      date: updates.date || oldTx.date,
+      profit: updates.profit !== undefined ? updates.profit : (updates.margin !== undefined ? updates.margin : oldTx.profit),
+      margin: updates.profit !== undefined ? updates.profit : (updates.margin !== undefined ? updates.margin : oldTx.margin),
+    };
+
+    // Revert old impact & apply new impact on accounts
+    const oldOutflow = oldTx.type === 'sm' || oldTx.type === 'co' || oldTx.type === 'send' || oldTx.type === 'send_money' || oldTx.type === 'cash_out' || oldTx.type === 'b2b';
+    const oldInflow = oldTx.type === 'recev' || oldTx.type === 'receive_money' || oldTx.type === 'cash_in';
+    const oldProfit = oldTx.margin || oldTx.profit || 0;
+
+    const newOutflow = updatedTx.type === 'sm' || updatedTx.type === 'co' || updatedTx.type === 'send' || updatedTx.type === 'send_money' || updatedTx.type === 'cash_out' || updatedTx.type === 'b2b';
+    const newInflow = updatedTx.type === 'recev' || updatedTx.type === 'receive_money' || updatedTx.type === 'cash_in';
+    const newProfit = updatedTx.margin || updatedTx.profit || 0;
+
+    const updatedAccounts = currentAccounts.map((acc) => {
+      if (acc.id === updatedTx.accountId) {
+        let balance = acc.balance;
+        let todaySend = acc.todaySend;
+        let todayReceive = acc.todayReceive;
+        let todayProfit = acc.todayProfit;
+        let totalMargin = acc.totalMargin || 0;
+        let monthlyLimitUsed = acc.monthlyLimitUsed || 0;
+
+        // 1. Revert old transaction
+        if (oldOutflow) {
+          balance += oldTx.amount + (oldTx.cost || 0);
+          todaySend = Math.max(0, todaySend - oldTx.amount);
+          if (oldTx.type === 'sm' || oldTx.type === 'send_money') {
+            monthlyLimitUsed = Math.max(0, monthlyLimitUsed - oldTx.amount);
+          }
+        } else if (oldInflow) {
+          balance -= oldTx.amount;
+          todayReceive = Math.max(0, todayReceive - oldTx.amount);
+        } else if (oldTx.type === 'adjustment') {
+          balance -= oldTx.amount;
+        }
+        todayProfit = Math.max(0, todayProfit - oldProfit);
+        totalMargin = Math.max(0, totalMargin - oldProfit);
+
+        // 2. Apply updated transaction
+        if (newOutflow) {
+          balance -= updatedTx.amount + (updatedTx.cost || 0);
+          todaySend += updatedTx.amount;
+          if (updatedTx.type === 'sm' || updatedTx.type === 'send_money') {
+            monthlyLimitUsed += updatedTx.amount;
+          }
+        } else if (newInflow) {
+          balance += updatedTx.amount;
+          todayReceive += updatedTx.amount;
+        } else if (updatedTx.type === 'adjustment') {
+          balance += updatedTx.amount;
+        }
+        todayProfit += newProfit;
+        totalMargin += newProfit;
+
+        const monthlyLimit = acc.monthlyLimit || 300000;
+        const remainingLimit = Math.max(0, monthlyLimit - monthlyLimitUsed);
+
+        return {
+          ...acc,
+          balance,
+          todaySend,
+          todayReceive,
+          todayProfit,
+          totalMargin,
+          monthlyLimitUsed,
+          remainingLimit,
+        };
+      }
+      return acc;
+    });
+
+    const updatedTransactions = currentTxs.map((t) => (t.id === id ? updatedTx : t));
+
+    await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(updatedTransactions));
+    await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(updatedAccounts));
+
+    return { transaction: updatedTx, updatedAccounts };
+  },
+
+  /**
    * Delete a transaction & revert balance impact
    */
   async deleteTransaction(id: string): Promise<{ deletedId: string; updatedAccounts: Account[] }> {
@@ -255,7 +398,8 @@ export const ledgerApi = {
       try {
         await httpRequest(`/transactions/${id}`, { method: 'DELETE' });
       } catch {
-        // Fallback to local
+        // Enqueue offline delete mutation
+        await syncService.enqueueDeleteTransaction(id);
       }
     }
 
@@ -344,7 +488,8 @@ export const ledgerApi = {
         const created = await httpRequest<Account>('/accounts', { method: 'POST', body: JSON.stringify(newAccount) });
         if (created?.id) newAccount = created;
       } catch {
-        // Fallback to local
+        // Enqueue offline account creation
+        await syncService.enqueueCreateAccount(newAccount);
       }
     }
 
@@ -366,7 +511,8 @@ export const ledgerApi = {
           body: JSON.stringify(updates),
         });
       } catch {
-        // Fallback to local
+        // Enqueue offline account update
+        await syncService.enqueueUpdateAccount(id, updates);
       }
     }
 
@@ -394,7 +540,8 @@ export const ledgerApi = {
       try {
         await httpRequest(`/accounts/${id}`, { method: 'DELETE' });
       } catch {
-        // Fallback to local
+        // Enqueue offline account deletion
+        await syncService.enqueueDeleteAccount(id);
       }
     }
 
@@ -420,11 +567,11 @@ export const ledgerApi = {
     const todaySendTotal = accounts.reduce((sum, a) => sum + (a.todaySend || 0), 0);
 
     const monthlyIncome = txs
-      .filter((t) => t.type === 'recev' || t.type === 'receive_money')
+      .filter((t) => t.type === 'recev' || t.type === 'receive_money' || t.type === 'cash_in')
       .reduce((sum, t) => sum + t.amount, 0);
 
     const monthlyExpense = txs
-      .filter((t) => t.type === 'sm' || t.type === 'co' || t.type === 'send' || t.type === 'send_money' || t.type === 'cash_out')
+      .filter((t) => t.type === 'sm' || t.type === 'co' || t.type === 'send' || t.type === 'send_money' || t.type === 'cash_out' || t.type === 'b2b')
       .reduce((sum, t) => sum + t.amount, 0);
 
     return {

@@ -19,6 +19,8 @@ import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
 import { validateTransaction } from '../utils/validation';
 import { formatCurrency } from '../utils';
+import { TransactionTypeSelector, TxSelectableType } from './TransactionTypeSelector';
+import { CustomCalendarModal } from './CustomCalendarModal';
 
 interface AddTransactionModalProps {
   visible: boolean;
@@ -35,23 +37,68 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
   const { accounts, addTransaction } = useLedger();
 
   const [accountId, setAccountId] = useState(preselectedAccountId || (accounts.length > 0 ? accounts[0].id : ''));
-  const [txType, setTxType] = useState<'send' | 'receive' | 'adjustment'>('send');
+  const [txType, setTxType] = useState<'send' | 'receive' | 'cash_out' | 'adjustment'>('send');
   const [amount, setAmount] = useState('');
   const [recipientNumber, setRecipientNumber] = useState('');
   const [cost, setCost] = useState('0');
   const [profit, setProfit] = useState('0');
   const [note, setNote] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showDatePickerModal, setShowDatePickerModal] = useState(false);
+  const [pickerViewMonth, setPickerViewMonth] = useState<Date>(new Date());
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
 
+  const amountInputRef = useRef<TextInput>(null);
+  const recipientInputRef = useRef<TextInput>(null);
+  const costInputRef = useRef<TextInput>(null);
+  const profitInputRef = useRef<TextInput>(null);
+  const noteInputRef = useRef<TextInput>(null);
+
   const slideAnim = useRef(new Animated.Value(400)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const dropdownAnim = useRef(new Animated.Value(0)).current;
+
+  const toggleAccountDropdown = () => {
+    if (!showAccountDropdown) {
+      setShowAccountDropdown(true);
+      Animated.timing(dropdownAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(dropdownAnim, {
+        toValue: 0,
+        duration: 120,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowAccountDropdown(false);
+      });
+    }
+  };
+
+  const closeAccountDropdown = () => {
+    if (showAccountDropdown) {
+      Animated.timing(dropdownAnim, {
+        toValue: 0,
+        duration: 120,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowAccountDropdown(false);
+      });
+    }
+  };
 
   useEffect(() => {
     if (visible) {
+      setShowAccountDropdown(false);
+      dropdownAnim.setValue(0);
       slideAnim.setValue(400);
       fadeAnim.setValue(0);
+      setSelectedDate(new Date());
+      setPickerViewMonth(new Date());
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -102,15 +149,14 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
 
   const selectedAccount = activeAccounts.find((a) => a.id === accountId) || activeAccounts[0];
 
-  // Auto-calculate suggested cost & profit based on business rules for send money
+  // Auto-calculate suggested cost & profit based on business rules for send money / cash out
   const handleAmountChange = (val: string) => {
     setAmount(val);
     const num = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
-    if (txType === 'send') {
-      // Standard MFS send cost model (~15tk per 1000 or custom)
+    if (txType === 'send' || txType === 'cash_out') {
       if (num > 0) {
-        const estimatedCost = Math.round(num * 0.015); // e.g. 150 on 10,000
-        const estimatedProfit = Math.round(num * 0.005); // e.g. 50 on 10,000
+        const estimatedCost = Math.round(num * 0.015);
+        const estimatedProfit = Math.round(num * 0.005);
         setCost(String(estimatedCost));
         setProfit(String(estimatedProfit));
       } else {
@@ -119,7 +165,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
       }
     } else if (txType === 'receive') {
       if (num > 0) {
-        const estimatedProfit = Math.round(num * 0.02); // 2% commission on cash in/receive
+        const estimatedProfit = Math.round(num * 0.02);
         setCost('0');
         setProfit(String(estimatedProfit));
       } else {
@@ -132,6 +178,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
   const mappedTransactionType: TransactionType = useMemo(() => {
     if (txType === 'send') return 'sm';
     if (txType === 'receive') return 'recev';
+    if (txType === 'cash_out') return 'co';
     return 'adjustment';
   }, [txType]);
 
@@ -148,7 +195,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
     const current = selectedAccount.balance || 0;
     if (txType === 'receive') {
       return current + numAmount;
-    } else if (txType === 'send') {
+    } else if (txType === 'send' || txType === 'cash_out') {
       return current - (numAmount + numCost);
     } else {
       return numAmount > 0 ? numAmount : current;
@@ -173,11 +220,12 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
         cost: numCost,
         profit: numProfit,
         margin: numProfit,
-        counterparty: recipientNumber.trim() || selectedAccount.accountNumber,
-        recipientNumber: txType === 'send' ? recipientNumber.trim() : undefined,
+        counterparty: recipientNumber.trim() || (txType === 'cash_out' ? 'Cash Out' : selectedAccount.accountNumber),
+        recipientNumber: txType === 'send' || txType === 'cash_out' ? recipientNumber.trim() : undefined,
         senderNumber: txType === 'receive' ? recipientNumber.trim() : undefined,
         runningBalance: previewNewBalance,
         note: note.trim() || undefined,
+        date: selectedDate.toISOString(),
       });
 
       // Clear & close
@@ -186,6 +234,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
       setCost('0');
       setProfit('0');
       setNote('');
+      setSelectedDate(new Date());
       setTouched({});
       onClose();
     } catch {
@@ -195,26 +244,105 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
     }
   };
 
-  const currentDateDisplay = useMemo(() => {
-    const d = new Date();
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  }, []);
+  const isToday = (d: Date) => {
+    const today = new Date();
+    return (
+      d.getDate() === today.getDate() &&
+      d.getMonth() === today.getMonth() &&
+      d.getFullYear() === today.getFullYear()
+    );
+  };
+
+  const isYesterday = (d: Date) => {
+    const yest = new Date(Date.now() - 86400000);
+    return (
+      d.getDate() === yest.getDate() &&
+      d.getMonth() === yest.getMonth() &&
+      d.getFullYear() === yest.getFullYear()
+    );
+  };
+
+  const selectedDateDisplay = useMemo(() => {
+    const dStr = selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    if (isToday(selectedDate)) return `${dStr} (Today)`;
+    if (isYesterday(selectedDate)) return `${dStr} (Yesterday)`;
+    return dStr;
+  }, [selectedDate]);
+
+  // Calendar generation helpers
+  const calendarDays = useMemo(() => {
+    const year = pickerViewMonth.getFullYear();
+    const month = pickerViewMonth.getMonth();
+
+    const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sun
+    const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+    const prevMonthDays = new Date(year, month, 0).getDate();
+
+    const days: Array<{ day: number; isCurrentMonth: boolean; date: Date }> = [];
+
+    // Leading days from previous month
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const d = prevMonthDays - i;
+      days.push({
+        day: d,
+        isCurrentMonth: false,
+        date: new Date(year, month - 1, d),
+      });
+    }
+
+    // Current month days
+    for (let i = 1; i <= totalDaysInMonth; i++) {
+      days.push({
+        day: i,
+        isCurrentMonth: true,
+        date: new Date(year, month, i),
+      });
+    }
+
+    // Trailing days to fill 35 or 42 grid slots
+    const totalSlots = days.length > 35 ? 42 : 35;
+    const remaining = totalSlots - days.length;
+    for (let i = 1; i <= remaining; i++) {
+      days.push({
+        day: i,
+        isCurrentMonth: false,
+        date: new Date(year, month + 1, i),
+      });
+    }
+
+    return days;
+  }, [pickerViewMonth]);
+
+  const changeMonth = (delta: number) => {
+    setPickerViewMonth(new Date(pickerViewMonth.getFullYear(), pickerViewMonth.getMonth() + delta, 1));
+  };
 
   return (
-    <Modal visible={visible} animationType="none" transparent onRequestClose={handleClose}>
+    <Modal visible={visible} animationType="none" transparent statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}>
           <Animated.View style={[styles.modalSheet, { backgroundColor: theme.card, borderColor: theme.border, transform: [{ translateY: slideAnim }] }]}>
             {/* Top Header */}
             <View style={[styles.header, { borderBottomColor: theme.divider }]}>
-              <TouchableOpacity onPress={handleClose} style={styles.backButton} activeOpacity={0.7}>
+              <TouchableOpacity
+                onPress={handleClose}
+                style={styles.backButton}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <Ionicons name="arrow-back" size={22} color={theme.text} />
               </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: theme.text }]}>Add Transaction</Text>
             <View style={styles.placeholderIcon} />
           </View>
 
-          <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" bounces={false}>
+          <ScrollView
+            style={styles.formContainer}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            bounces={false}
+          >
             {/* Account Selector (bKash Number) */}
             <View style={styles.inputGroup}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>ACCOUNT / PHONE NUMBER</Text>
@@ -226,132 +354,114 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                     borderBottomColor: showAccountDropdown ? theme.primary : theme.border,
                   },
                 ]}
-                onPress={() => setShowAccountDropdown(!showAccountDropdown)}
+                onPress={toggleAccountDropdown}
                 activeOpacity={0.8}
               >
                 <Text style={[styles.selectorNumberText, { color: theme.text }]}>
                   {selectedAccount?.accountNumber || 'Select Account'}
                 </Text>
-                <Ionicons
-                  name={showAccountDropdown ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={theme.textSecondary}
-                />
+                <Animated.View
+                  style={{
+                    transform: [
+                      {
+                        rotate: dropdownAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0deg', '180deg'],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <Ionicons
+                    name="chevron-down"
+                    size={20}
+                    color={theme.textSecondary}
+                  />
+                </Animated.View>
               </TouchableOpacity>
 
               {/* Account Dropdown Options */}
               {showAccountDropdown && (
-                <View style={[styles.dropdownContainer, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}>
-                  {activeAccounts.length === 0 ? (
-                    <View style={{ padding: 14, alignItems: 'center' }}>
-                      <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-                        No active SIM accounts available. Please activate an account first.
-                      </Text>
-                    </View>
-                  ) : (
-                    activeAccounts.map((acc) => (
-                      <TouchableOpacity
-                        key={acc.id}
-                        style={[
-                          styles.dropdownItem,
-                          acc.id === selectedAccount?.id && { backgroundColor: isDarkMode ? '#1E293B' : '#E8F0FE' },
-                        ]}
-                        onPress={() => {
-                          setAccountId(acc.id);
-                          setShowAccountDropdown(false);
-                        }}
-                      >
-                        <View>
-                          <Text style={[styles.dropdownNumber, { color: theme.text }]}>{acc.accountNumber}</Text>
-                          <Text style={[styles.dropdownName, { color: theme.textSecondary }]}>{acc.name}</Text>
-                        </View>
-                        <Text style={[styles.dropdownBalance, { color: theme.primary }]}>
-                          {formatCurrency(acc.balance)}
+                <Animated.View
+                  style={[
+                    styles.dropdownContainer,
+                    {
+                      backgroundColor: theme.cardSecondary,
+                      borderColor: theme.border,
+                      opacity: dropdownAnim,
+                      transform: [
+                        {
+                          translateY: dropdownAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-6, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <ScrollView
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator={activeAccounts.length > 6}
+                    style={styles.dropdownScrollView}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {activeAccounts.length === 0 ? (
+                      <View style={{ padding: 14, alignItems: 'center' }}>
+                        <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+                          No active SIM accounts available. Please activate an account first.
                         </Text>
-                      </TouchableOpacity>
-                    ))
-                  )}
-                </View>
+                      </View>
+                    ) : (
+                      activeAccounts.map((acc) => (
+                        <TouchableOpacity
+                          key={acc.id}
+                          style={[
+                            styles.dropdownItem,
+                            acc.id === selectedAccount?.id && { backgroundColor: isDarkMode ? '#1E293B' : '#E8F0FE' },
+                          ]}
+                          onPress={() => {
+                            setAccountId(acc.id);
+                            closeAccountDropdown();
+                          }}
+                        >
+                          <View>
+                            <Text style={[styles.dropdownNumber, { color: theme.text }]}>{acc.accountNumber}</Text>
+                            <Text style={[styles.dropdownName, { color: theme.textSecondary }]}>{acc.name}</Text>
+                          </View>
+                          <Text style={[styles.dropdownBalance, { color: theme.primary }]}>
+                            {formatCurrency(acc.balance)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))
+                    )}
+                  </ScrollView>
+                </Animated.View>
               )}
             </View>
 
-            {/* Segmented Type Bar: Send Money | Receive Money | Adjustment */}
+            {/* Transaction Type Selector */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>TYPE</Text>
-              <View style={[styles.segmentedContainer, { backgroundColor: theme.cardSecondary }]}>
-                <TouchableOpacity
-                  style={[
-                    styles.segmentButton,
-                    txType === 'send' && [styles.activeSegment, { backgroundColor: theme.card }],
-                  ]}
-                  onPress={() => {
-                    setTxType('send');
-                    handleAmountChange(amount);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.segmentText,
-                      { color: txType === 'send' ? theme.primary : theme.textSecondary },
-                      txType === 'send' && styles.activeSegmentText,
-                    ]}
-                  >
-                    Send Money
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.segmentButton,
-                    txType === 'receive' && [styles.activeSegment, { backgroundColor: theme.card }],
-                  ]}
-                  onPress={() => {
-                    setTxType('receive');
-                    handleAmountChange(amount);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.segmentText,
-                      { color: txType === 'receive' ? theme.success : theme.textSecondary },
-                      txType === 'receive' && styles.activeSegmentText,
-                    ]}
-                  >
-                    Receive Money
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.segmentButton,
-                    txType === 'adjustment' && [styles.activeSegment, { backgroundColor: theme.card }],
-                  ]}
-                  onPress={() => {
-                    setTxType('adjustment');
+              <TransactionTypeSelector
+                selectedType={txType}
+                onSelectType={(newType) => {
+                  setTxType(newType);
+                  if (newType === 'adjustment') {
                     setCost('0');
                     setProfit('0');
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.segmentText,
-                      { color: txType === 'adjustment' ? theme.text : theme.textSecondary },
-                      txType === 'adjustment' && styles.activeSegmentText,
-                    ]}
-                  >
-                    Adjustment
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                  } else {
+                    handleAmountChange(amount);
+                  }
+                }}
+              />
             </View>
 
             {/* Amount Input */}
             <View style={styles.inputGroup}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>AMOUNT</Text>
-              <View
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => amountInputRef.current?.focus()}
                 style={[
                   styles.inputBox,
                   {
@@ -362,6 +472,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
               >
                 <Text style={[styles.currencyPrefix, { color: theme.textSecondary }]}>৳</Text>
                 <TextInput
+                  ref={amountInputRef}
                   style={[styles.numericInput, { color: theme.text }]}
                   placeholder="0"
                   placeholderTextColor={theme.textMuted}
@@ -370,19 +481,25 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                   onChangeText={handleAmountChange}
                   onBlur={() => setTouched((prev) => ({ ...prev, amount: true }))}
                 />
-              </View>
+              </TouchableOpacity>
               {touched.amount && validation.errors.amount && (
                 <Text style={[styles.errorMsg, { color: theme.danger }]}>{validation.errors.amount}</Text>
               )}
             </View>
 
-            {/* Recipient / Counterparty Number (for Send or Receive) */}
+            {/* Recipient / Counterparty Number (for Send, Receive or Cash Out) */}
             {txType !== 'adjustment' && (
               <View style={styles.inputGroup}>
                 <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
-                  {txType === 'send' ? 'RECIPIENT NUMBER' : 'SENDER / CUSTOMER NUMBER'}
+                  {txType === 'send'
+                    ? 'RECIPIENT NUMBER'
+                    : txType === 'cash_out'
+                    ? 'AGENT / CASH OUT NUMBER'
+                    : 'SENDER / CUSTOMER NUMBER'}
                 </Text>
-                <View
+                <TouchableOpacity
+                  activeOpacity={1}
+                  onPress={() => recipientInputRef.current?.focus()}
                   style={[
                     styles.inputBox,
                     {
@@ -392,6 +509,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                   ]}
                 >
                   <TextInput
+                    ref={recipientInputRef}
                     style={[styles.monoInput, { color: theme.text }]}
                     placeholder="01712 345 678"
                     placeholderTextColor={theme.textMuted}
@@ -400,7 +518,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                     onChangeText={setRecipientNumber}
                     onBlur={() => setTouched((prev) => ({ ...prev, recipientNumber: true }))}
                   />
-                </View>
+                </TouchableOpacity>
                 {touched.recipientNumber && validation.errors.targetNumber && (
                   <Text style={[styles.errorMsg, { color: theme.danger }]}>{validation.errors.targetNumber}</Text>
                 )}
@@ -411,9 +529,14 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
             <View style={styles.rowInputs}>
               <View style={[styles.inputGroup, styles.halfCol]}>
                 <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>SEND COST</Text>
-                <View style={[styles.inputBox, { backgroundColor: theme.inputBg, borderBottomColor: theme.border }]}>
+                <TouchableOpacity
+                  activeOpacity={1}
+                  onPress={() => costInputRef.current?.focus()}
+                  style={[styles.inputBox, { backgroundColor: theme.inputBg, borderBottomColor: theme.border }]}
+                >
                   <Text style={[styles.currencyPrefix, { color: theme.textSecondary }]}>৳</Text>
                   <TextInput
+                    ref={costInputRef}
                     style={[styles.numericInput, { color: theme.text }]}
                     placeholder="0"
                     placeholderTextColor={theme.textMuted}
@@ -421,12 +544,14 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                     value={cost}
                     onChangeText={setCost}
                   />
-                </View>
+                </TouchableOpacity>
               </View>
 
               <View style={[styles.inputGroup, styles.halfCol]}>
                 <Text style={[styles.fieldLabel, { color: theme.success }]}>PROFIT (MARGIN)</Text>
-                <View
+                <TouchableOpacity
+                  activeOpacity={1}
+                  onPress={() => profitInputRef.current?.focus()}
                   style={[
                     styles.inputBox,
                     {
@@ -437,6 +562,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                 >
                   <Text style={[styles.currencyPrefix, { color: theme.success }]}>৳</Text>
                   <TextInput
+                    ref={profitInputRef}
                     style={[styles.numericInput, { color: theme.success, fontWeight: '700' }]}
                     placeholder="0"
                     placeholderTextColor={theme.textMuted}
@@ -444,24 +570,104 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                     value={profit}
                     onChangeText={setProfit}
                   />
-                </View>
+                </TouchableOpacity>
               </View>
             </View>
 
-            {/* Date Display */}
+            {/* Date Selector with Quick Chips & Manual Picker */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>DATE</Text>
-              <View style={[styles.inputBox, { backgroundColor: theme.inputBg, borderBottomColor: theme.border }]}>
-                <Ionicons name="calendar-outline" size={18} color={theme.textSecondary} style={{ marginRight: 10 }} />
-                <Text style={[styles.readOnlyText, { color: theme.text }]}>{currentDateDisplay}</Text>
+              <View style={styles.dateHeaderRow}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginBottom: 0 }]}>
+                  TRANSACTION DATE
+                </Text>
+                {/* Quick Date Chips */}
+                <View style={styles.quickChipsRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.quickChip,
+                      { backgroundColor: theme.cardSecondary, borderColor: theme.border },
+                      isToday(selectedDate) && { backgroundColor: theme.primaryLight, borderColor: theme.primary },
+                    ]}
+                    onPress={() => {
+                      const now = new Date();
+                      setSelectedDate(now);
+                      setPickerViewMonth(now);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.quickChipText,
+                        { color: theme.textSecondary },
+                        isToday(selectedDate) && { color: theme.primary, fontWeight: '700' },
+                      ]}
+                    >
+                      Today
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.quickChip,
+                      { backgroundColor: theme.cardSecondary, borderColor: theme.border },
+                      isYesterday(selectedDate) && { backgroundColor: theme.primaryLight, borderColor: theme.primary },
+                    ]}
+                    onPress={() => {
+                      const yest = new Date(Date.now() - 86400000);
+                      setSelectedDate(yest);
+                      setPickerViewMonth(yest);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.quickChipText,
+                        { color: theme.textSecondary },
+                        isYesterday(selectedDate) && { color: theme.primary, fontWeight: '700' },
+                      ]}
+                    >
+                      Yesterday
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
+
+              {/* Clickable Date Box */}
+              <TouchableOpacity
+                style={[
+                  styles.inputBox,
+                  styles.dateInputBox,
+                  { backgroundColor: theme.inputBg, borderBottomColor: theme.border },
+                ]}
+                onPress={() => {
+                  setPickerViewMonth(new Date(selectedDate));
+                  setShowDatePickerModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={styles.dateLeftContent}>
+                  <Ionicons name="calendar-outline" size={19} color={theme.primary} style={{ marginRight: 10 }} />
+                  <Text style={[styles.selectedDateText, { color: theme.text }]}>
+                    {selectedDateDisplay}
+                  </Text>
+                </View>
+                <View style={[styles.changeDateBadge, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}>
+                  <Text style={[styles.changeDateText, { color: theme.primary }]}>Change</Text>
+                  <Ionicons name="chevron-forward" size={14} color={theme.primary} />
+                </View>
+              </TouchableOpacity>
             </View>
 
             {/* Note */}
             <View style={styles.inputGroup}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>NOTE</Text>
-              <View style={[styles.textAreaBox, { backgroundColor: theme.inputBg, borderBottomColor: theme.border }]}>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => noteInputRef.current?.focus()}
+                style={[styles.textAreaBox, { backgroundColor: theme.inputBg, borderBottomColor: theme.border }]}
+              >
                 <TextInput
+                  ref={noteInputRef}
                   style={[styles.textAreaInput, { color: theme.text }]}
                   placeholder="Add details / customer reference..."
                   placeholderTextColor={theme.textMuted}
@@ -470,13 +676,70 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                   value={note}
                   onChangeText={setNote}
                 />
-              </View>
+              </TouchableOpacity>
             </View>
 
-            {/* Balance Impact Preview */}
-            <View style={[styles.previewBox, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}>
-              <Text style={[styles.previewLabel, { color: theme.textSecondary }]}>PROJECTED CLOSING BALANCE</Text>
-              <Text style={[styles.previewValue, { color: theme.primary }]}>
+            {/* Dynamic Balance Impact Preview */}
+            <View
+              style={[
+                styles.previewBox,
+                {
+                  backgroundColor: theme.cardSecondary,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <View style={styles.previewLeftContent}>
+                <View style={styles.previewLabelRow}>
+                  <Ionicons
+                    name={
+                      txType === 'send'
+                        ? 'arrow-down-circle-outline'
+                        : txType === 'receive'
+                        ? 'arrow-up-circle-outline'
+                        : 'swap-horizontal-outline'
+                    }
+                    size={16}
+                    color={
+                      txType === 'send'
+                        ? theme.danger
+                        : txType === 'receive'
+                        ? theme.success
+                        : theme.primary
+                    }
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={[styles.previewLabel, { color: theme.textSecondary }]}>
+                    {txType === 'send'
+                      ? 'NEW BALANCE AFTER SEND'
+                      : txType === 'receive'
+                      ? 'NEW BALANCE AFTER RECEIVE'
+                      : 'NEW ADJUSTED BALANCE'}
+                  </Text>
+                </View>
+
+                {numAmount > 0 && selectedAccount && (
+                  <Text style={[styles.previewSubtext, { color: theme.textMuted }]}>
+                    {txType === 'send'
+                      ? `Current ${formatCurrency(selectedAccount.balance)}  -  ${formatCurrency(numAmount + numCost)}`
+                      : txType === 'receive'
+                      ? `Current ${formatCurrency(selectedAccount.balance)}  +  ${formatCurrency(numAmount)}`
+                      : `Updated to ${formatCurrency(previewNewBalance)}`}
+                  </Text>
+                )}
+              </View>
+
+              <Text
+                style={[
+                  styles.previewValue,
+                  {
+                    color:
+                      txType === 'receive'
+                        ? theme.success
+                        : theme.primary,
+                  },
+                ]}
+              >
                 {formatCurrency(previewNewBalance)}
               </Text>
             </View>
@@ -510,6 +773,17 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
         </Animated.View>
       </KeyboardAvoidingView>
       </Animated.View>
+
+      {/* Interactive Calendar Date Picker Modal */}
+      <CustomCalendarModal
+        visible={showDatePickerModal}
+        selectedDate={selectedDate}
+        onSelectDate={(newDate) => {
+          setSelectedDate(newDate);
+          setPickerViewMonth(newDate);
+        }}
+        onClose={() => setShowDatePickerModal(false)}
+      />
     </Modal>
   );
 };
@@ -568,6 +842,50 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 6,
   },
+  dateHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  quickChipsRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  quickChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  quickChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  dateInputBox: {
+    justifyContent: 'space-between',
+  },
+  dateLeftContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectedDateText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  changeDateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    gap: 2,
+  },
+  changeDateText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
   selectorBox: {
     height: 52,
     borderTopLeftRadius: 6,
@@ -589,12 +907,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
     overflow: 'hidden',
   },
+  dropdownScrollView: {
+    maxHeight: 324,
+  },
   dropdownItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 14,
+    minHeight: 54,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
@@ -609,6 +931,28 @@ const styles = StyleSheet.create({
   },
   dropdownBalance: {
     fontSize: 14,
+    fontWeight: '700',
+  },
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  typeCard: {
+    width: '48.5%',
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  typeCardText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
+  typeCardTextSelected: {
     fontWeight: '700',
   },
   segmentedContainer: {
@@ -647,16 +991,20 @@ const styles = StyleSheet.create({
   },
   numericInput: {
     flex: 1,
+    height: '100%',
     fontSize: 18,
     fontWeight: '700',
-    padding: 0,
+    paddingVertical: 0,
+    textAlignVertical: 'center',
   },
   monoInput: {
     flex: 1,
+    height: '100%',
     fontFamily: 'monospace',
     fontSize: 15,
     fontWeight: '600',
-    padding: 0,
+    paddingVertical: 0,
+    textAlignVertical: 'center',
   },
   readOnlyText: {
     fontSize: 14,
@@ -678,9 +1026,11 @@ const styles = StyleSheet.create({
     minHeight: 70,
   },
   textAreaInput: {
+    flex: 1,
     fontSize: 14,
     padding: 0,
     textAlignVertical: 'top',
+    minHeight: 50,
   },
   errorMsg: {
     fontSize: 11,
@@ -697,10 +1047,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 4,
   },
+  previewLeftContent: {
+    flex: 1,
+    marginRight: 10,
+  },
+  previewLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   previewLabel: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.4,
+  },
+  previewSubtext: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 3,
   },
   previewValue: {
     fontSize: 16,

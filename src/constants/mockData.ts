@@ -382,7 +382,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01720000352",
     "cost": 0,
     "profit": 50,
-    "date": "2026-08-46030.0T10:00:00.000Z",
+    "date": "2026-08-27T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳50)",
     "syncStatus": "synced"
   },
@@ -399,7 +399,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "181.0",
     "cost": 0,
     "profit": 55,
-    "date": "2026-08-1.0T10:00:00.000Z",
+    "date": "2026-08-01T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳55)",
     "syncStatus": "synced"
   },
@@ -416,7 +416,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01710264993",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-1.0T10:00:00.000Z",
+    "date": "2026-08-01T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -432,7 +432,7 @@ export const initialTransactions: Transaction[] = [
     "counterparty": "01772477771",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-1.0T10:00:00.000Z",
+    "date": "2026-08-01T10:00:00.000Z",
     "note": "Cash Out / Company Bulk",
     "syncStatus": "synced"
   },
@@ -449,7 +449,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01720003181",
     "cost": 0,
     "profit": 55,
-    "date": "2026-08-2.0T10:00:00.000Z",
+    "date": "2026-08-02T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳55)",
     "syncStatus": "synced"
   },
@@ -466,7 +466,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01710009129",
     "cost": 0,
     "profit": 100,
-    "date": "2026-08-2.0T10:00:00.000Z",
+    "date": "2026-08-02T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳100)",
     "syncStatus": "synced"
   },
@@ -483,7 +483,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "2852.0",
     "cost": 0,
     "profit": 55,
-    "date": "2026-08-3.0T10:00:00.000Z",
+    "date": "2026-08-03T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳55)",
     "syncStatus": "synced"
   },
@@ -500,7 +500,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "3546.0",
     "cost": 0,
     "profit": 50,
-    "date": "2026-08-4.0T10:00:00.000Z",
+    "date": "2026-08-04T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳50)",
     "syncStatus": "synced"
   },
@@ -517,7 +517,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "2375.0",
     "cost": 0,
     "profit": 70,
-    "date": "2026-08-4.0T10:00:00.000Z",
+    "date": "2026-08-04T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳70)",
     "syncStatus": "synced"
   },
@@ -533,7 +533,7 @@ export const initialTransactions: Transaction[] = [
     "counterparty": "01772477771",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-4.0T10:00:00.000Z",
+    "date": "2026-08-04T10:00:00.000Z",
     "note": "Cash Out / Company Bulk",
     "syncStatus": "synced"
   },
@@ -550,7 +550,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "171000827",
     "cost": 0,
     "profit": 975,
-    "date": "2026-08-5.0T10:00:00.000Z",
+    "date": "2026-08-05T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳975)",
     "syncStatus": "synced"
   },
@@ -566,7 +566,7 @@ export const initialTransactions: Transaction[] = [
     "counterparty": "01772477771",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-5.0T10:00:00.000Z",
+    "date": "2026-08-05T10:00:00.000Z",
     "note": "Cash Out / Company Bulk",
     "syncStatus": "synced"
   },
@@ -583,7 +583,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "608.0",
     "cost": 0,
     "profit": 55,
-    "date": "2026-08-8.0T10:00:00.000Z",
+    "date": "2026-08-08T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳55)",
     "syncStatus": "synced"
   },
@@ -600,7 +600,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "1622.0",
     "cost": 0,
     "profit": 64,
-    "date": "2026-08-8.0T10:00:00.000Z",
+    "date": "2026-08-08T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳64)",
     "syncStatus": "synced"
   },
@@ -617,7 +617,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "6268.0",
     "cost": 0,
     "profit": 66,
-    "date": "2026-08-8.0T10:00:00.000Z",
+    "date": "2026-08-08T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳66)",
     "syncStatus": "synced"
   },
@@ -633,7 +633,7 @@ export const initialTransactions: Transaction[] = [
     "counterparty": "01772477771",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-8.0T10:00:00.000Z",
+    "date": "2026-08-08T10:00:00.000Z",
     "note": "Cash Out / Company Bulk",
     "syncStatus": "synced"
   },
@@ -650,7 +650,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "8867.0",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-10.0T10:00:00.000Z",
+    "date": "2026-08-10T10:00:00.000Z",
     "note": "Inflow / Receive (Direct)",
     "syncStatus": "synced"
   },
@@ -667,7 +667,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "",
     "cost": 0,
     "profit": 110,
-    "date": "2026-08-10.0T10:00:00.000Z",
+    "date": "2026-08-10T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳110)",
     "syncStatus": "synced"
   },
@@ -684,7 +684,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "2197.0",
     "cost": 0,
     "profit": 181,
-    "date": "2026-08-11.0T10:00:00.000Z",
+    "date": "2026-08-11T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳181)",
     "syncStatus": "synced"
   },
@@ -701,7 +701,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01840009132",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-12.0T10:00:00.000Z",
+    "date": "2026-08-12T10:00:00.000Z",
     "note": "Inflow / Receive (Direct)",
     "syncStatus": "synced"
   },
@@ -718,7 +718,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "197.0",
     "cost": 0,
     "profit": 600,
-    "date": "2026-08-12.0T10:00:00.000Z",
+    "date": "2026-08-12T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳600)",
     "syncStatus": "synced"
   },
@@ -735,7 +735,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "592.0",
     "cost": 0,
     "profit": 600,
-    "date": "2026-08-12.0T10:00:00.000Z",
+    "date": "2026-08-12T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳600)",
     "syncStatus": "synced"
   },
@@ -752,7 +752,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01915405223",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-13.0T10:00:00.000Z",
+    "date": "2026-08-13T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -769,7 +769,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-15.0T10:00:00.000Z",
+    "date": "2026-08-15T10:00:00.000Z",
     "note": "Inflow / Receive (Direct)",
     "syncStatus": "synced"
   },
@@ -786,7 +786,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01318779662",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-15.0T10:00:00.000Z",
+    "date": "2026-08-15T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -803,7 +803,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "7624.0",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-16.0T10:00:00.000Z",
+    "date": "2026-08-16T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -820,7 +820,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01850592102",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-16.0T10:00:00.000Z",
+    "date": "2026-08-16T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -836,7 +836,7 @@ export const initialTransactions: Transaction[] = [
     "counterparty": "01847061494",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-16.0T10:00:00.000Z",
+    "date": "2026-08-16T10:00:00.000Z",
     "note": "Cash Out / Company Bulk",
     "syncStatus": "synced"
   },
@@ -853,7 +853,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01971398356",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-16.0T10:00:00.000Z",
+    "date": "2026-08-16T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -870,7 +870,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "81346846917",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-16.0T10:00:00.000Z",
+    "date": "2026-08-16T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -887,7 +887,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "9342.0",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-16.0T10:00:00.000Z",
+    "date": "2026-08-16T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -904,7 +904,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01743235348",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-17.0T10:00:00.000Z",
+    "date": "2026-08-17T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -921,7 +921,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "6723.0",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-17.0T10:00:00.000Z",
+    "date": "2026-08-17T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -938,7 +938,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "1342.0",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-17.0T10:00:00.000Z",
+    "date": "2026-08-17T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -955,7 +955,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01875909893",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-17.0T10:00:00.000Z",
+    "date": "2026-08-17T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -972,7 +972,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01730006720",
     "cost": 0,
     "profit": 165,
-    "date": "2026-08-19.0T10:00:00.000Z",
+    "date": "2026-08-19T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳165)",
     "syncStatus": "synced"
   },
@@ -989,7 +989,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01870728798",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-19.0T10:00:00.000Z",
+    "date": "2026-08-19T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1006,7 +1006,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "131010.0",
     "cost": 0,
     "profit": 50,
-    "date": "2026-08-20.0T10:00:00.000Z",
+    "date": "2026-08-20T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳50)",
     "syncStatus": "synced"
   },
@@ -1023,7 +1023,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01970000286",
     "cost": 0,
     "profit": 70,
-    "date": "2026-08-20.0T10:00:00.000Z",
+    "date": "2026-08-20T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳70)",
     "syncStatus": "synced"
   },
@@ -1040,7 +1040,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01766911038",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-20.0T10:00:00.000Z",
+    "date": "2026-08-20T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1057,7 +1057,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01780000404",
     "cost": 0,
     "profit": 31,
-    "date": "2026-08-20.0T10:00:00.000Z",
+    "date": "2026-08-20T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳31)",
     "syncStatus": "synced"
   },
@@ -1074,7 +1074,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "",
     "cost": 0,
     "profit": 27,
-    "date": "2026-08-20.0T10:00:00.000Z",
+    "date": "2026-08-20T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳27)",
     "syncStatus": "synced"
   },
@@ -1091,7 +1091,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01775107178",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-1.0T10:00:00.000Z",
+    "date": "2026-08-01T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1108,7 +1108,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "Payment",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-2.0T10:00:00.000Z",
+    "date": "2026-08-02T10:00:00.000Z",
     "note": "Inflow / Receive (Direct)",
     "syncStatus": "synced"
   },
@@ -1125,7 +1125,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01888296570",
     "cost": 0,
     "profit": 390,
-    "date": "2026-08-2.0T10:00:00.000Z",
+    "date": "2026-08-02T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳390)",
     "syncStatus": "synced"
   },
@@ -1142,7 +1142,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01853393597",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-3.0T10:00:00.000Z",
+    "date": "2026-08-03T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1159,7 +1159,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01893381239",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-4.0T10:00:00.000Z",
+    "date": "2026-08-04T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1176,7 +1176,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "বিল home",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-4.0T10:00:00.000Z",
+    "date": "2026-08-04T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1193,7 +1193,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01866351326",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-4.0T10:00:00.000Z",
+    "date": "2026-08-04T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1210,7 +1210,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01776411200",
     "cost": 0,
     "profit": 204,
-    "date": "2026-08-7.0T10:00:00.000Z",
+    "date": "2026-08-07T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳204)",
     "syncStatus": "synced"
   },
@@ -1227,7 +1227,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01789689555",
     "cost": 0,
     "profit": 204,
-    "date": "2026-08-7.0T10:00:00.000Z",
+    "date": "2026-08-07T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳204)",
     "syncStatus": "synced"
   },
@@ -1244,7 +1244,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01317588867",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-7.0T10:00:00.000Z",
+    "date": "2026-08-07T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1261,7 +1261,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01921310969",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-8.0T10:00:00.000Z",
+    "date": "2026-08-08T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1278,7 +1278,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01860271040",
     "cost": 0,
     "profit": 575,
-    "date": "2026-08-10.0T10:00:00.000Z",
+    "date": "2026-08-10T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳575)",
     "syncStatus": "synced"
   },
@@ -1295,7 +1295,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01743840296",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-10.0T10:00:00.000Z",
+    "date": "2026-08-10T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1311,7 +1311,7 @@ export const initialTransactions: Transaction[] = [
     "counterparty": "01860779658",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-10.0T10:00:00.000Z",
+    "date": "2026-08-10T10:00:00.000Z",
     "note": "Shop Bill / Outflow",
     "syncStatus": "synced"
   },
@@ -1328,7 +1328,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "link 3 dokan",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-10.0T10:00:00.000Z",
+    "date": "2026-08-10T10:00:00.000Z",
     "note": "Shop Bill / Outflow",
     "syncStatus": "synced"
   },
@@ -1345,7 +1345,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01621998042",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-10.0T10:00:00.000Z",
+    "date": "2026-08-10T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1362,7 +1362,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "Umer &amp; Muh",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-10.0T10:00:00.000Z",
+    "date": "2026-08-10T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1379,7 +1379,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "dadon",
     "cost": 0,
     "profit": 59,
-    "date": "2026-08-11.0T10:00:00.000Z",
+    "date": "2026-08-11T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳59)",
     "syncStatus": "synced"
   },
@@ -1396,7 +1396,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01765896907",
     "cost": 0,
     "profit": 63,
-    "date": "2026-08-12.0T10:00:00.000Z",
+    "date": "2026-08-12T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳63)",
     "syncStatus": "synced"
   },
@@ -1413,7 +1413,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "",
     "cost": 0,
     "profit": 600,
-    "date": "2026-08-12.0T10:00:00.000Z",
+    "date": "2026-08-12T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳600)",
     "syncStatus": "synced"
   },
@@ -1430,7 +1430,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01985843970",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-12.0T10:00:00.000Z",
+    "date": "2026-08-12T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1447,7 +1447,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01703502684",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-12.0T10:00:00.000Z",
+    "date": "2026-08-12T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1464,7 +1464,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01963752357",
     "cost": 0,
     "profit": 269,
-    "date": "2026-08-16.0T10:00:00.000Z",
+    "date": "2026-08-16T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳269)",
     "syncStatus": "synced"
   },
@@ -1481,7 +1481,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01791235541",
     "cost": 0,
     "profit": 129,
-    "date": "2026-08-16.0T10:00:00.000Z",
+    "date": "2026-08-16T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳129)",
     "syncStatus": "synced"
   },
@@ -1498,7 +1498,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01831607082",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-16.0T10:00:00.000Z",
+    "date": "2026-08-16T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1515,7 +1515,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01781963788",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-17.0T10:00:00.000Z",
+    "date": "2026-08-17T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1532,7 +1532,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "",
     "cost": 0,
     "profit": 315,
-    "date": "2026-08-19.0T10:00:00.000Z",
+    "date": "2026-08-19T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳315)",
     "syncStatus": "synced"
   },
@@ -1549,7 +1549,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "",
     "cost": 0,
     "profit": 50,
-    "date": "2026-08-19.0T10:00:00.000Z",
+    "date": "2026-08-19T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳50)",
     "syncStatus": "synced"
   },
@@ -1566,7 +1566,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01881756324",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-20.0T10:00:00.000Z",
+    "date": "2026-08-20T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1583,7 +1583,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01791235541",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-20.0T10:00:00.000Z",
+    "date": "2026-08-20T10:00:00.000Z",
     "note": "Inflow / Receive (Direct)",
     "syncStatus": "synced"
   },
@@ -1600,7 +1600,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01778933918",
     "cost": 0,
     "profit": 338,
-    "date": "2026-08-1.0T10:00:00.000Z",
+    "date": "2026-08-01T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳338)",
     "syncStatus": "synced"
   },
@@ -1617,7 +1617,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01987444573",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-1.0T10:00:00.000Z",
+    "date": "2026-08-01T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1634,7 +1634,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01798321374",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-1.0T10:00:00.000Z",
+    "date": "2026-08-01T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1651,7 +1651,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01856177768",
     "cost": 0,
     "profit": 134,
-    "date": "2026-08-2.0T10:00:00.000Z",
+    "date": "2026-08-02T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳134)",
     "syncStatus": "synced"
   },
@@ -1668,7 +1668,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01922402999",
     "cost": 0,
     "profit": 100,
-    "date": "2026-08-2.0T10:00:00.000Z",
+    "date": "2026-08-02T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳100)",
     "syncStatus": "synced"
   },
@@ -1684,7 +1684,7 @@ export const initialTransactions: Transaction[] = [
     "counterparty": "Cash Out Bulk",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-2.0T10:00:00.000Z",
+    "date": "2026-08-02T10:00:00.000Z",
     "note": "Cash Out / Company Bulk",
     "syncStatus": "synced"
   },
@@ -1701,7 +1701,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01752149931",
     "cost": 0,
     "profit": 190,
-    "date": "2026-08-3.0T10:00:00.000Z",
+    "date": "2026-08-03T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳190)",
     "syncStatus": "synced"
   },
@@ -1718,7 +1718,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01732324670",
     "cost": 0,
     "profit": 190,
-    "date": "2026-08-3.0T10:00:00.000Z",
+    "date": "2026-08-03T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳190)",
     "syncStatus": "synced"
   },
@@ -1735,7 +1735,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01331441096",
     "cost": 0,
     "profit": 90,
-    "date": "2026-08-3.0T10:00:00.000Z",
+    "date": "2026-08-03T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳90)",
     "syncStatus": "synced"
   },
@@ -1752,7 +1752,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01745810323",
     "cost": 0,
     "profit": 200,
-    "date": "2026-08-3.0T10:00:00.000Z",
+    "date": "2026-08-03T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳200)",
     "syncStatus": "synced"
   },
@@ -1769,7 +1769,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01731317570",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-3.0T10:00:00.000Z",
+    "date": "2026-08-03T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1786,7 +1786,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01947231894",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-3.0T10:00:00.000Z",
+    "date": "2026-08-03T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1803,7 +1803,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "130825700",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-3.0T10:00:00.000Z",
+    "date": "2026-08-03T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1820,7 +1820,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01854516136",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-3.0T10:00:00.000Z",
+    "date": "2026-08-03T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1837,7 +1837,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01724369420",
     "cost": 0,
     "profit": 64,
-    "date": "2026-08-4.0T10:00:00.000Z",
+    "date": "2026-08-04T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳64)",
     "syncStatus": "synced"
   },
@@ -1854,7 +1854,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01687227185",
     "cost": 0,
     "profit": 70,
-    "date": "2026-08-4.0T10:00:00.000Z",
+    "date": "2026-08-04T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳70)",
     "syncStatus": "synced"
   },
@@ -1871,7 +1871,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01986052936",
     "cost": 0,
     "profit": 64,
-    "date": "2026-08-4.0T10:00:00.000Z",
+    "date": "2026-08-04T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳64)",
     "syncStatus": "synced"
   },
@@ -1888,7 +1888,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01712863525",
     "cost": 0,
     "profit": 134,
-    "date": "2026-08-4.0T10:00:00.000Z",
+    "date": "2026-08-04T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳134)",
     "syncStatus": "synced"
   },
@@ -1905,7 +1905,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01859596065",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-4.0T10:00:00.000Z",
+    "date": "2026-08-04T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1922,7 +1922,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01838511443",
     "cost": 0,
     "profit": 78,
-    "date": "2026-08-5.0T10:00:00.000Z",
+    "date": "2026-08-05T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳78)",
     "syncStatus": "synced"
   },
@@ -1939,7 +1939,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01890282729",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-6.0T10:00:00.000Z",
+    "date": "2026-08-06T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1956,7 +1956,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01724369420",
     "cost": 0,
     "profit": 565,
-    "date": "2026-08-8.0T10:00:00.000Z",
+    "date": "2026-08-08T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳565)",
     "syncStatus": "synced"
   },
@@ -1973,7 +1973,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01956095803",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-8.0T10:00:00.000Z",
+    "date": "2026-08-08T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -1990,7 +1990,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01881328730",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-9.0T10:00:00.000Z",
+    "date": "2026-08-09T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -2007,7 +2007,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01763000033",
     "cost": 0,
     "profit": 260,
-    "date": "2026-08-10.0T10:00:00.000Z",
+    "date": "2026-08-10T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳260)",
     "syncStatus": "synced"
   },
@@ -2024,7 +2024,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01711706151",
     "cost": 0,
     "profit": 80,
-    "date": "2026-08-11.0T10:00:00.000Z",
+    "date": "2026-08-11T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳80)",
     "syncStatus": "synced"
   },
@@ -2041,7 +2041,7 @@ export const initialTransactions: Transaction[] = [
     "recipientNumber": "01616212806",
     "cost": 0,
     "profit": 0,
-    "date": "2026-08-11.0T10:00:00.000Z",
+    "date": "2026-08-11T10:00:00.000Z",
     "note": "Send Money / B2B",
     "syncStatus": "synced"
   },
@@ -2058,7 +2058,7 @@ export const initialTransactions: Transaction[] = [
     "senderNumber": "01963752375",
     "cost": 0,
     "profit": 120,
-    "date": "2026-08-11.0T10:00:00.000Z",
+    "date": "2026-08-11T10:00:00.000Z",
     "note": "Inflow / Receive (Margin: ৳120)",
     "syncStatus": "synced"
   }

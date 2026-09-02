@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,25 @@ import {
   ActivityIndicator,
   Platform,
   Animated,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
-import { TransactionItem, TransactionItemSkeleton, ConfirmationModal, FilterModal } from '../components';
+import {
+  TransactionItem,
+  TransactionItemSkeleton,
+  ConfirmationModal,
+  FilterModal,
+  EditTransactionModal,
+  SearchBar,
+  ActionSheetModal,
+  AppHeader,
+} from '../components';
 import { useBounceScroll } from '../hooks';
 import { Transaction } from '../types';
+import { parseDate } from '../utils';
 
 const PAGE_SIZE = 25;
 
@@ -32,7 +43,7 @@ const STITCH_FILTER_CHIPS: { label: string; value: string }[] = [
   { label: 'Balance Adjustment', value: 'adjustment' },
 ];
 
-const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = () => {
+const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpenAddTransaction }) => {
   const { theme, isDarkMode, toggleTheme } = useTheme();
   const { transactions, isLoading, filters, setFilters, deleteTransaction, refetch } = useLedger();
   const { scrollProps, bounceStyle } = useBounceScroll();
@@ -42,6 +53,9 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = () => {
   const [displayedCount, setDisplayedCount] = useState(PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedTxForAction, setSelectedTxForAction] = useState<Transaction | null>(null);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
 
   const onRefresh = React.useCallback(async () => {
@@ -82,19 +96,25 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = () => {
 
       // 2. Type Filter
       if (filters.type && filters.type !== 'all') {
-        if (filters.type === 'sm' && !(t.type === 'sm' || t.type === 'co' || t.type === 'send' || t.type === 'send_money')) return false;
-        if (filters.type === 'recev' && !(t.type === 'recev' || t.type === 'receive_money' || t.type === 'cash_in')) return false;
-        if (filters.type === 'co' && !(t.type === 'co' || t.type === 'cash_out')) return false;
-        if (filters.type === 'send' && !(t.type === 'send' || t.type === 'b2b')) return false;
-        if (filters.type === 'adjustment' && t.type !== 'adjustment') return false;
+        const isSend = t.type === 'sm' || t.type === 'send' || t.type === 'send_money' || t.type === 'b2b';
+        const isReceive = t.type === 'recev' || t.type === 'receive_money' || t.type === 'cash_in';
+        const isCashOut = t.type === 'co' || t.type === 'cash_out';
+        const isAdjustment = t.type === 'adjustment';
+
+        if (filters.type === 'sm' && !isSend) return false;
+        if (filters.type === 'recev' && !isReceive) return false;
+        if (filters.type === 'co' && !isCashOut) return false;
+        if (filters.type === 'adjustment' && !isAdjustment) return false;
       }
 
       // 3. Date Range Filter
-      const txTime = new Date(t.date).getTime();
-      if (filters.dateRange === 'today' && txTime < startOfToday) return false;
-      if (filters.dateRange === 'yesterday' && (txTime < startOfYesterday || txTime >= startOfToday)) return false;
-      if (filters.dateRange === 'this_week' && txTime < startOfWeek) return false;
-      if (filters.dateRange === 'this_month' && txTime < startOfMonth) return false;
+      if (filters.dateRange && filters.dateRange !== 'all') {
+        const tTime = parseDate(t.date).getTime();
+        if (filters.dateRange === 'today' && tTime < startOfToday) return false;
+        if (filters.dateRange === 'yesterday' && (tTime < startOfYesterday || tTime >= startOfToday)) return false;
+        if (filters.dateRange === 'this_week' && tTime < startOfWeek) return false;
+        if (filters.dateRange === 'this_month' && tTime < startOfMonth) return false;
+      }
 
       // 4. Search Query match
       const q = searchQuery.toLowerCase().trim();
@@ -129,6 +149,16 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = () => {
     return list;
   }, [transactions, filters, searchQuery]);
 
+  const paginationTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (paginationTimerRef.current) {
+        clearTimeout(paginationTimerRef.current);
+      }
+    };
+  }, []);
+
   const visibleTransactions = useMemo(() => {
     return filteredTransactions.slice(0, displayedCount);
   }, [filteredTransactions, displayedCount]);
@@ -138,7 +168,8 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = () => {
   const handleEndReached = useCallback(() => {
     if (!hasMore || isLoadingMore) return;
     setIsLoadingMore(true);
-    setTimeout(() => {
+    if (paginationTimerRef.current) clearTimeout(paginationTimerRef.current);
+    paginationTimerRef.current = setTimeout(() => {
       setDisplayedCount((prev) => Math.min(prev + PAGE_SIZE, filteredTransactions.length));
       setIsLoadingMore(false);
     }, 150);
@@ -153,116 +184,73 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = () => {
 
   const renderItem = useCallback(
     ({ item }: { item: Transaction }) => (
-      <TransactionItem transaction={item} onPress={() => setTransactionToDelete(item)} />
+      <TransactionItem
+        transaction={item}
+        onOptionsPress={(tx) => {
+          setSelectedTxForAction(tx);
+          setShowOptionsMenu(true);
+        }}
+      />
     ),
     []
   );
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top']}>
-      {/* Stitch Top App Bar */}
-      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.divider }]}>
-        <View style={styles.headerLeft}>
-          <View style={[styles.logoBadge, { backgroundColor: theme.primaryLight }]}>
-            <Ionicons name="journal-outline" size={18} color={theme.primary} />
-          </View>
-        </View>
-
-        <Text style={[styles.headerCenterTitle, { color: theme.text }]}>Transactions</Text>
-
-        <View style={styles.headerRight}>
-          {/* Theme Toggle Button */}
+      {/* Top App Bar */}
+      <AppHeader
+        rightContent={
           <TouchableOpacity
-            style={[styles.iconButton, { backgroundColor: theme.cardSecondary }]}
-            onPress={toggleTheme}
+            style={[
+              styles.iconButton,
+              { backgroundColor: theme.cardSecondary },
+              activeFilterCount > 0 && { borderColor: theme.primary, borderWidth: 1.5 },
+            ]}
+            onPress={() => setFilterModalVisible(true)}
             activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Ionicons
-              name={isDarkMode ? 'sunny-outline' : 'moon-outline'}
+              name={activeFilterCount > 0 ? 'options' : 'options-outline'}
               size={18}
-              color={theme.textSecondary}
+              color={activeFilterCount > 0 ? theme.primary : theme.textSecondary}
             />
+            {activeFilterCount > 0 && (
+              <View style={[styles.filterBadge, { backgroundColor: theme.primary }]}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
-        </View>
-      </View>
+        }
+      />
 
-      {/* Search & Filter Header Section */}
-      <View style={[styles.filterContainer, { backgroundColor: theme.card, borderBottomColor: theme.divider }]}>
-        {/* Search Input with Clear Button */}
-        <View style={[styles.searchBox, { backgroundColor: theme.inputBg, borderBottomColor: theme.border }]}>
-          <Ionicons name="search" size={18} color={theme.textMuted} style={styles.searchIcon} />
-          <TextInput
-            style={[styles.searchInput, { color: theme.text }]}
-            placeholder="Search phone number, note, amount..."
-            placeholderTextColor={theme.textMuted}
-            value={searchQuery}
-            onChangeText={(text) => {
-              setSearchQuery(text);
-              setDisplayedCount(PAGE_SIZE);
-            }}
-            clearButtonMode="while-editing"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={16} color={theme.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Filter Chips Reel */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-          {STITCH_FILTER_CHIPS.map((chip) => {
-            const isSelected = (filters.type || 'all') === chip.value;
-            return (
-              <TouchableOpacity
-                key={chip.value}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: isSelected ? theme.primary : theme.cardSecondary,
-                    borderColor: isSelected ? theme.primary : theme.border,
-                  },
-                ]}
-                onPress={() => {
-                  setFilters({ type: chip.value });
-                  setDisplayedCount(PAGE_SIZE);
-                }}
-                activeOpacity={0.75}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    { color: isSelected ? '#FFFFFF' : theme.textSecondary },
-                    isSelected && styles.chipTextSelected,
-                  ]}
-                >
-                  {chip.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+      {/* Search Header Section */}
+      <View style={styles.filterContainer}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={(text) => {
+            setSearchQuery(text);
+            setDisplayedCount(PAGE_SIZE);
+          }}
+          placeholder="Search phone number, note, amount..."
+          onClear={() => setDisplayedCount(PAGE_SIZE)}
+        />
       </View>
 
       {/* Transactions List */}
       <FlatList
         data={visibleTransactions}
-        renderItem={({ item }) => (
-          <Animated.View style={bounceStyle}>
-            {renderItem({ item })}
-          </Animated.View>
-        )}
-        keyExtractor={(item) => item.id || String(item.clientTxId)}
+        renderItem={renderItem}
+        keyExtractor={(item, index) => item.id || item.clientTxId || `tx_${index}`}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
         showsVerticalScrollIndicator={false}
-        {...scrollProps}
-        initialNumToRender={12}
-        maxToRenderPerBatch={12}
-        windowSize={7}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={5}
         removeClippedSubviews={Platform.OS === 'android'}
         onEndReached={handleEndReached}
-        onEndReachedThreshold={0.3}
+        onEndReachedThreshold={0.4}
         ListEmptyComponent={
           isLoading && transactions.length === 0 ? (
             <View style={{ gap: 8 }}>
@@ -300,17 +288,63 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = () => {
         onClose={() => setFilterModalVisible(false)}
       />
 
+      {/* 3-Dot Transaction Options Action Sheet Modal */}
+      <ActionSheetModal
+        visible={showOptionsMenu}
+        title="Transaction Options"
+        subtitle={
+          selectedTxForAction
+            ? `৳${selectedTxForAction.amount.toLocaleString()} • ${selectedTxForAction.type.toUpperCase()}`
+            : undefined
+        }
+        actions={[
+          {
+            id: 'edit',
+            title: 'Edit Transaction',
+            subtitle: 'Modify amount, number, cost, margin or date',
+            icon: 'create-outline',
+            onPress: () => {
+              setShowOptionsMenu(false);
+              setShowEditModal(true);
+            },
+          },
+          {
+            id: 'delete',
+            title: 'Delete Transaction',
+            subtitle: 'Permanently delete and revert balance impact',
+            icon: 'trash-outline',
+            isDestructive: true,
+            onPress: () => {
+              setShowOptionsMenu(false);
+              setTransactionToDelete(selectedTxForAction);
+            },
+          },
+        ]}
+        onClose={() => setShowOptionsMenu(false)}
+      />
+
+      {/* Edit Transaction Modal */}
+      <EditTransactionModal
+        visible={showEditModal}
+        transaction={selectedTxForAction}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedTxForAction(null);
+        }}
+      />
+
       {/* Delete Confirmation Modal */}
       <ConfirmationModal
         visible={!!transactionToDelete}
         title="Delete Transaction"
-        message={`Remove this transaction of ৳${transactionToDelete?.amount?.toLocaleString()}?`}
+        message={`Remove this transaction of ৳${transactionToDelete?.amount?.toLocaleString()}? Account balance will be restored.`}
         confirmText="Delete"
         cancelText="Cancel"
         type="danger"
         onConfirm={handleConfirmDelete}
         onCancel={() => setTransactionToDelete(null)}
       />
+
     </SafeAreaView>
   );
 };
@@ -378,9 +412,7 @@ const styles = StyleSheet.create({
   filterContainer: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 10,
-    gap: 10,
-    borderBottomWidth: 1,
+    paddingBottom: 4,
   },
   searchBox: {
     height: 44,
@@ -399,24 +431,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     padding: 0,
-  },
-  chipsScroll: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingVertical: 2,
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  chipTextSelected: {
-    fontWeight: '700',
   },
   listContent: {
     paddingHorizontal: 16,
@@ -446,5 +460,91 @@ const styles = StyleSheet.create({
   loadingMore: {
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  /* 3-Dot Options Action Sheet Styles */
+  optionsModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  optionsSheetCard: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 28,
+    width: '100%',
+    maxWidth: 540,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(128, 128, 128, 0.35)',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  optionsSheetHeader: {
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    marginBottom: 6,
+    alignItems: 'center',
+  },
+  optionsSheetTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  optionsSheetSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  optionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  optionItemLast: {
+    borderBottomWidth: 0,
+  },
+  optionIconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  optionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  optionDescription: {
+    fontSize: 11.5,
+    fontWeight: '500',
+  },
+  optionsCancelBtn: {
+    marginTop: 14,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionsCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
