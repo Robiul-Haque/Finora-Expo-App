@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -31,52 +31,56 @@ const ConfirmationModalComponent: React.FC<ConfirmationModalProps> = ({
   isLoading = false,
 }) => {
   const { theme, isDarkMode } = useTheme();
-  const scaleAnim = useRef(new Animated.Value(0.85)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
 
-  const [shouldRender, setShouldRender] = useState(visible);
-
-  const effectiveType = isDestructive ? 'danger' : type;
+  const isClosing = useRef(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.92)).current;
 
   useEffect(() => {
     if (visible) {
-      setShouldRender(true);
+      isClosing.current = false;
+      fadeAnim.setValue(0);
+      scaleAnim.setValue(0.92);
       Animated.parallel([
-        Animated.timing(opacityAnim, {
+        Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 180,
-          easing: Easing.out(Easing.quad),
+          duration: 170,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.spring(scaleAnim, {
           toValue: 1,
-          friction: 6,
-          tension: 140,
+          damping: 18,
+          mass: 0.8,
+          stiffness: 220,
           useNativeDriver: true,
         }),
       ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(opacityAnim, {
-          toValue: 0,
-          duration: 120,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 0.85,
-          duration: 120,
-          useNativeDriver: true,
-        }),
-      ]).start(({ finished }) => {
-        if (finished) {
-          setShouldRender(false);
-        }
-      });
     }
   }, [visible]);
 
-  if (!shouldRender) return null;
+  const handleCancel = () => {
+    if (isClosing.current) return;
+    isClosing.current = true;
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 120,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.94,
+        duration: 120,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onCancel();
+    });
+  };
+
+  const effectiveType = isDestructive ? 'danger' : type;
 
   const getThemeColors = () => {
     switch (effectiveType) {
@@ -112,13 +116,13 @@ const ConfirmationModalComponent: React.FC<ConfirmationModalProps> = ({
   const colors = getThemeColors();
 
   return (
-    <Modal transparent visible={visible} animationType="none" onRequestClose={onCancel} statusBarTranslucent>
-      <TouchableWithoutFeedback onPress={onCancel}>
+    <Modal transparent visible={visible} animationType="none" onRequestClose={handleCancel} statusBarTranslucent>
+      <TouchableWithoutFeedback onPress={handleCancel}>
         <Animated.View
           style={[
             styles.overlay,
             {
-              opacity: opacityAnim,
+              opacity: fadeAnim,
               backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(15, 23, 42, 0.5)',
             },
           ]}
@@ -130,7 +134,6 @@ const ConfirmationModalComponent: React.FC<ConfirmationModalProps> = ({
                 {
                   backgroundColor: theme.card,
                   borderColor: theme.border,
-                  opacity: opacityAnim,
                   transform: [{ scale: scaleAnim }],
                 },
               ]}
@@ -157,11 +160,11 @@ const ConfirmationModalComponent: React.FC<ConfirmationModalProps> = ({
                       borderColor: theme.border,
                     },
                   ]}
-                  onPress={onCancel}
-                  activeOpacity={0.75}
+                  onPress={handleCancel}
+                  activeOpacity={0.7}
                   disabled={isLoading}
                 >
-                  <Text style={[styles.cancelButtonText, { color: theme.textSecondary }]}>{cancelText}</Text>
+                  <Text style={[styles.cancelButtonText, { color: theme.text }]}>{cancelText}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity

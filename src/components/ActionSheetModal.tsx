@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Modal,
   TouchableOpacity,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -44,24 +46,83 @@ const ActionSheetModalComponent: React.FC<ActionSheetModalProps> = ({
 }) => {
   const { theme, isDarkMode } = useTheme();
 
+  const isClosing = useRef(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(140)).current;
+
+  useEffect(() => {
+    if (visible) {
+      isClosing.current = false;
+      fadeAnim.setValue(0);
+      slideAnim.setValue(140);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 180,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          damping: 20,
+          mass: 0.8,
+          stiffness: 240,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const handleClose = () => {
+    if (isClosing.current) return;
+    isClosing.current = true;
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 140,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+    });
+  };
+
+  const handleActionPress = (actionOnPress: () => void) => {
+    handleClose();
+    setTimeout(() => {
+      actionOnPress();
+    }, 130);
+  };
+
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
     >
-      <TouchableOpacity
-        style={styles.modalOverlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View
+      <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={handleClose}
+        />
+        <Animated.View
           style={[
             styles.sheetCard,
-            { backgroundColor: theme.card, borderColor: theme.border },
+            {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+              transform: [{ translateY: slideAnim }],
+            },
           ]}
-          onStartShouldSetResponder={() => true}
         >
           {/* Top Handle */}
           <View style={styles.sheetHandle} />
@@ -98,10 +159,7 @@ const ActionSheetModalComponent: React.FC<ActionSheetModalProps> = ({
                   { borderBottomColor: theme.border },
                   isLast && styles.optionItemLast,
                 ]}
-                onPress={() => {
-                  onClose();
-                  action.onPress();
-                }}
+                onPress={() => handleActionPress(action.onPress)}
                 activeOpacity={0.7}
               >
                 <View style={[styles.optionIconContainer, { backgroundColor: itemIconBg }]}>
@@ -140,13 +198,13 @@ const ActionSheetModalComponent: React.FC<ActionSheetModalProps> = ({
               styles.cancelBtn,
               { backgroundColor: theme.cardSecondary, borderColor: theme.border },
             ]}
-            onPress={onClose}
+            onPress={handleClose}
             activeOpacity={0.8}
           >
             <Text style={[styles.cancelBtnText, { color: theme.text }]}>{cancelText}</Text>
           </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 };

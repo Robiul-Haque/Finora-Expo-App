@@ -8,6 +8,7 @@ import {
   ScrollView,
   TouchableWithoutFeedback,
   Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { DateFilter, SortFilter } from '../types/ledger';
@@ -29,55 +30,59 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
   const [selectedSort, setSelectedSort] = useState<SortFilter>(filters.sortBy);
   const [showAccountPicker, setShowAccountPicker] = useState(false);
 
-  const slideAnim = useRef(new Animated.Value(400)).current;
+  const isClosing = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(140)).current;
 
   useEffect(() => {
     if (visible) {
-      slideAnim.setValue(400);
+      isClosing.current = false;
       fadeAnim.setValue(0);
+      slideAnim.setValue(140);
+      setSelectedAccountId(filters.accountId);
+      setSelectedType(filters.type);
+      setSelectedDate(filters.dateRange);
+      setSelectedSort(filters.sortBy);
+      setShowAccountPicker(false);
+
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 180,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
           toValue: 0,
-          friction: 8,
-          tension: 65,
+          damping: 20,
+          mass: 0.8,
+          stiffness: 240,
           useNativeDriver: true,
         }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, filters]);
 
   const handleClose = () => {
+    if (isClosing.current) return;
+    isClosing.current = true;
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 150,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 400,
-        duration: 150,
+        toValue: 140,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
     ]).start(() => {
       onClose();
     });
   };
-
-  React.useEffect(() => {
-    if (visible) {
-      setSelectedAccountId(filters.accountId);
-      setSelectedType(filters.type);
-      setSelectedDate(filters.dateRange);
-      setSelectedSort(filters.sortBy);
-      setShowAccountPicker(false);
-    }
-  }, [visible, filters]);
 
   const handleApply = () => {
     setFilters({
@@ -86,7 +91,7 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
       dateRange: selectedDate,
       sortBy: selectedSort,
     });
-    onClose();
+    handleClose();
   };
 
   const handleReset = () => {
@@ -95,7 +100,7 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
     setSelectedDate('all');
     setSelectedSort('newest');
     resetFilters();
-    onClose();
+    handleClose();
   };
 
   const selectedAccountLabel = React.useMemo(() => {
@@ -127,19 +132,22 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
 
   return (
     <Modal visible={visible} animationType="none" transparent onRequestClose={handleClose}>
-      <TouchableWithoutFeedback onPress={handleClose}>
-        <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
-          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-            <Animated.View
-              style={[
-                styles.bottomSheet,
-                {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
-                  transform: [{ translateY: slideAnim }],
-                },
-              ]}
-            >
+      <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={handleClose}
+        />
+        <Animated.View
+          style={[
+            styles.bottomSheet,
+            {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
               {/* Drag Handle & Header */}
               <View style={[styles.sheetHeader, { borderBottomColor: theme.divider }]}>
                 {/* Drag Handle Pill */}
@@ -383,10 +391,8 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
                 </TouchableOpacity>
               </View>
             </Animated.View>
-          </TouchableWithoutFeedback>
-        </Animated.View>
-      </TouchableWithoutFeedback>
-    </Modal>
+          </Animated.View>
+        </Modal>
   );
 };
 

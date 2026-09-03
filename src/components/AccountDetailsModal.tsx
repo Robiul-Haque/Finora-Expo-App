@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Alert, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Account, Transaction } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
@@ -50,42 +50,75 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
     return found ? found.label : 'All';
   }, [selectedFilter, historyFilterOptions]);
 
-  const slideAnim = useRef(new Animated.Value(400)).current;
+  const isClosing = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(40)).current;
+
+  const filterDropdownFade = useRef(new Animated.Value(0)).current;
+  const filterDropdownScale = useRef(new Animated.Value(0.94)).current;
 
   useEffect(() => {
     if (visible) {
-      slideAnim.setValue(400);
+      isClosing.current = false;
       fadeAnim.setValue(0);
+      slideAnim.setValue(40);
       setShowOptionsMenu(false);
       setShowDeleteConfirm(false);
       setShowHistoryFilterModal(false);
+
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 180,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
-        Animated.spring(slideAnim, {
+        Animated.timing(slideAnim, {
           toValue: 0,
-          friction: 8,
-          tension: 65,
+          duration: 180,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
       ]).start();
     }
   }, [visible]);
 
+  useEffect(() => {
+    if (showHistoryFilterModal) {
+      filterDropdownFade.setValue(0);
+      filterDropdownScale.setValue(0.94);
+      Animated.parallel([
+        Animated.timing(filterDropdownFade, {
+          toValue: 1,
+          duration: 160,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(filterDropdownScale, {
+          toValue: 1,
+          damping: 18,
+          mass: 0.8,
+          stiffness: 220,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showHistoryFilterModal]);
+
   const handleClose = () => {
+    if (isClosing.current) return;
+    isClosing.current = true;
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 150,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 400,
-        duration: 150,
+        toValue: 40,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -464,20 +497,24 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
         <Modal
           visible={showHistoryFilterModal}
           transparent
-          animationType="fade"
+          animationType="none"
           onRequestClose={() => setShowHistoryFilterModal(false)}
         >
-          <TouchableOpacity
-            style={styles.dropdownModalOverlay}
-            activeOpacity={1}
-            onPress={() => setShowHistoryFilterModal(false)}
-          >
-            <View
+          <Animated.View style={[styles.dropdownModalOverlay, { opacity: filterDropdownFade }]}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => setShowHistoryFilterModal(false)}
+            />
+            <Animated.View
               style={[
                 styles.dropdownModalCard,
-                { backgroundColor: theme.card, borderColor: theme.border },
+                {
+                  backgroundColor: theme.card,
+                  borderColor: theme.border,
+                  transform: [{ scale: filterDropdownScale }],
+                },
               ]}
-              onStartShouldSetResponder={() => true}
             >
               <View style={[styles.dropdownModalHeader, { borderBottomColor: theme.divider }]}>
                 <Text style={[styles.dropdownModalTitle, { color: theme.text }]}>
@@ -528,8 +565,8 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
                   Close
                 </Text>
               </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
+            </Animated.View>
+          </Animated.View>
         </Modal>
 
         {/* 3-Dot Transaction Options Action Sheet Modal */}

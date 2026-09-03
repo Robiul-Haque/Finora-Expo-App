@@ -12,6 +12,7 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Transaction, TransactionType } from '../types/ledger';
@@ -54,8 +55,9 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
   const profitRef = useRef<TextInput>(null);
   const noteRef = useRef<TextInput>(null);
 
-  const slideAnim = useRef(new Animated.Value(400)).current;
+  const isClosing = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(140)).current;
   const dropdownAnim = useRef(new Animated.Value(0)).current;
 
   const toggleAccountDropdown = () => {
@@ -92,10 +94,11 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
   // Sync state with selected transaction
   useEffect(() => {
     if (visible && transaction) {
+      isClosing.current = false;
+      fadeAnim.setValue(0);
+      slideAnim.setValue(140);
       setShowAccountDropdown(false);
       dropdownAnim.setValue(0);
-      slideAnim.setValue(400);
-      fadeAnim.setValue(0);
 
       setAccountId(transaction.accountId || (accounts[0]?.id || ''));
 
@@ -124,12 +127,14 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 180,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
           toValue: 0,
-          friction: 8,
-          tension: 65,
+          damping: 20,
+          mass: 0.8,
+          stiffness: 240,
           useNativeDriver: true,
         }),
       ]).start();
@@ -137,15 +142,19 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
   }, [visible, transaction]);
 
   const handleClose = () => {
+    if (isClosing.current) return;
+    isClosing.current = true;
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 150,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 400,
-        duration: 150,
+        toValue: 140,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -167,6 +176,36 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
 
     const parsedCost = parseFloat(cost) || 0;
     const parsedProfit = parseFloat(profit) || 0;
+
+    if ((txType === 'send' || txType === 'cash_out') && !counterpartyNumber.trim()) {
+      Alert.alert('Recipient Required', 'Please enter a recipient or counterparty number.');
+      return;
+    }
+
+    // Balance check for outflow edits
+    if (selectedAccount && (txType === 'send' || txType === 'cash_out')) {
+      const isOldOutflow =
+        transaction.type === 'sm' ||
+        transaction.type === 'co' ||
+        transaction.type === 'send' ||
+        transaction.type === 'send_money' ||
+        transaction.type === 'cash_out' ||
+        transaction.type === 'b2b';
+
+      const restoredBalance =
+        transaction.accountId === selectedAccount.id && isOldOutflow
+          ? selectedAccount.balance + transaction.amount + (transaction.cost || 0)
+          : selectedAccount.balance;
+
+      const totalNeeded = parsedAmount + parsedCost;
+      if (totalNeeded > restoredBalance) {
+        Alert.alert(
+          'Insufficient Balance',
+          `The selected account has ৳${restoredBalance.toLocaleString('en-US')} available, but ৳${totalNeeded.toLocaleString('en-US')} is needed.`
+        );
+        return;
+      }
+    }
 
     // Convert UI type to ledger format
     let finalType: TransactionType = 'send_money';
@@ -274,14 +313,24 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
   return (
     <Modal visible={visible} animationType="none" transparent statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={handleClose}
+        />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}
+          pointerEvents="box-none"
         >
           <Animated.View
             style={[
               styles.modalSheet,
-              { backgroundColor: theme.card, borderColor: theme.border, transform: [{ translateY: slideAnim }] },
+              {
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+                transform: [{ translateY: slideAnim }],
+              },
             ]}
           >
             {/* Top Header */}

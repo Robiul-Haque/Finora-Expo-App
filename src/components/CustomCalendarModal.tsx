@@ -1,10 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Modal,
   TouchableOpacity,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -24,6 +26,56 @@ const CustomCalendarModalComponent: React.FC<CustomCalendarModalProps> = ({
 }) => {
   const { theme, isDarkMode } = useTheme();
   const [pickerViewMonth, setPickerViewMonth] = useState<Date>(selectedDate || new Date());
+
+  const isClosing = useRef(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.92)).current;
+
+  useEffect(() => {
+    if (visible) {
+      const initDate = selectedDate ? new Date(selectedDate) : new Date();
+      setPickerViewMonth(isNaN(initDate.getTime()) ? new Date() : initDate);
+      isClosing.current = false;
+      fadeAnim.setValue(0);
+      scaleAnim.setValue(0.92);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 170,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          damping: 18,
+          mass: 0.8,
+          stiffness: 220,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const handleClose = () => {
+    if (isClosing.current) return;
+    isClosing.current = true;
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 120,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.94,
+        duration: 120,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+    });
+  };
 
   const daysInMonth = useMemo(() => {
     const year = pickerViewMonth.getFullYear();
@@ -59,7 +111,7 @@ const CustomCalendarModalComponent: React.FC<CustomCalendarModalProps> = ({
       0
     );
     onSelectDate(newDate);
-    onClose();
+    handleClose();
   };
 
   const monthName = pickerViewMonth.toLocaleDateString('en-US', {
@@ -71,20 +123,24 @@ const CustomCalendarModalComponent: React.FC<CustomCalendarModalProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
     >
-      <TouchableOpacity
-        style={styles.modalOverlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View
+      <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={handleClose}
+        />
+        <Animated.View
           style={[
             styles.calendarCard,
-            { backgroundColor: theme.card, borderColor: theme.border },
+            {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+              transform: [{ scale: scaleAnim }],
+            },
           ]}
-          onStartShouldSetResponder={() => true}
         >
           {/* Header Navigation */}
           <View style={styles.header}>
@@ -184,12 +240,12 @@ const CustomCalendarModalComponent: React.FC<CustomCalendarModalProps> = ({
           {/* Close Button */}
           <TouchableOpacity
             style={[styles.closeBtn, { backgroundColor: theme.cardSecondary }]}
-            onPress={onClose}
+            onPress={handleClose}
           >
             <Text style={[styles.closeBtnText, { color: theme.textSecondary }]}>Close</Text>
           </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 };

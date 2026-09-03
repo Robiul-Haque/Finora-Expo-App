@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
   Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
@@ -39,23 +40,27 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
   const openingBalanceRef = useRef<TextInput>(null);
   const accountLabelRef = useRef<TextInput>(null);
 
-  const slideAnim = useRef(new Animated.Value(400)).current;
+  const isClosing = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(140)).current;
 
   useEffect(() => {
     if (visible) {
-      slideAnim.setValue(400);
+      isClosing.current = false;
       fadeAnim.setValue(0);
+      slideAnim.setValue(140);
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 180,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
           toValue: 0,
-          friction: 8,
-          tension: 65,
+          damping: 20,
+          mass: 0.8,
+          stiffness: 240,
           useNativeDriver: true,
         }),
       ]).start();
@@ -63,15 +68,19 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
   }, [visible]);
 
   const handleClose = () => {
+    if (isClosing.current) return;
+    isClosing.current = true;
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 150,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 400,
-        duration: 150,
+        toValue: 140,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -100,7 +109,7 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
       openingBalance: true,
     });
 
-    if (!phoneNumber.trim()) {
+    if (!phoneNumber.trim() || !validation.isValid) {
       return;
     }
 
@@ -127,8 +136,7 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
       setDailyLimit('');
       setOpeningBalance('');
       setAccountLabel('');
-      setTouched({});
-      onClose();
+      handleClose();
     } catch {
       // Inline state fallback
     } finally {
@@ -139,11 +147,26 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
   return (
     <Modal visible={visible} animationType="none" transparent statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={handleClose}
+        />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}
+          pointerEvents="box-none"
         >
-          <Animated.View style={[styles.modalContent, { backgroundColor: theme.card, borderColor: theme.border, transform: [{ translateY: slideAnim }] }]}>
+          <Animated.View
+            style={[
+              styles.modalContent,
+              {
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
             {/* Top Navigation Header */}
             <View style={[styles.modalHeader, { borderBottomColor: theme.divider }]}>
               <TouchableOpacity
@@ -197,9 +220,9 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
                   onBlur={() => handleBlur('phoneNumber')}
                 />
               </TouchableOpacity>
-              {touched.phoneNumber && !phoneNumber.trim() && (
+              {touched.phoneNumber && validation.errors.accountNumber && (
                 <Text style={[styles.inlineWarning, { color: theme.danger }]}>
-                  Please enter a valid bKash number
+                  {validation.errors.accountNumber}
                 </Text>
               )}
             </View>
@@ -290,7 +313,7 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
 
             <TouchableOpacity
               style={[styles.cancelBtn, { borderColor: theme.primary }]}
-              onPress={onClose}
+              onPress={handleClose}
               disabled={isSubmitting}
               activeOpacity={0.75}
             >

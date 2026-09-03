@@ -12,6 +12,7 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TransactionType } from '../types/ledger';
@@ -56,8 +57,9 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
   const profitInputRef = useRef<TextInput>(null);
   const noteInputRef = useRef<TextInput>(null);
 
-  const slideAnim = useRef(new Animated.Value(400)).current;
+  const isClosing = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(140)).current;
   const dropdownAnim = useRef(new Animated.Value(0)).current;
 
   const toggleAccountDropdown = () => {
@@ -93,10 +95,11 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
 
   useEffect(() => {
     if (visible) {
+      isClosing.current = false;
+      fadeAnim.setValue(0);
+      slideAnim.setValue(140);
       setShowAccountDropdown(false);
       dropdownAnim.setValue(0);
-      slideAnim.setValue(400);
-      fadeAnim.setValue(0);
       setAmount('');
       setCost('0');
       setProfit('0');
@@ -105,16 +108,19 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
       setTouched({});
       setSelectedDate(new Date());
       setPickerViewMonth(new Date());
+
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 180,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
           toValue: 0,
-          friction: 8,
-          tension: 65,
+          damping: 20,
+          mass: 0.8,
+          stiffness: 240,
           useNativeDriver: true,
         }),
       ]).start();
@@ -122,15 +128,19 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
   }, [visible]);
 
   const handleClose = () => {
+    if (isClosing.current) return;
+    isClosing.current = true;
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 150,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 400,
-        duration: 150,
+        toValue: 140,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -210,7 +220,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
   const handleSave = async () => {
     setTouched({ amount: true, recipientNumber: true });
 
-    if (!selectedAccount || numAmount <= 0 || (txType === 'send' && !recipientNumber.trim())) {
+    if (!selectedAccount || numAmount <= 0 || !validation.isValid) {
       return;
     }
 
@@ -241,7 +251,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
       setNote('');
       setSelectedDate(new Date());
       setTouched({});
-      onClose();
+      handleClose();
     } catch {
       Alert.alert('Error', 'Could not save transaction. Please try again.');
     } finally {
@@ -325,7 +335,12 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
   return (
     <Modal visible={visible} animationType="none" transparent statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={handleClose}
+        />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }} pointerEvents="box-none">
           <Animated.View style={[styles.modalSheet, { backgroundColor: theme.card, borderColor: theme.border, transform: [{ translateY: slideAnim }] }]}>
             {/* Top Header */}
             <View style={[styles.header, { borderBottomColor: theme.divider }]}>
@@ -753,7 +768,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
           <View style={[styles.stickyFooter, { backgroundColor: theme.card, borderTopColor: theme.divider }]}>
             <TouchableOpacity
               style={[styles.cancelBtn, { borderColor: theme.primary }]}
-              onPress={onClose}
+              onPress={handleClose}
               activeOpacity={0.7}
             >
               <Text style={[styles.cancelBtnText, { color: theme.primary }]}>Cancel</Text>

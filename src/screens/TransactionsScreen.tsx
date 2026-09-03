@@ -135,9 +135,9 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpen
 
     // 5. Sorting
     if (filters.sortBy === 'newest') {
-      list.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
+      list.sort((a, b) => parseDate(b.date).getTime() - parseDate(a.date).getTime());
     } else if (filters.sortBy === 'oldest') {
-      list.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
+      list.sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime());
     } else if (filters.sortBy === 'amount_high') {
       list.sort((a, b) => b.amount - a.amount);
     } else if (filters.sortBy === 'amount_low') {
