@@ -34,9 +34,9 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress, on
         style={[
           styles.card,
           {
-            backgroundColor: account.isActive ? theme.card : (isDarkMode ? '#242728' : '#F5F6F8'),
-            borderColor: isCritical ? (isDarkMode ? 'rgba(255, 218, 214, 0.3)' : '#FFDAD6') : theme.border,
-            opacity: account.isActive ? 1 : 0.55,
+            backgroundColor: account.isActive ? theme.card : theme.cardSecondary,
+            borderColor: isCritical ? theme.dangerLight : theme.border,
+            opacity: account.isActive ? 1 : 0.65,
           },
         ]}
       >
@@ -62,7 +62,7 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress, on
                 style={[
                   styles.profitBadge,
                   {
-                    backgroundColor: isDarkMode ? 'rgba(137, 250, 155, 0.15)' : 'rgba(0, 110, 44, 0.1)',
+                    backgroundColor: theme.successLight,
                   },
                 ]}
               >
@@ -76,9 +76,7 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress, on
                 style={[
                   styles.statusPill,
                   {
-                    backgroundColor: account.isActive
-                      ? (isDarkMode ? 'rgba(26, 115, 232, 0.15)' : '#E8F0FE')
-                      : (isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E5E7EB'),
+                    backgroundColor: account.isActive ? theme.primaryLight : theme.cardSecondary,
                   },
                 ]}
               >
@@ -113,7 +111,7 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress, on
               styles.infoGrid,
               {
                 backgroundColor: isCritical
-                  ? (isDarkMode ? 'rgba(255, 218, 214, 0.08)' : '#FFF5F5')
+                  ? theme.dangerLight
                   : theme.cardSecondary,
               },
             ]}
@@ -186,7 +184,7 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress, on
                 styles.progressTrack,
                 {
                   backgroundColor: isCritical
-                    ? (isDarkMode ? 'rgba(255, 218, 214, 0.2)' : '#FFDAD6')
+                    ? theme.dangerLight
                     : theme.progressBarBg,
                 },
               ]}

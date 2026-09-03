@@ -12,14 +12,7 @@ export interface AppHeaderProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const AppHeaderComponent: React.FC<AppHeaderProps> = ({
-  title = 'Finora',
-  subtitle,
-  showBrandLogo = true,
-  rightContent,
-  showThemeToggle = true,
-  style,
-}) => {
+const AppHeaderComponent: React.FC<AppHeaderProps> = ({ title = 'Finora', subtitle, showBrandLogo = true, rightContent, showThemeToggle = true, style }) => {
   const { theme, isDarkMode, toggleTheme } = useTheme();
 
   return (
@@ -86,23 +79,26 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   logoBadgeImage: {
-    width: 26,
-    height: 26,
+    width: 34,
+    height: 34,
+    backgroundColor: 'transparent',
   },
   headerTitleGroup: {
     justifyContent: 'center',
   },
   brandTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
+    lineHeight: 23,
   },
   brandSubtitle: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '500',
+    lineHeight: 14,
   },
   headerRight: {
     flexDirection: 'row',

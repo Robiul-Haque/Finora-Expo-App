@@ -11,32 +11,79 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const exitFadeAnim = useRef(new Animated.Value(1)).current;
+  const logoScaleAnim = useRef(new Animated.Value(0.86)).current;
+
+  // 3 Animated values for the loading dots wave
+  const dot1Anim = useRef(new Animated.Value(0.3)).current;
+  const dot2Anim = useRef(new Animated.Value(0.3)).current;
+  const dot3Anim = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
-    // 1. Instant 120ms fade entrance
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 120,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
+    // 1. Entrance animation (fade + smooth logo pop-in)
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoScaleAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 55,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
-    // 2. Fast smooth exit after 350ms (Zero startup lag)
+    // 2. Continuous smooth, gentle wave animation for loading dots
+    const createDotAnimation = (anim: Animated.Value, delay: number) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 380,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim, {
+            toValue: 0.35,
+            duration: 380,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.delay(Math.max(0, 560 - delay)),
+        ])
+      );
+    };
+
+    const anim1 = createDotAnimation(dot1Anim, 0);
+    const anim2 = createDotAnimation(dot2Anim, 180);
+    const anim3 = createDotAnimation(dot3Anim, 360);
+
+    anim1.start();
+    anim2.start();
+    anim3.start();
+
+    // 3. Smooth exit after 1250ms duration (1.25s total display)
     const timer = setTimeout(() => {
       Animated.timing(exitFadeAnim, {
         toValue: 0,
-        duration: 160,
+        duration: 200,
         easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }).start(() => {
         onFinish();
       });
-    }, 350);
+    }, 1250);
 
     return () => {
       clearTimeout(timer);
+      anim1.stop();
+      anim2.stop();
+      anim3.stop();
     };
-  }, [fadeAnim, exitFadeAnim, onFinish]);
+  }, [fadeAnim, exitFadeAnim, logoScaleAnim, dot1Anim, dot2Anim, dot3Anim, onFinish]);
 
   return (
     <Animated.View
@@ -62,13 +109,20 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           },
         ]}
       >
-        <View style={styles.logoBadge}>
+        <Animated.View
+          style={[
+            styles.logoBadge,
+            {
+              transform: [{ scale: logoScaleAnim }],
+            },
+          ]}
+        >
           <Image
             source={require('../../assets/icon.png')}
             style={styles.logoImage}
             resizeMode="contain"
           />
-        </View>
+        </Animated.View>
 
         <Text style={[styles.title, { color: theme.primary }]}>Finora</Text>
         <Text style={[styles.subtitle, { color: isDarkMode ? '#94A3B8' : '#5F6368' }]}>
@@ -76,12 +130,60 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
         </Text>
       </Animated.View>
 
-      {/* Bottom Sync Indicator */}
+      {/* Bottom Sync Indicator with Smooth Pulsing Dots */}
       <View style={styles.bottomBar}>
         <View style={styles.dotsRow}>
-          <View style={[styles.dot, { backgroundColor: theme.primary }]} />
-          <View style={[styles.dot, { backgroundColor: theme.primary, opacity: 0.6 }]} />
-          <View style={[styles.dot, { backgroundColor: theme.primary, opacity: 0.3 }]} />
+          <Animated.View
+            style={[
+              styles.dot,
+              {
+                backgroundColor: theme.primary,
+                opacity: dot1Anim,
+                transform: [
+                  {
+                    scale: dot1Anim.interpolate({
+                      inputRange: [0.3, 1],
+                      outputRange: [0.8, 1.25],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.dot,
+              {
+                backgroundColor: theme.primary,
+                opacity: dot2Anim,
+                transform: [
+                  {
+                    scale: dot2Anim.interpolate({
+                      inputRange: [0.3, 1],
+                      outputRange: [0.8, 1.25],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.dot,
+              {
+                backgroundColor: theme.primary,
+                opacity: dot3Anim,
+                transform: [
+                  {
+                    scale: dot3Anim.interpolate({
+                      inputRange: [0.3, 1],
+                      outputRange: [0.8, 1.25],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
         </View>
         <Text style={[styles.syncText, { color: isDarkMode ? '#94A3B8' : '#80868B' }]}>
           SYNCING DATA
@@ -103,16 +205,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoBadge: {
-    width: 88,
-    height: 88,
+    width: 42,
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
     backgroundColor: 'transparent',
   },
   logoImage: {
-    width: 88,
-    height: 88,
+    width: 42,
+    height: 42,
+    backgroundColor: 'transparent',
   },
   title: {
     fontSize: 26,
@@ -136,7 +239,7 @@ const styles = StyleSheet.create({
   dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
   dot: {
     width: 6,

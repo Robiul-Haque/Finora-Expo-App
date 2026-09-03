@@ -10,6 +10,7 @@ import { LedgerProvider, useLedger } from './src/context/LedgerContext';
 import { HomeScreen, TransactionsScreen, AccountsScreen } from './src/screens';
 import { AddTransactionModal, AddAccountModal, AccountDetailsModal, ErrorBoundary, SplashScreen } from './src/components';
 import { Account } from './src/types';
+import { initializeThemeSync } from './src/store/useThemeStore';
 
 type TabType = 'home' | 'transactions' | 'accounts';
 
@@ -24,16 +25,7 @@ interface TabButtonProps {
   inactiveColor: string;
 }
 
-const TabButtonComponent: React.FC<TabButtonProps> = ({
-  tab,
-  activeTab,
-  label,
-  activeIcon,
-  inactiveIcon,
-  onPress,
-  activeColor,
-  inactiveColor,
-}) => {
+const TabButtonComponent: React.FC<TabButtonProps> = ({ tab, activeTab, label, activeIcon, inactiveIcon, onPress, activeColor, inactiveColor }) => {
   const isActive = activeTab === tab;
 
   return (
@@ -246,22 +238,31 @@ const MainApp: React.FC = () => {
 };
 
 export default function App() {
-  const [appReady, setAppReady] = useState(true);
+  const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
-    async function loadFonts() {
+    async function prepareApp() {
       try {
-        await Font.loadAsync({
-          ...Ionicons.font,
-          Ionicons: require('./assets/fonts/Ionicons.ttf'),
-          ionicons: require('./assets/fonts/Ionicons.ttf'),
-        });
+        await Promise.all([
+          initializeThemeSync(),
+          Font.loadAsync({
+            ...Ionicons.font,
+            Ionicons: require('./assets/fonts/Ionicons.ttf'),
+            ionicons: require('./assets/fonts/Ionicons.ttf'),
+          }),
+        ]);
       } catch (e) {
-        console.warn('Font loading error:', e);
+        console.warn('App preparation error:', e);
+      } finally {
+        setAppReady(true);
       }
     }
-    loadFonts();
+    prepareApp();
   }, []);
+
+  if (!appReady) {
+    return null;
+  }
 
   return (
     <ErrorBoundary>

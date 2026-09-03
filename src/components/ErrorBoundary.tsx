@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useThemeStore } from '../store/useThemeStore';
 
 interface Props {
   children: ReactNode;
@@ -31,19 +32,25 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      const isDarkMode = useThemeStore.getState().isDarkMode;
+      const theme = useThemeStore.getState().theme;
+
       return (
-        <SafeAreaView style={styles.container}>
-          <StatusBar barStyle="light-content" backgroundColor="#191C1D" />
+        <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#191C1D' : '#F8F9FA' }]}>
+          <StatusBar
+            barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+            backgroundColor={isDarkMode ? '#191C1D' : '#F8F9FA'}
+          />
           <View style={styles.content}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="warning-outline" size={44} color="#1A73E8" />
+            <View style={[styles.iconContainer, { backgroundColor: theme.primaryLight }]}>
+              <Ionicons name="warning-outline" size={44} color={theme.primary} />
             </View>
-            <Text style={styles.title}>Something went wrong</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: theme.text }]}>Something went wrong</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
               An unexpected issue occurred. Your data is safe and stored locally.
             </Text>
             <TouchableOpacity
-              style={styles.retryButton}
+              style={[styles.retryButton, { backgroundColor: theme.primary }]}
               onPress={this.handleReset}
               activeOpacity={0.8}
             >
