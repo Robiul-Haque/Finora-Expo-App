@@ -144,27 +144,30 @@ const MainApp: React.FC = () => {
         )}
       </View>
 
-      {/* Floating Action Button (FAB) */}
-      <TouchableOpacity
-        style={[
-          styles.fabContainer,
-          {
-            bottom: (insets.bottom > 0 ? insets.bottom : 12) + 84,
-          },
-        ]}
-        onPress={() => handleOpenAddTx()}
-        activeOpacity={0.92}
-      >
-        <View style={[styles.fabButton, { backgroundColor: theme.primary }]}>
-          <Ionicons name="add" size={24} color="#FFFFFF" />
-        </View>
-      </TouchableOpacity>
+      {/* Floating Action Button (FAB) - hidden during splash */}
+      {!showSplash && (
+        <TouchableOpacity
+          style={[
+            styles.fabContainer,
+            {
+              bottom: (insets.bottom > 0 ? insets.bottom : 12) + 84,
+            },
+          ]}
+          onPress={() => handleOpenAddTx()}
+          activeOpacity={0.92}
+        >
+          <View style={[styles.fabButton, { backgroundColor: theme.primary }]}>
+            <Ionicons name="add" size={24} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+      )}
 
-      {/* Modern Floating Island Bottom Navigation Bar */}
-      <View
-        style={[styles.floatingBarWrapper, { paddingBottom: Math.max(insets.bottom, 12) }]}
-        pointerEvents="box-none"
-      >
+      {/* Modern Floating Island Bottom Navigation Bar - hidden during splash */}
+      {!showSplash && (
+        <View
+          style={[styles.floatingBarWrapper, { paddingBottom: Math.max(insets.bottom, 12) }]}
+          pointerEvents="box-none"
+        >
         <View
           style={[
             styles.bottomTabBar,
@@ -211,6 +214,7 @@ const MainApp: React.FC = () => {
           />
         </View>
       </View>
+    )}
 
       {/* Modals Stack */}
       <AddTransactionModal

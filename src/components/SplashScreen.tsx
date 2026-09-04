@@ -65,7 +65,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     anim2.start();
     anim3.start();
 
-    // 3. Smooth exit after 1250ms duration (1.25s total display)
+    // 3. Smooth exit after 2000ms duration (extended by 250ms)
     const timer = setTimeout(() => {
       Animated.timing(exitFadeAnim, {
         toValue: 0,
@@ -75,7 +75,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       }).start(() => {
         onFinish();
       });
-    }, 1250);
+    }, 2000);
 
     return () => {
       clearTimeout(timer);
@@ -90,14 +90,14 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       style={[
         styles.container,
         {
-          backgroundColor: isDarkMode ? '#191C1D' : '#F8F9FA',
+          backgroundColor: theme.background,
           opacity: exitFadeAnim,
         },
       ]}
     >
       <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#191C1D' : '#F8F9FA'}
+        barStyle={theme.statusBar === 'dark' ? 'dark-content' : 'light-content'}
+        backgroundColor={theme.background}
       />
 
       {/* Center Brand Identity */}
@@ -125,7 +125,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
         </Animated.View>
 
         <Text style={[styles.title, { color: theme.primary }]}>Finora</Text>
-        <Text style={[styles.subtitle, { color: isDarkMode ? '#94A3B8' : '#5F6368' }]}>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           Smart Business Ledger
         </Text>
       </Animated.View>
@@ -185,7 +185,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
             ]}
           />
         </View>
-        <Text style={[styles.syncText, { color: isDarkMode ? '#94A3B8' : '#80868B' }]}>
+        <Text style={[styles.syncText, { color: theme.textMuted }]}>
           SYNCING DATA
         </Text>
       </View>
@@ -196,7 +196,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 9999,
+    zIndex: 99999,
+    elevation: 99999,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -205,26 +206,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoBadge: {
-    width: 42,
-    height: 42,
+    width: 104,
+    height: 104,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
     backgroundColor: 'transparent',
   },
   logoImage: {
-    width: 42,
-    height: 42,
+    width: 96,
+    height: 96,
     backgroundColor: 'transparent',
   },
   title: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
     letterSpacing: -0.4,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     letterSpacing: 0.1,
   },
