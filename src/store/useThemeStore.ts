@@ -1,16 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Appearance } from 'react-native';
 import { ThemeColors, lightTheme, darkTheme } from '../constants/theme';
 
-export const THEME_STORAGE_KEY = '@finora_theme_preference_v2';
-
-// Detect initial system theme on device
-const getSystemIsDark = (): boolean => {
-  const scheme = Appearance.getColorScheme();
-  return scheme === 'dark';
-};
+export const THEME_STORAGE_KEY = '@finora_theme_preference_v3';
 
 interface ThemeState {
   isDarkMode: boolean;
@@ -27,18 +20,17 @@ interface ThemeState {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
-      // 1. Initial state before storage hydration
-      isDarkMode: getSystemIsDark(),
+      // 1. Initial default state: ALWAYS Light Theme on first install
+      isDarkMode: false,
       hasUserOverride: false,
       isHydrated: false,
-      theme: getSystemIsDark() ? darkTheme : lightTheme,
+      theme: lightTheme,
 
       // 2. When user toggles theme, save explicit choice forever
       toggleTheme: () =>
         set((state) => {
           const nextMode = !state.isDarkMode;
           const nextTheme = nextMode ? darkTheme : lightTheme;
-          // Asynchronously ensure storage write
           AsyncStorage.setItem(
             THEME_STORAGE_KEY,
             JSON.stringify({
@@ -90,19 +82,18 @@ export const useThemeStore = create<ThemeState>()(
         }),
 
       resetToSystemTheme: () => {
-        const isDark = getSystemIsDark();
         AsyncStorage.setItem(
           THEME_STORAGE_KEY,
           JSON.stringify({
-            state: { isDarkMode: isDark, hasUserOverride: false },
+            state: { isDarkMode: false, hasUserOverride: false },
             version: 0,
           })
         ).catch(() => {});
 
         set(() => ({
-          isDarkMode: isDark,
+          isDarkMode: false,
           hasUserOverride: false,
-          theme: isDark ? darkTheme : lightTheme,
+          theme: lightTheme,
         }));
       },
 
@@ -116,25 +107,22 @@ export const useThemeStore = create<ThemeState>()(
         hasUserOverride: state.hasUserOverride,
       }),
       onRehydrateStorage: () => (state, error) => {
-        if (!error && state) {
-          if (!state.hasUserOverride) {
-            const systemIsDark = getSystemIsDark();
-            useThemeStore.setState({
-              isDarkMode: systemIsDark,
-              hasUserOverride: false,
-              isHydrated: true,
-              theme: systemIsDark ? darkTheme : lightTheme,
-            });
-          } else {
-            useThemeStore.setState({
-              isDarkMode: state.isDarkMode,
-              hasUserOverride: true,
-              isHydrated: true,
-              theme: state.isDarkMode ? darkTheme : lightTheme,
-            });
-          }
+        if (!error && state && state.hasUserOverride && typeof state.isDarkMode === 'boolean') {
+          // User previously changed theme: restore user's exact chosen theme
+          useThemeStore.setState({
+            isDarkMode: state.isDarkMode,
+            hasUserOverride: true,
+            isHydrated: true,
+            theme: state.isDarkMode ? darkTheme : lightTheme,
+          });
         } else {
-          useThemeStore.setState({ isHydrated: true });
+          // First time install: always default to Light Theme
+          useThemeStore.setState({
+            isDarkMode: false,
+            hasUserOverride: false,
+            isHydrated: true,
+            theme: lightTheme,
+          });
         }
       },
     }
@@ -150,12 +138,11 @@ export async function initializeThemeSync(): Promise<boolean> {
     if (raw) {
       const parsed = JSON.parse(raw);
       const savedState = parsed?.state;
-      if (savedState && typeof savedState.isDarkMode === 'boolean') {
+      if (savedState && savedState.hasUserOverride && typeof savedState.isDarkMode === 'boolean') {
         const isDark = savedState.isDarkMode;
-        const hasOverride = Boolean(savedState.hasUserOverride);
         useThemeStore.setState({
           isDarkMode: isDark,
-          hasUserOverride: hasOverride,
+          hasUserOverride: true,
           isHydrated: true,
           theme: isDark ? darkTheme : lightTheme,
         });
@@ -165,21 +152,15 @@ export async function initializeThemeSync(): Promise<boolean> {
   } catch (e) {
     console.warn('Theme preloader error:', e);
   }
-  useThemeStore.setState({ isHydrated: true });
+  // Default to light theme on fresh install
+  useThemeStore.setState({
+    isDarkMode: false,
+    hasUserOverride: false,
+    isHydrated: true,
+    theme: lightTheme,
+  });
   return false;
 }
 
 // Proactive immediate load
 initializeThemeSync();
-
-// Listen to Android / iOS system theme changes ONLY if user hasn't chosen an explicit theme
-Appearance.addChangeListener(({ colorScheme }) => {
-  const store = useThemeStore.getState();
-  if (store.isHydrated && !store.hasUserOverride) {
-    const isDark = colorScheme === 'dark';
-    useThemeStore.setState({
-      isDarkMode: isDark,
-      theme: isDark ? darkTheme : lightTheme,
-    });
-  }
-});

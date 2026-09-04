@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Transaction } from '../types/ledger';
 import { useTheme } from '../context/ThemeContext';
@@ -119,6 +119,15 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction,
                 </>
               )}
             </View>
+
+            {Boolean(transaction.note && transaction.note.trim()) && (
+              <View style={styles.noteContainer}>
+                <Ionicons name="chatbox-ellipses-outline" size={11} color={theme.textMuted} />
+                <Text style={[styles.noteText, { color: theme.textSecondary }]} numberOfLines={1}>
+                  {transaction.note?.trim()}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           {/* Right Group: Amount, Timestamp & Options Action */}
@@ -204,21 +213,26 @@ export const TransactionItem = React.memo(TransactionItemComponent);
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1.5,
   },
   leftIndicator: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
-    width: 4,
+    width: 4.5,
     zIndex: 2,
   },
   innerContent: {
-    paddingVertical: 12,
+    paddingVertical: 13,
     paddingHorizontal: 14,
     paddingLeft: 16,
     gap: 8,
@@ -231,17 +245,17 @@ const styles = StyleSheet.create({
   typeFlowCol: {
     flex: 1,
     marginRight: 10,
-    gap: 3,
+    gap: 3.5,
   },
   typeLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 4.5,
   },
   typeLabel: {
     fontSize: 10.5,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
   offlinePill: {
@@ -261,13 +275,25 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   monoNumber: {
-    fontFamily: 'monospace',
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 13.5,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   flowArrow: {
-    marginHorizontal: 4,
+    marginHorizontal: 5,
+  },
+  noteContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 4,
+    paddingVertical: 1,
+  },
+  noteText: {
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
   },
   rightGroup: {
     flexDirection: 'row',
@@ -277,60 +303,60 @@ const styles = StyleSheet.create({
   },
   amountCol: {
     alignItems: 'flex-end',
-    gap: 1.5,
+    gap: 2,
   },
   optionsBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
   amountText: {
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: -0.2,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   dateText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '500',
   },
   bottomStrip: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 7,
+    paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    marginTop: 2,
+    marginTop: 3,
   },
   breakdownGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   metaText: {
-    fontSize: 11,
+    fontSize: 11.5,
   },
   metaBold: {
     fontWeight: '700',
-    fontFamily: 'monospace',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   profitGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2.5,
+    gap: 3,
   },
   metaProfit: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '600',
   },
   metaProfitBold: {
     fontWeight: '800',
-    fontFamily: 'monospace',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   runningBalanceText: {
-    fontSize: 10.5,
-    fontWeight: '500',
-    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
 });

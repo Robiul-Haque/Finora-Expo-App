@@ -444,11 +444,11 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingTop: 0,
-    paddingBottom: 105,
+    paddingTop: 8,
+    paddingBottom: 110,
   },
   itemSeparator: {
-    height: 10,
+    height: 12,
   },
   emptyContainer: {
     alignItems: 'center',

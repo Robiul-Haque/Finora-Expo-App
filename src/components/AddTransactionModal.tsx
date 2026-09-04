@@ -165,21 +165,14 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
 
   const selectedAccount = activeAccounts.find((a) => a.id === accountId) || activeAccounts[0];
 
-  // Pure fee calculator based on business rules for send money / cash out / receive
+  // Cost and margin calculator aligned with Google Sheet MFS ledger
   const calculateDefaultFees = (val: string, targetType: 'send' | 'receive' | 'cash_out' | 'adjustment') => {
     const num = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
     if (num <= 0 || targetType === 'adjustment') {
       return { cost: '0', profit: '0' };
     }
-    if (targetType === 'send' || targetType === 'cash_out') {
-      const estimatedCost = Math.round(num * 0.015);
-      const estimatedProfit = Math.round(num * 0.005);
-      return { cost: String(estimatedCost), profit: String(estimatedProfit) };
-    }
-    if (targetType === 'receive') {
-      const estimatedProfit = Math.round(num * 0.02);
-      return { cost: '0', profit: String(estimatedProfit) };
-    }
+    // In MFS agent ledger, balance is only debited by transaction amount (cost = 0)
+    // Margin/profit is earned income, not a cost deduction
     return { cost: '0', profit: '0' };
   };
 

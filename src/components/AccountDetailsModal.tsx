@@ -362,48 +362,54 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
                 {groupedTransactions.TODAY.length > 0 && (
                   <View style={styles.groupContainer}>
                     <Text style={[styles.groupHeading, { color: theme.textMuted }]}>TODAY</Text>
-                    {groupedTransactions.TODAY.map((t) => (
-                      <TransactionItem
-                        key={t.id}
-                        transaction={t}
-                        onOptionsPress={(tx) => {
-                          setSelectedTxForAction(tx);
-                          setShowTxOptionsMenu(true);
-                        }}
-                      />
-                    ))}
+                    <View style={styles.groupCardsList}>
+                      {groupedTransactions.TODAY.map((t) => (
+                        <TransactionItem
+                          key={t.id}
+                          transaction={t}
+                          onOptionsPress={(tx) => {
+                            setSelectedTxForAction(tx);
+                            setShowTxOptionsMenu(true);
+                          }}
+                        />
+                      ))}
+                    </View>
                   </View>
                 )}
 
                 {groupedTransactions.YESTERDAY.length > 0 && (
                   <View style={styles.groupContainer}>
                     <Text style={[styles.groupHeading, { color: theme.textMuted }]}>YESTERDAY</Text>
-                    {groupedTransactions.YESTERDAY.map((t) => (
-                      <TransactionItem
-                        key={t.id}
-                        transaction={t}
-                        onOptionsPress={(tx) => {
-                          setSelectedTxForAction(tx);
-                          setShowTxOptionsMenu(true);
-                        }}
-                      />
-                    ))}
+                    <View style={styles.groupCardsList}>
+                      {groupedTransactions.YESTERDAY.map((t) => (
+                        <TransactionItem
+                          key={t.id}
+                          transaction={t}
+                          onOptionsPress={(tx) => {
+                            setSelectedTxForAction(tx);
+                            setShowTxOptionsMenu(true);
+                          }}
+                        />
+                      ))}
+                    </View>
                   </View>
                 )}
 
                 {groupedTransactions.EARLIER.length > 0 && (
                   <View style={styles.groupContainer}>
                     <Text style={[styles.groupHeading, { color: theme.textMuted }]}>EARLIER</Text>
-                    {groupedTransactions.EARLIER.map((t) => (
-                      <TransactionItem
-                        key={t.id}
-                        transaction={t}
-                        onOptionsPress={(tx) => {
-                          setSelectedTxForAction(tx);
-                          setShowTxOptionsMenu(true);
-                        }}
-                      />
-                    ))}
+                    <View style={styles.groupCardsList}>
+                      {groupedTransactions.EARLIER.map((t) => (
+                        <TransactionItem
+                          key={t.id}
+                          transaction={t}
+                          onOptionsPress={(tx) => {
+                            setSelectedTxForAction(tx);
+                            setShowTxOptionsMenu(true);
+                          }}
+                        />
+                      ))}
+                    </View>
                   </View>
                 )}
               </>
@@ -775,10 +781,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   groupContainer: {
-    marginBottom: 14,
+    marginBottom: 16,
+  },
+  groupCardsList: {
+    gap: 10,
   },
   groupHeading: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.6,
     textTransform: 'uppercase',

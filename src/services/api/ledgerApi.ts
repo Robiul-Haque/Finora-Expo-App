@@ -5,9 +5,9 @@ import syncServiceInstance, { syncService as namedSyncService } from '../sync/sy
 const syncService = syncServiceInstance || namedSyncService;
 import { parseDate, isSameDay, isSameMonth } from '../../utils/formatters';
 
-const ACCOUNTS_STORAGE_KEY = '@finora_accounts_v3';
-const TRANSACTIONS_STORAGE_KEY = '@finora_transactions_v3';
-const DAILY_PROFITS_STORAGE_KEY = '@finora_daily_profits_v3';
+const ACCOUNTS_STORAGE_KEY = '@finora_accounts_v4';
+const TRANSACTIONS_STORAGE_KEY = '@finora_transactions_v4';
+const DAILY_PROFITS_STORAGE_KEY = '@finora_daily_profits_v4';
 
 const sanitizeTransactions = (txList: Transaction[]): Transaction[] => {
   return txList.map((t) => {
@@ -136,9 +136,24 @@ export const ledgerApi = {
         const queryParams = options ? `?page=${options.page || 1}&limit=${options.limit || 50}` : '';
         const rawTxs = await httpRequest<Transaction[]>(`/transactions${queryParams}`);
         if (Array.isArray(rawTxs) && rawTxs.length > 0) {
-          const transactions = sanitizeTransactions(rawTxs);
-          await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
-          return transactions;
+          const serverTxs = sanitizeTransactions(rawTxs);
+          const localData = await AsyncStorage.getItem(TRANSACTIONS_STORAGE_KEY);
+          let mergedTxs = serverTxs;
+          if (localData) {
+            try {
+              const localTxs: Transaction[] = JSON.parse(localData);
+              const pendingTxs = localTxs.filter((t) => t.syncStatus === 'pending');
+              if (pendingTxs.length > 0) {
+                const serverIdSet = new Set(serverTxs.map((t) => t.id));
+                const pendingToPrepend = pendingTxs.filter((p) => !serverIdSet.has(p.id));
+                mergedTxs = [...pendingToPrepend, ...serverTxs];
+              }
+            } catch {
+              // Graceful fallback
+            }
+          }
+          await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(mergedTxs));
+          return mergedTxs;
         }
       } catch {
         // Fallback to local cache on API failure
