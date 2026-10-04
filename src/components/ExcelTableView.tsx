@@ -62,9 +62,6 @@ interface ExcelTableRowProps {
   textSecondaryColor: string;
   dangerColor: string;
   primaryColor: string;
-  highlightedBgColor: string;
-  highlightedBorderColor: string;
-  highlightedTextColor: string;
   altRowBgColor: string;
   gridBorderColor: string;
   onSelectAccount: (account: Account) => void;
@@ -79,27 +76,22 @@ const ExcelTableRow = React.memo<ExcelTableRowProps>(({
   textSecondaryColor,
   dangerColor,
   primaryColor,
-  highlightedBgColor,
-  highlightedBorderColor,
-  highlightedTextColor,
   altRowBgColor,
   gridBorderColor,
   onSelectAccount,
   onAddTransaction,
 }) => {
-  const isHighlighted = account.isHighlighted || account.group === 'secondary';
   const used = account.monthlyLimitUsed !== undefined ? account.monthlyLimitUsed : account.todaySend;
   const totalLimit = account.monthlyLimit || 300000;
   const remaining =
     account.remainingLimit !== undefined ? account.remainingLimit : Math.max(0, totalLimit - used);
   const isLowLimit = remaining <= 30000;
   const dailyLimitVal = account.dailyLimit !== undefined ? account.dailyLimit : 300000;
+  const isLowBalance = account.balance < 5000;
+  const usedRatio = dailyLimitVal > 0 ? used / dailyLimitVal : 0;
+  const isHighUsed = usedRatio >= 0.85;
 
-  const rowBg = isHighlighted
-    ? highlightedBgColor
-    : index % 2 === 1
-    ? altRowBgColor
-    : 'transparent';
+  const rowBg = index % 2 === 1 ? altRowBgColor : 'transparent';
 
   return (
     <TouchableOpacity
@@ -107,7 +99,7 @@ const ExcelTableRow = React.memo<ExcelTableRowProps>(({
         styles.row,
         {
           backgroundColor: rowBg,
-          borderBottomColor: isHighlighted ? highlightedBorderColor : gridBorderColor,
+          borderBottomColor: gridBorderColor,
         },
       ]}
       onPress={() => onSelectAccount(account)}
@@ -116,15 +108,12 @@ const ExcelTableRow = React.memo<ExcelTableRowProps>(({
       {/* SIM Number: First 4 + Last 4 */}
       <View style={[styles.cell, styles.colNumber]}>
         <View style={styles.numberRow}>
-          {isHighlighted && (
-            <View style={[styles.highlightPill, { backgroundColor: isDarkMode ? '#F59E0B' : '#D97706' }]} />
-          )}
           <Text
             style={[
               styles.monoNumberText,
               {
-                color: isHighlighted ? highlightedTextColor : textColor,
-                fontWeight: isHighlighted ? '700' : '600',
+                color: textColor,
+                fontWeight: '600',
               },
             ]}
             numberOfLines={1}
@@ -142,8 +131,8 @@ const ExcelTableRow = React.memo<ExcelTableRowProps>(({
           style={[
             styles.monoAmountText,
             {
-              color: isHighlighted ? highlightedTextColor : textColor,
-              fontWeight: '700',
+              color: isLowBalance ? dangerColor : textColor,
+              fontWeight: isLowBalance ? '700' : '700',
             },
           ]}
           numberOfLines={1}
@@ -160,7 +149,7 @@ const ExcelTableRow = React.memo<ExcelTableRowProps>(({
           style={[
             styles.monoAmountText,
             {
-              color: isHighlighted ? highlightedTextColor : textSecondaryColor,
+              color: textSecondaryColor,
               fontWeight: '600',
             },
           ]}
@@ -178,8 +167,8 @@ const ExcelTableRow = React.memo<ExcelTableRowProps>(({
           style={[
             styles.monoAmountText,
             {
-              color: isHighlighted ? highlightedTextColor : textSecondaryColor,
-              fontWeight: '500',
+              color: isHighUsed ? dangerColor : textSecondaryColor,
+              fontWeight: isHighUsed ? '700' : '500',
             },
           ]}
           numberOfLines={1}
@@ -196,7 +185,7 @@ const ExcelTableRow = React.memo<ExcelTableRowProps>(({
           style={[
             styles.monoAmountText,
             {
-              color: isLowLimit ? dangerColor : isHighlighted ? highlightedTextColor : textColor,
+              color: isLowLimit ? dangerColor : textColor,
               fontWeight: isLowLimit ? '700' : '600',
             },
           ]}
@@ -314,9 +303,6 @@ export const ExcelTableView: React.FC<ExcelTableViewProps> = ({
   const gridBorderColor = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0';
   const headerBgColor = isDarkMode ? '#20242B' : '#F1F5F9';
   const altRowBgColor = isDarkMode ? 'rgba(255, 255, 255, 0.025)' : '#F8FAFC';
-  const highlightedBgColor = isDarkMode ? 'rgba(217, 119, 6, 0.22)' : '#FEF3C7';
-  const highlightedBorderColor = isDarkMode ? 'rgba(217, 119, 6, 0.35)' : '#FDE68A';
-  const highlightedTextColor = isDarkMode ? '#FCD34D' : '#92400E';
 
   return (
     <View style={[styles.container, { backgroundColor: theme.card, borderColor: gridBorderColor }]}>
@@ -379,14 +365,14 @@ export const ExcelTableView: React.FC<ExcelTableViewProps> = ({
               </View>
             </TouchableOpacity>
 
-            {/* Limit Left Column - Centered */}
+            {/* Monthly Limit Column - Centered */}
             <TouchableOpacity
               style={[styles.headerCell, styles.colRemaining]}
               onPress={() => handleSort('remaining')}
               activeOpacity={0.7}
             >
               <View style={styles.headerTitleRowCenter}>
-                <Text style={[styles.headerMainText, { color: theme.text }]}>LIMIT LEFT</Text>
+                <Text style={[styles.headerMainText, { color: theme.text }]}>MONTHLY LIMIT</Text>
                 {getSortIcon('remaining')}
               </View>
             </TouchableOpacity>
@@ -400,7 +386,7 @@ export const ExcelTableView: React.FC<ExcelTableViewProps> = ({
           {/* Spreadsheet Data Rows */}
           {sortedAccounts.map((account, index) => (
             <ExcelTableRow
-              key={account.id}
+              key={account.id || account.accountNumber || String(index)}
               account={account}
               index={index}
               isDarkMode={isDarkMode}
@@ -408,9 +394,6 @@ export const ExcelTableView: React.FC<ExcelTableViewProps> = ({
               textSecondaryColor={theme.textSecondary}
               dangerColor={theme.danger}
               primaryColor={theme.primary}
-              highlightedBgColor={highlightedBgColor}
-              highlightedBorderColor={highlightedBorderColor}
-              highlightedTextColor={highlightedTextColor}
               altRowBgColor={altRowBgColor}
               gridBorderColor={gridBorderColor}
               onSelectAccount={onSelectAccount}
@@ -491,12 +474,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 2,
     elevation: 1,
+    marginBottom: 8,
   },
   scrollContent: {
     minWidth: '100%',
   },
   tableInner: {
-    minWidth: 504,
+    minWidth: 512,
   },
   headerRow: {
     flexDirection: 'row',
@@ -564,8 +548,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   colRemaining: {
-    width: 96,
-    paddingHorizontal: 4,
+    width: 104,
+    paddingHorizontal: 3,
     alignItems: 'center',
     justifyContent: 'center',
   },

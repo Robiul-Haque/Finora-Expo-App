@@ -112,6 +112,10 @@ const MainApp: React.FC = () => {
     setAddAccountVisible(true);
   }, []);
 
+  // Equal outer gap for floating bottom navigation bar
+  const menuOuterGap = 16;
+  const menuBottomGap = insets.bottom > 0 ? insets.bottom + 8 : menuOuterGap;
+
   return (
     <View style={[styles.rootContainer, { backgroundColor: theme.background }]}>
       <StatusBar
@@ -156,7 +160,13 @@ const MainApp: React.FC = () => {
       {/* Modern Floating Island Bottom Navigation Bar - hidden during splash */}
       {!showSplash && (
         <View
-          style={[styles.floatingBarWrapper, { paddingBottom: Math.max(insets.bottom, 12) }]}
+          style={[
+            styles.floatingBarWrapper,
+            {
+              paddingHorizontal: menuOuterGap,
+              paddingBottom: menuBottomGap,
+            },
+          ]}
           pointerEvents="box-none"
         >
         <View
@@ -293,8 +303,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
-    paddingTop: 4,
     backgroundColor: 'transparent',
     zIndex: 90,
     alignItems: 'center',

@@ -116,7 +116,7 @@ export const ExcelTableSkeleton: React.FC = () => {
   return (
     <View style={[styles.tableContainer, { backgroundColor: theme.card, borderColor }]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tableInner}>
-        <View style={{ width: 504 }}>
+        <View style={{ width: 512 }}>
           {/* Header Row */}
           <View style={[styles.tableHeaderRow, { backgroundColor: headerBg, borderBottomColor: borderColor }]}>
             <View style={[styles.colNumber, { alignItems: 'flex-start' }]}>
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   colBalance: { width: 88, paddingHorizontal: 4, justifyContent: 'center' },
   colDailyLimit: { width: 98, paddingHorizontal: 4, justifyContent: 'center' },
   colUsed: { width: 80, paddingHorizontal: 4, justifyContent: 'center' },
-  colRemaining: { width: 96, paddingHorizontal: 4, justifyContent: 'center' },
+  colRemaining: { width: 104, paddingHorizontal: 3, justifyContent: 'center' },
   colAction: { width: 48, paddingRight: 8, justifyContent: 'center' },
   accountCardSkeleton: {
     borderRadius: 14,

@@ -53,9 +53,9 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
     const result = !q
       ? accounts
       : accounts.filter((acc) =>
-          acc.name.toLowerCase().includes(q) ||
-          acc.accountNumber.toLowerCase().includes(q)
-        );
+        acc.name.toLowerCase().includes(q) ||
+        acc.accountNumber.toLowerCase().includes(q)
+      );
 
     switch (sortOption) {
       case 'balance_desc':
@@ -68,6 +68,7 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
         return result;
     }
   }, [accounts, searchQuery, sortOption]);
+
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top']}>
@@ -154,10 +155,10 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
             badge:
               sortOption === 'balance_desc'
                 ? {
-                    text: 'Active',
-                    color: theme.primary,
-                    bg: isDarkMode ? 'rgba(26, 115, 232, 0.2)' : theme.primaryLight,
-                  }
+                  text: 'Active',
+                  color: theme.primary,
+                  bg: isDarkMode ? 'rgba(26, 115, 232, 0.2)' : theme.primaryLight,
+                }
                 : undefined,
             onPress: () => setSortOption('balance_desc'),
           },
@@ -168,10 +169,10 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
             badge:
               sortOption === 'balance_asc'
                 ? {
-                    text: 'Active',
-                    color: theme.primary,
-                    bg: isDarkMode ? 'rgba(26, 115, 232, 0.2)' : theme.primaryLight,
-                  }
+                  text: 'Active',
+                  color: theme.primary,
+                  bg: isDarkMode ? 'rgba(26, 115, 232, 0.2)' : theme.primaryLight,
+                }
                 : undefined,
             onPress: () => setSortOption('balance_asc'),
           },
@@ -182,10 +183,10 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
             badge:
               sortOption === 'limit_asc'
                 ? {
-                    text: 'Active',
-                    color: theme.primary,
-                    bg: isDarkMode ? 'rgba(26, 115, 232, 0.2)' : theme.primaryLight,
-                  }
+                  text: 'Active',
+                  color: theme.primary,
+                  bg: isDarkMode ? 'rgba(26, 115, 232, 0.2)' : theme.primaryLight,
+                }
                 : undefined,
             onPress: () => setSortOption('limit_asc'),
           },
@@ -232,7 +233,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: 10,
     paddingTop: 8,
-    paddingBottom: 70,
+    paddingBottom: 90,
   },
   bounceContainer: {
     gap: 12,
