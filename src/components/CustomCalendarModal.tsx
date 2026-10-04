@@ -24,7 +24,7 @@ const CustomCalendarModalComponent: React.FC<CustomCalendarModalProps> = ({
   onSelectDate,
   onClose,
 }) => {
-  const { theme, isDarkMode } = useTheme();
+  const { theme } = useTheme();
   const [pickerViewMonth, setPickerViewMonth] = useState<Date>(selectedDate || new Date());
 
   const isClosing = useRef(false);

@@ -109,7 +109,21 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
       openingBalance: true,
     });
 
-    if (!phoneNumber.trim() || !validation.isValid) {
+    if (!phoneNumber.trim()) {
+      Alert.alert('Phone Number Required', 'Please enter a valid phone number.');
+      return;
+    }
+
+    if (validation.errors.accountNumber) {
+      Alert.alert(
+        'Duplicate Number',
+        validation.errors.accountNumber,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (!validation.isValid) {
       return;
     }
 
@@ -137,8 +151,8 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
       setOpeningBalance('');
       setAccountLabel('');
       handleClose();
-    } catch {
-      // Inline state fallback
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to add account.');
     } finally {
       setIsSubmitting(false);
     }
@@ -200,7 +214,10 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
                   styles.inputBox,
                   {
                     backgroundColor: theme.inputBg,
-                    borderColor: touched.phoneNumber && !phoneNumber.trim() ? theme.danger : theme.border,
+                    borderColor:
+                      touched.phoneNumber && validation.errors.accountNumber
+                        ? theme.danger
+                        : theme.border,
                   },
                 ]}
               >
@@ -221,9 +238,12 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
                 />
               </TouchableOpacity>
               {touched.phoneNumber && validation.errors.accountNumber && (
-                <Text style={[styles.inlineWarning, { color: theme.danger }]}>
-                  {validation.errors.accountNumber}
-                </Text>
+                <View style={styles.warningContainer}>
+                  <Ionicons name="alert-circle" size={14} color={theme.danger} />
+                  <Text style={[styles.inlineWarning, { color: theme.danger }]}>
+                    {validation.errors.accountNumber}
+                  </Text>
+                </View>
               )}
             </View>
 
@@ -444,10 +464,15 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     fontWeight: '700',
   },
-  inlineWarning: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    marginTop: 4,
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 5,
     paddingLeft: 2,
+  },
+  inlineWarning: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

@@ -320,7 +320,9 @@ export const initialAccounts: Account[] = [
     "isActive": true,
     "color": "#EA580C",
     "createdAt": "2026-08-01T00:00:00.000Z",
-    "syncStatus": "synced"
+    "syncStatus": "synced",
+    "isHighlighted": true,
+    "group": "secondary"
   },
   {
     "id": "acc_17",
@@ -341,7 +343,9 @@ export const initialAccounts: Account[] = [
     "isActive": true,
     "color": "#EA580C",
     "createdAt": "2026-08-01T00:00:00.000Z",
-    "syncStatus": "synced"
+    "syncStatus": "synced",
+    "isHighlighted": true,
+    "group": "secondary"
   },
   {
     "id": "acc_18",
@@ -362,7 +366,9 @@ export const initialAccounts: Account[] = [
     "isActive": true,
     "color": "#1A73E8",
     "createdAt": "2026-08-01T00:00:00.000Z",
-    "syncStatus": "synced"
+    "syncStatus": "synced",
+    "isHighlighted": true,
+    "group": "secondary"
   },
   {
     "id": "acc_19",
@@ -383,7 +389,9 @@ export const initialAccounts: Account[] = [
     "isActive": true,
     "color": "#DC2626",
     "createdAt": "2026-08-01T00:00:00.000Z",
-    "syncStatus": "synced"
+    "syncStatus": "synced",
+    "isHighlighted": true,
+    "group": "secondary"
   }
 ];
 

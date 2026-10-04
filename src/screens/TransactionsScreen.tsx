@@ -4,13 +4,9 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  ScrollView,
   TouchableOpacity,
-  TextInput,
   ActivityIndicator,
   Platform,
-  Animated,
-  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,29 +22,22 @@ import {
   ActionSheetModal,
   AppHeader,
 } from '../components';
-import { useBounceScroll } from '../hooks';
 import { Transaction } from '../types';
 import { parseDate } from '../utils';
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 35;
 
 interface TransactionsScreenProps {
   onOpenAddTransaction?: () => void;
 }
 
-const STITCH_FILTER_CHIPS: { label: string; value: string }[] = [
-  { label: 'All', value: 'all' },
-  { label: 'Send Money', value: 'sm' },
-  { label: 'Receive Money', value: 'recev' },
-  { label: 'Balance Adjustment', value: 'adjustment' },
-];
-
-const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpenAddTransaction }) => {
-  const { theme, isDarkMode, toggleTheme } = useTheme();
-  const { transactions, isLoading, filters, setFilters, deleteTransaction, refetch } = useLedger();
-  const { scrollProps, bounceStyle } = useBounceScroll();
+const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = () => {
+  const { theme } = useTheme();
+  const { transactions, isLoading, filters, deleteTransaction, refetch } = useLedger();
 
   const [searchQuery, setSearchQuery] = useState('');
+  // Use React 18 deferred value to keep typing silky-smooth with 10,000+ items
+  const deferredSearchQuery = React.useDeferredValue(searchQuery);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [displayedCount, setDisplayedCount] = useState(PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -88,6 +77,18 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpen
     const startOfWeek = startOfToday - 7 * 86400000;
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
+    const q = deferredSearchQuery.toLowerCase().trim();
+    // Cache timestamps with WeakMap to avoid expensive repeated Date parsing during sort O(N log N)
+    const timeMap = new WeakMap<Transaction, number>();
+    const getTxTime = (t: Transaction): number => {
+      let time = timeMap.get(t);
+      if (time === undefined) {
+        time = parseDate(t.date).getTime();
+        timeMap.set(t, time);
+      }
+      return time;
+    };
+
     const list = transactions.filter((t) => {
       // 1. Account Filter
       if (filters.accountId && filters.accountId !== 'all' && t.accountId !== filters.accountId && t.accountNumber !== filters.accountId) {
@@ -109,7 +110,7 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpen
 
       // 3. Date Range Filter
       if (filters.dateRange && filters.dateRange !== 'all') {
-        const tTime = parseDate(t.date).getTime();
+        const tTime = getTxTime(t);
         if (filters.dateRange === 'today' && tTime < startOfToday) return false;
         if (filters.dateRange === 'yesterday' && (tTime < startOfYesterday || tTime >= startOfToday)) return false;
         if (filters.dateRange === 'this_week' && tTime < startOfWeek) return false;
@@ -117,7 +118,6 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpen
       }
 
       // 4. Search Query match
-      const q = searchQuery.toLowerCase().trim();
       if (q) {
         const matchesQuery =
           (t.accountNumber && t.accountNumber.toLowerCase().includes(q)) ||
@@ -133,11 +133,11 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpen
       return true;
     });
 
-    // 5. Sorting
-    if (filters.sortBy === 'newest') {
-      list.sort((a, b) => parseDate(b.date).getTime() - parseDate(a.date).getTime());
+    // 5. High-speed Sorting using cached timestamps
+    if (!filters.sortBy || filters.sortBy === 'newest') {
+      list.sort((a, b) => getTxTime(b) - getTxTime(a));
     } else if (filters.sortBy === 'oldest') {
-      list.sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime());
+      list.sort((a, b) => getTxTime(a) - getTxTime(b));
     } else if (filters.sortBy === 'amount_high') {
       list.sort((a, b) => b.amount - a.amount);
     } else if (filters.sortBy === 'amount_low') {
@@ -147,17 +147,7 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpen
     }
 
     return list;
-  }, [transactions, filters, searchQuery]);
-
-  const paginationTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (paginationTimerRef.current) {
-        clearTimeout(paginationTimerRef.current);
-      }
-    };
-  }, []);
+  }, [transactions, filters, deferredSearchQuery]);
 
   const visibleTransactions = useMemo(() => {
     return filteredTransactions.slice(0, displayedCount);
@@ -165,14 +155,14 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpen
 
   const hasMore = displayedCount < filteredTransactions.length;
 
+  // Instant seamless pre-fetching: user NEVER has to wait when scrolling near the end
   const handleEndReached = useCallback(() => {
     if (!hasMore || isLoadingMore) return;
     setIsLoadingMore(true);
-    if (paginationTimerRef.current) clearTimeout(paginationTimerRef.current);
-    paginationTimerRef.current = setTimeout(() => {
+    requestAnimationFrame(() => {
       setDisplayedCount((prev) => Math.min(prev + PAGE_SIZE, filteredTransactions.length));
       setIsLoadingMore(false);
-    }, 150);
+    });
   }, [hasMore, isLoadingMore, filteredTransactions.length]);
 
   const handleConfirmDelete = () => {
@@ -255,15 +245,19 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpen
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={renderItemSeparator}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={10}
-        maxToRenderPerBatch={8}
-        windowSize={5}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        initialNumToRender={15}
+        maxToRenderPerBatch={15}
+        updateCellsBatchingPeriod={40}
+        windowSize={7}
         removeClippedSubviews={Platform.OS === 'android'}
         onEndReached={handleEndReached}
-        onEndReachedThreshold={0.4}
+        onEndReachedThreshold={0.8}
         ListEmptyComponent={
           isLoading && transactions.length === 0 ? (
-            <View style={{ gap: 8 }}>
+            <View style={{ gap: 10 }}>
+              <TransactionItemSkeleton />
               <TransactionItemSkeleton />
               <TransactionItemSkeleton />
               <TransactionItemSkeleton />
@@ -283,8 +277,8 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = ({ onOpen
         }
         ListFooterComponent={
           isLoadingMore ? (
-            <View style={styles.loadingMore}>
-              <ActivityIndicator size="small" color={theme.primary} />
+            <View style={{ paddingTop: 8, paddingBottom: 80 }}>
+              <TransactionItemSkeleton />
             </View>
           ) : (
             <View style={{ height: 80 }} />

@@ -6,7 +6,6 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
-  TouchableWithoutFeedback,
   Animated,
   Easing,
 } from 'react-native';
@@ -155,9 +154,14 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
 
                 <View style={styles.headerRow}>
                   <Text style={[styles.headerTitle, { color: theme.text }]}>Filters</Text>
-                  <TouchableOpacity onPress={handleClose} style={styles.closeBtn} activeOpacity={0.7}>
-                    <Ionicons name="close" size={20} color={theme.textSecondary} />
-                  </TouchableOpacity>
+                  <View style={styles.headerActions}>
+                    <TouchableOpacity onPress={handleReset} activeOpacity={0.7} style={styles.resetBtn}>
+                      <Text style={[styles.resetBtnText, { color: theme.primary }]}>Reset</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleClose} style={styles.closeBtn} activeOpacity={0.7}>
+                      <Ionicons name="close" size={20} color={theme.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
 
@@ -441,6 +445,19 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 16,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  resetBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  resetBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
   scrollBody: {
     paddingHorizontal: 16,
   },
@@ -562,18 +579,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 24,
     borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  resetBtn: {
-    flex: 1,
-    height: 46,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  resetBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   applyBtn: {
     flex: 2,

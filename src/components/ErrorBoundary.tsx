@@ -23,7 +23,8 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Gracefully catch rendering errors without throwing unhandled exceptions
+    // Gracefully catch and log rendering errors
+    console.warn('ErrorBoundary caught error:', error?.message || error, errorInfo?.componentStack);
   }
 
   private handleReset = () => {

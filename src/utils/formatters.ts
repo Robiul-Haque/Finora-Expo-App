@@ -2,13 +2,28 @@
  * Shared formatting utilities for Finora Expo App
  */
 
+// Bounded cache to avoid expensive Intl/toLocaleString calls during large list rendering
+const currencyCache = new Map<number, string>();
+const MAX_CACHE_SIZE = 500;
+
 /**
  * Formats numeric value into standard Bangladeshi Taka currency format (e.g. ৳ 50,000)
  */
 export const formatCurrency = (val: number | string | undefined | null): string => {
   const num = typeof val === 'number' ? val : Number(val || 0);
   if (isNaN(num)) return '৳ 0';
-  return '৳ ' + num.toLocaleString('en-US');
+
+  const cached = currencyCache.get(num);
+  if (cached) return cached;
+
+  const formatted = '৳ ' + num.toLocaleString('en-US');
+  if (currencyCache.size >= MAX_CACHE_SIZE) {
+    // Evict oldest entry
+    const firstKey = currencyCache.keys().next().value;
+    if (firstKey !== undefined) currencyCache.delete(firstKey);
+  }
+  currencyCache.set(num, formatted);
+  return formatted;
 };
 
 /**
@@ -103,10 +118,17 @@ export const formatDate = (dateVal: string | number | Date | undefined | null): 
   }
 };
 
+const dateTimeCache = new Map<string, string>();
+
 /**
  * Formats an ISO date string into formatted date + time (e.g. 23 Aug, 10:32 AM)
  */
 export const formatDateTime = (dateVal: string | number | Date | undefined | null): string => {
+  if (!dateVal) return 'Today';
+  const cacheKey = typeof dateVal === 'string' ? dateVal : String(dateVal);
+  const cached = dateTimeCache.get(cacheKey);
+  if (cached) return cached;
+
   try {
     const d = parseDate(dateVal);
     const datePart = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -114,7 +136,13 @@ export const formatDateTime = (dateVal: string | number | Date | undefined | nul
     if (datePart.includes('Invalid') || timePart.includes('Invalid')) {
       return 'Today';
     }
-    return `${datePart}, ${timePart}`;
+    const result = `${datePart}, ${timePart}`;
+    if (dateTimeCache.size >= MAX_CACHE_SIZE) {
+      const firstKey = dateTimeCache.keys().next().value;
+      if (firstKey !== undefined) dateTimeCache.delete(firstKey);
+    }
+    dateTimeCache.set(cacheKey, result);
+    return result;
   } catch {
     return 'Today';
   }

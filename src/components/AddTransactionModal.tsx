@@ -20,7 +20,7 @@ import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
 import { validateTransaction } from '../utils/validation';
 import { formatCurrency } from '../utils';
-import { TransactionTypeSelector, TxSelectableType } from './TransactionTypeSelector';
+import { TransactionTypeSelector } from './TransactionTypeSelector';
 import { CustomCalendarModal } from './CustomCalendarModal';
 
 interface AddTransactionModalProps {
@@ -46,7 +46,6 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
   const [note, setNote] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePickerModal, setShowDatePickerModal] = useState(false);
-  const [pickerViewMonth, setPickerViewMonth] = useState<Date>(new Date());
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
@@ -95,6 +94,13 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
 
   useEffect(() => {
     if (visible) {
+      if (preselectedAccountId && accounts.some((a) => a.id === preselectedAccountId)) {
+        setAccountId(preselectedAccountId);
+      } else if (!accountId || !accounts.some((a) => a.id === accountId)) {
+        if (accounts.length > 0) {
+          setAccountId(accounts[0].id);
+        }
+      }
       isClosing.current = false;
       fadeAnim.setValue(0);
       slideAnim.setValue(140);
@@ -107,7 +113,6 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
       setNote('');
       setTouched({});
       setSelectedDate(new Date());
-      setPickerViewMonth(new Date());
 
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -125,7 +130,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
         }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, preselectedAccountId, accounts]);
 
   const handleClose = () => {
     if (isClosing.current) return;
@@ -148,22 +153,15 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
     });
   };
 
-  const activeAccounts = useMemo(() => accounts.filter((a) => a.isActive), [accounts]);
-
   React.useEffect(() => {
-    if (preselectedAccountId) {
-      const targetAcc = accounts.find((a) => a.id === preselectedAccountId);
-      if (targetAcc && targetAcc.isActive) {
-        setAccountId(preselectedAccountId);
-      } else if (activeAccounts.length > 0) {
-        setAccountId(activeAccounts[0].id);
-      }
-    } else if (activeAccounts.length > 0 && (!accountId || !activeAccounts.some((a) => a.id === accountId))) {
-      setAccountId(activeAccounts[0].id);
+    if (preselectedAccountId && accounts.some((a) => a.id === preselectedAccountId)) {
+      setAccountId(preselectedAccountId);
+    } else if (accounts.length > 0 && (!accountId || !accounts.some((a) => a.id === accountId))) {
+      setAccountId(accounts[0].id);
     }
-  }, [preselectedAccountId, accounts, activeAccounts]);
+  }, [preselectedAccountId, accounts]);
 
-  const selectedAccount = activeAccounts.find((a) => a.id === accountId) || activeAccounts[0];
+  const selectedAccount = accounts.find((a) => a.id === accountId) || accounts[0];
 
   // Cost and margin calculator aligned with Google Sheet MFS ledger
   const calculateDefaultFees = (val: string, targetType: 'send' | 'receive' | 'cash_out' | 'adjustment') => {
@@ -277,54 +275,6 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
     return dStr;
   }, [selectedDate]);
 
-  // Calendar generation helpers
-  const calendarDays = useMemo(() => {
-    const year = pickerViewMonth.getFullYear();
-    const month = pickerViewMonth.getMonth();
-
-    const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sun
-    const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
-    const prevMonthDays = new Date(year, month, 0).getDate();
-
-    const days: Array<{ day: number; isCurrentMonth: boolean; date: Date }> = [];
-
-    // Leading days from previous month
-    for (let i = firstDayIndex - 1; i >= 0; i--) {
-      const d = prevMonthDays - i;
-      days.push({
-        day: d,
-        isCurrentMonth: false,
-        date: new Date(year, month - 1, d),
-      });
-    }
-
-    // Current month days
-    for (let i = 1; i <= totalDaysInMonth; i++) {
-      days.push({
-        day: i,
-        isCurrentMonth: true,
-        date: new Date(year, month, i),
-      });
-    }
-
-    // Trailing days to fill 35 or 42 grid slots
-    const totalSlots = days.length > 35 ? 42 : 35;
-    const remaining = totalSlots - days.length;
-    for (let i = 1; i <= remaining; i++) {
-      days.push({
-        day: i,
-        isCurrentMonth: false,
-        date: new Date(year, month + 1, i),
-      });
-    }
-
-    return days;
-  }, [pickerViewMonth]);
-
-  const changeMonth = (delta: number) => {
-    setPickerViewMonth(new Date(pickerViewMonth.getFullYear(), pickerViewMonth.getMonth() + delta, 1));
-  };
-
   return (
     <Modal visible={visible} animationType="none" transparent statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
@@ -415,18 +365,18 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                 >
                   <ScrollView
                     nestedScrollEnabled
-                    showsVerticalScrollIndicator={activeAccounts.length > 6}
+                    showsVerticalScrollIndicator={accounts.length > 6}
                     style={styles.dropdownScrollView}
                     keyboardShouldPersistTaps="handled"
                   >
-                    {activeAccounts.length === 0 ? (
+                    {accounts.length === 0 ? (
                       <View style={{ padding: 14, alignItems: 'center' }}>
                         <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-                          No active SIM accounts available. Please activate an account first.
+                          No SIM accounts available. Please add an account first.
                         </Text>
                       </View>
                     ) : (
-                      activeAccounts.map((acc) => (
+                      accounts.map((acc) => (
                         <TouchableOpacity
                           key={acc.id}
                           style={[
@@ -599,9 +549,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                       isToday(selectedDate) && { backgroundColor: theme.primaryLight, borderColor: theme.primary },
                     ]}
                     onPress={() => {
-                      const now = new Date();
-                      setSelectedDate(now);
-                      setPickerViewMonth(now);
+                      setSelectedDate(new Date());
                     }}
                     activeOpacity={0.7}
                   >
@@ -623,9 +571,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                       isYesterday(selectedDate) && { backgroundColor: theme.primaryLight, borderColor: theme.primary },
                     ]}
                     onPress={() => {
-                      const yest = new Date(Date.now() - 86400000);
-                      setSelectedDate(yest);
-                      setPickerViewMonth(yest);
+                      setSelectedDate(new Date(Date.now() - 86400000));
                     }}
                     activeOpacity={0.7}
                   >
@@ -650,7 +596,6 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                   { backgroundColor: theme.inputBg, borderBottomColor: theme.border },
                 ]}
                 onPress={() => {
-                  setPickerViewMonth(new Date(selectedDate));
                   setShowDatePickerModal(true);
                 }}
                 activeOpacity={0.8}
@@ -790,7 +735,6 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
         selectedDate={selectedDate}
         onSelectDate={(newDate) => {
           setSelectedDate(newDate);
-          setPickerViewMonth(newDate);
         }}
         onClose={() => setShowDatePickerModal(false)}
       />

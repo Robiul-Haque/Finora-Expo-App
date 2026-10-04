@@ -1,9 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { Account, Transaction, DailyProfitRecord, LedgerMetrics } from '../../types/ledger';
 import { initialAccounts, initialTransactions, initialDailyProfitRecords } from '../../constants/mockData';
 import syncServiceInstance, { syncService as namedSyncService } from '../sync/syncService';
 const syncService = syncServiceInstance || namedSyncService;
 import { parseDate, isSameDay, isSameMonth } from '../../utils/formatters';
+
+const checkIsOnline = async (): Promise<boolean> => {
+  try {
+    const net = await NetInfo.fetch();
+    return Boolean(net.isConnected && (net.isInternetReachable ?? true));
+  } catch {
+    return false;
+  }
+};
 
 const ACCOUNTS_STORAGE_KEY = '@finora_accounts_v4';
 const TRANSACTIONS_STORAGE_KEY = '@finora_transactions_v4';
@@ -43,7 +53,7 @@ export const setAuthToken = (token: string | null) => {
 };
 
 /**
- * Robust HTTP client wrapper with timeout, AbortController & Bearer Auth injection
+ * Robust & Secure HTTP client wrapper with timeout, AbortController & Secure Client identification
  */
 async function httpRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
@@ -57,6 +67,8 @@ async function httpRequest<T>(endpoint: string, options: RequestInit = {}): Prom
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        'X-Client-App': 'Finora-Secure-Client',
+        'X-Requested-With': 'XMLHttpRequest',
         ...(currentAuthToken ? { Authorization: `Bearer ${currentAuthToken}` } : {}),
         ...(options.headers || {}),
       },
@@ -66,15 +78,19 @@ async function httpRequest<T>(endpoint: string, options: RequestInit = {}): Prom
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
-      const message = errorBody?.message || errorBody?.error || `HTTP Error ${response.status}: ${response.statusText}`;
-      throw new Error(message);
+      // Sanitize error message to prevent leaking internal backend / database stack traces
+      let safeMessage = `Request failed (${response.status})`;
+      if (typeof errorBody?.message === 'string' && errorBody.message.length < 120 && !errorBody.message.includes('at ')) {
+        safeMessage = errorBody.message;
+      }
+      throw new Error(safeMessage);
     }
 
     const data = await response.json();
     return data?.data ?? data;
   } catch (error: any) {
     clearTimeout(timeoutId);
-    if (error.name === 'AbortError') throw new Error('Network request timed out. Please check your connection.');
+    if (error.name === 'AbortError') throw new Error('Request timed out. Please check your connection.');
     throw error;
   }
 }
@@ -234,15 +250,21 @@ export const ledgerApi = {
     let backendResult: any = null;
 
     if (!API_CONFIG.USE_MOCK_STORAGE) {
-      try {
-        backendResult = await httpRequest<{ transaction: Transaction; updatedAccounts: Account[] }>('/transactions', {
-          method: 'POST',
-          headers: { 'X-Idempotency-Key': clientTxId },
-          body: JSON.stringify({ ...newTx }),
-        });
-      } catch {
+      const isOnline = await checkIsOnline();
+      if (!isOnline) {
         newTx.syncStatus = 'pending';
         await syncService.enqueueTransaction({ ...newTx, clientTxId });
+      } else {
+        try {
+          backendResult = await httpRequest<{ transaction: Transaction; updatedAccounts: Account[] }>('/transactions', {
+            method: 'POST',
+            headers: { 'X-Idempotency-Key': clientTxId },
+            body: JSON.stringify({ ...newTx }),
+          });
+        } catch {
+          newTx.syncStatus = 'pending';
+          await syncService.enqueueTransaction({ ...newTx, clientTxId });
+        }
       }
     }
 
@@ -308,14 +330,18 @@ export const ledgerApi = {
     updates: Partial<Transaction>
   ): Promise<{ transaction: Transaction; updatedAccounts: Account[] }> {
     if (!API_CONFIG.USE_MOCK_STORAGE) {
-      try {
-        await httpRequest(`/transactions/${id}`, {
-          method: 'PUT',
-          body: JSON.stringify(updates),
-        });
-      } catch {
-        // Enqueue offline update mutation
+      const isOnline = await checkIsOnline();
+      if (!isOnline) {
         await syncService.enqueueUpdateTransaction(id, updates);
+      } else {
+        try {
+          await httpRequest(`/transactions/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(updates),
+          });
+        } catch {
+          await syncService.enqueueUpdateTransaction(id, updates);
+        }
       }
     }
 
@@ -421,11 +447,15 @@ export const ledgerApi = {
    */
   async deleteTransaction(id: string): Promise<{ deletedId: string; updatedAccounts: Account[] }> {
     if (!API_CONFIG.USE_MOCK_STORAGE) {
-      try {
-        await httpRequest(`/transactions/${id}`, { method: 'DELETE' });
-      } catch {
-        // Enqueue offline delete mutation
+      const isOnline = await checkIsOnline();
+      if (!isOnline) {
         await syncService.enqueueDeleteTransaction(id);
+      } else {
+        try {
+          await httpRequest(`/transactions/${id}`, { method: 'DELETE' });
+        } catch {
+          await syncService.enqueueDeleteTransaction(id);
+        }
       }
     }
 
@@ -498,6 +528,16 @@ export const ledgerApi = {
   async createAccount(
     accData: Omit<Account, 'id' | 'createdAt' | 'todaySend' | 'todayReceive' | 'todayProfit' | 'remainingLimit'>
   ): Promise<Account> {
+    // 1. Check for duplicates BEFORE network call or queueing
+    const currentAccounts = await this.getAccounts();
+    const cleanNum = accData.accountNumber.replace(/[\s\-\(\)]/g, '');
+    const isDup = currentAccounts.some(
+      (a) => a.accountNumber.replace(/[\s\-\(\)]/g, '') === cleanNum
+    );
+    if (isDup) {
+      throw new Error('This phone number already exists in your accounts.');
+    }
+
     const monthlyLimit = accData.monthlyLimit || 300000;
     const monthlyLimitUsed = accData.monthlyLimitUsed || 0;
     const remainingLimit = Math.max(0, monthlyLimit - monthlyLimitUsed);
@@ -517,16 +557,21 @@ export const ledgerApi = {
     };
 
     if (!API_CONFIG.USE_MOCK_STORAGE) {
-      try {
-        const created = await httpRequest<Account>('/accounts', { method: 'POST', body: JSON.stringify(newAccount) });
-        if (created?.id) newAccount = created;
-      } catch {
-        // Enqueue offline account creation
+      const isOnline = await checkIsOnline();
+      if (!isOnline) {
+        newAccount.syncStatus = 'pending';
         await syncService.enqueueCreateAccount(newAccount);
+      } else {
+        try {
+          const created = await httpRequest<Account>('/accounts', { method: 'POST', body: JSON.stringify(newAccount) });
+          if (created?.id) newAccount = created;
+        } catch {
+          newAccount.syncStatus = 'pending';
+          await syncService.enqueueCreateAccount(newAccount);
+        }
       }
     }
 
-    const currentAccounts = await this.getAccounts();
     const updated = [newAccount, ...currentAccounts];
     await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(updated));
 
@@ -538,14 +583,18 @@ export const ledgerApi = {
    */
   async updateAccount(id: string, updates: Partial<Account>): Promise<Account[]> {
     if (!API_CONFIG.USE_MOCK_STORAGE) {
-      try {
-        await httpRequest(`/accounts/${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify(updates),
-        });
-      } catch {
-        // Enqueue offline account update
+      const isOnline = await checkIsOnline();
+      if (!isOnline) {
         await syncService.enqueueUpdateAccount(id, updates);
+      } else {
+        try {
+          await httpRequest(`/accounts/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(updates),
+          });
+        } catch {
+          await syncService.enqueueUpdateAccount(id, updates);
+        }
       }
     }
 
@@ -570,11 +619,15 @@ export const ledgerApi = {
    */
   async deleteAccount(id: string): Promise<string> {
     if (!API_CONFIG.USE_MOCK_STORAGE) {
-      try {
-        await httpRequest(`/accounts/${id}`, { method: 'DELETE' });
-      } catch {
-        // Enqueue offline account deletion
+      const isOnline = await checkIsOnline();
+      if (!isOnline) {
         await syncService.enqueueDeleteAccount(id);
+      } else {
+        try {
+          await httpRequest(`/accounts/${id}`, { method: 'DELETE' });
+        } catch {
+          await syncService.enqueueDeleteAccount(id);
+        }
       }
     }
 
@@ -604,13 +657,26 @@ export const ledgerApi = {
     const todayProfit = accounts.reduce((sum, a) => sum + (a.todayProfit || 0), 0);
     const todaySendTotal = accounts.reduce((sum, a) => sum + (a.todaySend || 0), 0);
 
-    const monthlyIncome = txs
-      .filter((t) => t.type === 'recev' || t.type === 'receive_money' || t.type === 'cash_in')
-      .reduce((sum, t) => sum + t.amount, 0);
+    let monthlyIncome = 0;
+    let monthlyExpense = 0;
 
-    const monthlyExpense = txs
-      .filter((t) => t.type === 'sm' || t.type === 'co' || t.type === 'send' || t.type === 'send_money' || t.type === 'cash_out' || t.type === 'b2b')
-      .reduce((sum, t) => sum + t.amount, 0);
+    for (let i = 0; i < txs.length; i++) {
+      const t = txs[i];
+      if (isSameMonth(t.date)) {
+        if (t.type === 'recev' || t.type === 'receive_money' || t.type === 'cash_in') {
+          monthlyIncome += t.amount;
+        } else if (
+          t.type === 'sm' ||
+          t.type === 'co' ||
+          t.type === 'send' ||
+          t.type === 'send_money' ||
+          t.type === 'cash_out' ||
+          t.type === 'b2b'
+        ) {
+          monthlyExpense += t.amount;
+        }
+      }
+    }
 
     return {
       totalBalance,
@@ -636,19 +702,97 @@ export const ledgerApi = {
           method: 'POST',
           body: JSON.stringify({ items }),
         });
+        const synced = res?.syncedIds || [];
+        if (synced.length > 0) {
+          await this.markTransactionsAsSynced(synced);
+        }
         return {
-          syncedIds: res?.syncedIds || [],
+          syncedIds: synced,
           failedIds: res?.failedIds || [],
         };
       } catch {
-        // Network / server offline: do not falsely report as synced
-        return {
-          syncedIds: [],
-          failedIds: items.map((i) => i.id),
-        };
+        // Fallback: If /transactions/sync is not available, execute item-by-item
+        const syncedIds: string[] = [];
+        const failedIds: string[] = [];
+
+        for (const item of items) {
+          try {
+            if (item.type === 'CREATE_TRANSACTION') {
+              await httpRequest('/transactions', {
+                method: 'POST',
+                headers: { 'X-Idempotency-Key': item.clientTxId },
+                body: JSON.stringify(item.payload),
+              });
+              syncedIds.push(item.clientTxId || item.id);
+            } else if (item.type === 'UPDATE_TRANSACTION') {
+              await httpRequest(`/transactions/${item.payload.id}`, {
+                method: 'PUT',
+                body: JSON.stringify(item.payload.updates),
+              });
+              syncedIds.push(item.id);
+            } else if (item.type === 'DELETE_TRANSACTION') {
+              await httpRequest(`/transactions/${item.payload.id}`, {
+                method: 'DELETE',
+              });
+              syncedIds.push(item.id);
+            } else if (item.type === 'CREATE_ACCOUNT') {
+              await httpRequest('/accounts', {
+                method: 'POST',
+                body: JSON.stringify(item.payload),
+              });
+              syncedIds.push(item.id);
+            } else if (item.type === 'UPDATE_ACCOUNT') {
+              await httpRequest(`/accounts/${item.payload.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify(item.payload.updates),
+              });
+              syncedIds.push(item.id);
+            } else if (item.type === 'DELETE_ACCOUNT') {
+              await httpRequest(`/accounts/${item.payload.id}`, {
+                method: 'DELETE',
+              });
+              syncedIds.push(item.id);
+            } else {
+              syncedIds.push(item.id);
+            }
+          } catch {
+            failedIds.push(item.id);
+          }
+        }
+
+        if (syncedIds.length > 0) {
+          await this.markTransactionsAsSynced(syncedIds);
+        }
+
+        return { syncedIds, failedIds };
       }
     }
     return { syncedIds: items.map((i) => i.clientTxId || i.id), failedIds: [] };
+  },
+
+  /**
+   * Helper to mark local transactions as 'synced' in AsyncStorage
+   */
+  async markTransactionsAsSynced(syncedIds: string[]): Promise<void> {
+    try {
+      const data = await AsyncStorage.getItem(TRANSACTIONS_STORAGE_KEY);
+      if (!data) return;
+      const txs: Transaction[] = JSON.parse(data);
+      const set = new Set(syncedIds);
+      let changed = false;
+      const updated = txs.map((t) => {
+        if ((set.has(t.id) || (t.clientTxId && set.has(t.clientTxId))) && t.syncStatus === 'pending') {
+          changed = true;
+          return { ...t, syncStatus: 'synced' as const };
+        }
+        return t;
+      });
+      if (changed) {
+        await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(updated));
+      }
+    } catch {
+      // Ignore
+    }
   },
 
   /**

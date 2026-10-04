@@ -11,8 +11,8 @@ interface AccountCardProps {
   onAddTransactionPress?: (accountId: string) => void;
 }
 
-const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress, onAddTransactionPress }) => {
-  const { theme, isDarkMode } = useTheme();
+const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress }) => {
+  const { theme } = useTheme();
 
   const monthlyLimit = account.monthlyLimit || 300000;
   const monthlyLimitUsed = account.monthlyLimitUsed !== undefined ? account.monthlyLimitUsed : account.todaySend;

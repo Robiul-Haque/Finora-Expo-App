@@ -1,19 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
-  Image,
-  Animated,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
-import { AccountCard, AccountCardSkeleton, SearchBar, AppHeader, ActionSheetModal } from '../components';
+import { ExcelTableSkeleton, SearchBar, AppHeader, ActionSheetModal, ExcelTableView } from '../components';
 import { Account } from '../types';
 
 interface HomeScreenProps {
@@ -35,18 +33,29 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState<SortOption>('balance_desc');
   const [showSortModal, setShowSortModal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      if (refetch) await refetch();
+    } catch {
+      // Offline fallback
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const isCustomSorted = sortOption !== 'balance_desc';
 
   const filteredAccounts = useMemo(() => {
-    let result = accounts.filter((acc) => {
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase().trim();
-      return (
-        acc.name.toLowerCase().includes(q) ||
-        acc.accountNumber.toLowerCase().includes(q)
-      );
-    });
+    const q = searchQuery.toLowerCase().trim();
+    const result = !q
+      ? accounts
+      : accounts.filter((acc) =>
+          acc.name.toLowerCase().includes(q) ||
+          acc.accountNumber.toLowerCase().includes(q)
+        );
 
     switch (sortOption) {
       case 'balance_desc':
@@ -93,6 +102,14 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
+        }
       >
         <View style={styles.bounceContainer}>
           {/* Controls Section: Clean Search */}
@@ -100,19 +117,14 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
             <SearchBar
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="Search phone numbers..."
+              placeholder="Search by phone number..."
               style={styles.searchBox}
             />
           </View>
 
-          {/* Account Cards Grid */}
-          <View style={styles.accountsGrid}>
+          {/* Responsive Spreadsheet Data Table */}
           {isLoading && accounts.length === 0 ? (
-            <>
-              <AccountCardSkeleton />
-              <AccountCardSkeleton />
-              <AccountCardSkeleton />
-            </>
+            <ExcelTableSkeleton />
           ) : filteredAccounts.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: theme.card, borderColor: theme.border }]}>
               <Ionicons name="search-outline" size={32} color={theme.textMuted} />
@@ -121,18 +133,12 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
               </Text>
             </View>
           ) : (
-            filteredAccounts.map((account) => (
-              <AccountCard
-                key={account.id}
-                account={account}
-                onPress={onOpenAccountDetails}
-                onAddTransactionPress={onOpenAddTransaction}
-              />
-            ))
+            <ExcelTableView
+              accounts={filteredAccounts}
+              onSelectAccount={onOpenAccountDetails}
+              onAddTransaction={onOpenAddTransaction}
+            />
           )}
-        </View>
-
-        <View style={{ height: 80 }} />
         </View>
       </ScrollView>
 
@@ -224,19 +230,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 105,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 70,
   },
   bounceContainer: {
-    gap: 16,
+    gap: 12,
   },
   controlsSection: {
     position: 'relative',
     zIndex: 10,
   },
   searchBox: {
-    height: 48,
+    height: 44,
     borderTopLeftRadius: 6,
     borderTopRightRadius: 6,
     borderBottomWidth: 2,

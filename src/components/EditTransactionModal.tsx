@@ -19,7 +19,7 @@ import { Transaction, TransactionType } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../utils';
-import { TransactionTypeSelector, TxSelectableType } from './TransactionTypeSelector';
+import { TransactionTypeSelector } from './TransactionTypeSelector';
 import { CustomCalendarModal } from './CustomCalendarModal';
 
 interface EditTransactionModalProps {
@@ -33,7 +33,7 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
   transaction,
   onClose,
 }) => {
-  const { theme, isDarkMode } = useTheme();
+  const { theme } = useTheme();
   const { accounts, updateTransaction } = useLedger();
 
   const [accountId, setAccountId] = useState('');
@@ -45,7 +45,6 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
   const [note, setNote] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePickerModal, setShowDatePickerModal] = useState(false);
-  const [pickerViewMonth, setPickerViewMonth] = useState<Date>(new Date());
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -121,7 +120,6 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
 
       const parsedDate = transaction.date ? new Date(transaction.date) : new Date();
       setSelectedDate(isNaN(parsedDate.getTime()) ? new Date() : parsedDate);
-      setPickerViewMonth(isNaN(parsedDate.getTime()) ? new Date() : parsedDate);
 
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -262,51 +260,6 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
     if (isYesterday(selectedDate)) return `${dStr} (Yesterday)`;
     return dStr;
   }, [selectedDate]);
-
-  // Calendar generation helpers
-  const calendarDays = useMemo(() => {
-    const year = pickerViewMonth.getFullYear();
-    const month = pickerViewMonth.getMonth();
-
-    const firstDayIndex = new Date(year, month, 1).getDay();
-    const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
-    const prevMonthDays = new Date(year, month, 0).getDate();
-
-    const days: Array<{ day: number; isCurrentMonth: boolean; date: Date }> = [];
-
-    for (let i = firstDayIndex - 1; i >= 0; i--) {
-      const d = prevMonthDays - i;
-      days.push({
-        day: d,
-        isCurrentMonth: false,
-        date: new Date(year, month - 1, d),
-      });
-    }
-
-    for (let i = 1; i <= totalDaysInMonth; i++) {
-      days.push({
-        day: i,
-        isCurrentMonth: true,
-        date: new Date(year, month, i),
-      });
-    }
-
-    const totalSlots = days.length > 35 ? 42 : 35;
-    const remaining = totalSlots - days.length;
-    for (let i = 1; i <= remaining; i++) {
-      days.push({
-        day: i,
-        isCurrentMonth: false,
-        date: new Date(year, month + 1, i),
-      });
-    }
-
-    return days;
-  }, [pickerViewMonth]);
-
-  const changeMonth = (delta: number) => {
-    setPickerViewMonth(new Date(pickerViewMonth.getFullYear(), pickerViewMonth.getMonth() + delta, 1));
-  };
 
   if (!transaction) return null;
 

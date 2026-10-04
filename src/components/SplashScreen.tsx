@@ -7,7 +7,7 @@ interface SplashScreenProps {
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
-  const { theme, isDarkMode } = useTheme();
+  const { theme } = useTheme();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const exitFadeAnim = useRef(new Animated.Value(1)).current;

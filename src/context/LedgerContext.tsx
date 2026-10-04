@@ -12,7 +12,6 @@ import {
   useResetDatabaseMutation,
 } from '../hooks/useLedgerQueries';
 import { useFilterStore } from '../store/useFilterStore';
-import { parseDate } from '../utils/formatters';
 
 interface LedgerContextType {
   accounts: Account[];

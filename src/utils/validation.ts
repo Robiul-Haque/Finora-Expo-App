@@ -164,11 +164,17 @@ export const validateAccount = (
   if (!trimmedNumber) {
     errors.accountNumber = 'SIM phone number or shortcode is required';
   } else {
-    const isDuplicate = existingAccounts.some(
-      (acc) => acc.id !== currentAccountId && acc.accountNumber === trimmedNumber
-    );
+    const normalizedInput = normalizePhoneNumber(trimmedNumber);
+    const isDuplicate = existingAccounts.some((acc) => {
+      if (acc.id === currentAccountId) return false;
+      const normalizedExisting = normalizePhoneNumber(acc.accountNumber);
+      return (
+        (normalizedInput.length >= 8 && normalizedExisting === normalizedInput) ||
+        acc.accountNumber.trim().toLowerCase() === trimmedNumber.toLowerCase()
+      );
+    });
     if (isDuplicate) {
-      errors.accountNumber = 'An account with this number already exists';
+      errors.accountNumber = 'This phone number already exists in your accounts';
     }
   }
 

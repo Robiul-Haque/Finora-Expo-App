@@ -5,9 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
-  Image,
-  Animated,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,14 +44,12 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
   }, [refetch]);
 
   const filteredAccounts = useMemo(() => {
-    return accounts.filter((acc) => {
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase().trim();
-      return (
-        acc.name.toLowerCase().includes(q) ||
-        acc.accountNumber.toLowerCase().includes(q)
-      );
-    });
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return accounts;
+    return accounts.filter((acc) =>
+      acc.name.toLowerCase().includes(q) ||
+      acc.accountNumber.toLowerCase().includes(q)
+    );
   }, [accounts, searchQuery]);
 
   const handleConfirmDelete = () => {
@@ -72,6 +68,14 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
+        }
       >
         <View style={styles.bounceContainer}>
           {/* Search Header */}

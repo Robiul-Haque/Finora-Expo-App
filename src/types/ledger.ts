@@ -37,6 +37,9 @@ export interface Account {
   color?: string;
   createdAt: string;
   syncStatus?: SyncStatus;
+  group?: 'primary' | 'secondary' | string;
+  isHighlighted?: boolean;
+  highlightColor?: string;
 }
 
 export interface Transaction {

@@ -8,9 +8,13 @@ import { queryClient } from './src/services/queryClient';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { LedgerProvider, useLedger } from './src/context/LedgerContext';
 import { HomeScreen, TransactionsScreen, AccountsScreen } from './src/screens';
-import { AddTransactionModal, AddAccountModal, AccountDetailsModal, ErrorBoundary, SplashScreen } from './src/components';
+import { AddTransactionModal, AddAccountModal, AccountDetailsModal, ErrorBoundary, SplashScreen, OfflineBanner } from './src/components';
 import { Account } from './src/types';
 import { initializeThemeSync } from './src/store/useThemeStore';
+import { setupCrashPrevention } from './src/utils/crashPrevention';
+
+// Initialize global crash prevention before any rendering or async logic
+setupCrashPrevention();
 
 type TabType = 'home' | 'transactions' | 'accounts';
 
@@ -116,6 +120,11 @@ const MainApp: React.FC = () => {
         animated={false}
       />
 
+      {/* Floating Subtle Offline Banner (Auto-shows when offline, auto-removes on reconnection) */}
+      <View style={[styles.offlineBannerContainer, { top: insets.top + 2 }]} pointerEvents="none">
+        <OfflineBanner />
+      </View>
+
       {/* Main Content Area: Instant Zero-Lag Lazy-Preserved Tab Views */}
       <View style={styles.screenContainer}>
         <View style={[styles.screenPage, { display: activeTab === 'home' ? 'flex' : 'none' }]}>
@@ -129,7 +138,7 @@ const MainApp: React.FC = () => {
 
         {visitedTabs.transactions && (
           <View style={[styles.screenPage, { display: activeTab === 'transactions' ? 'flex' : 'none' }]}>
-            <TransactionsScreen onOpenAddTransaction={() => handleOpenAddTx()} />
+            <TransactionsScreen onOpenAddTransaction={handleOpenAddTx} />
           </View>
         )}
 
@@ -143,24 +152,6 @@ const MainApp: React.FC = () => {
           </View>
         )}
       </View>
-
-      {/* Floating Action Button (FAB) - hidden during splash */}
-      {!showSplash && (
-        <TouchableOpacity
-          style={[
-            styles.fabContainer,
-            {
-              bottom: (insets.bottom > 0 ? insets.bottom : 12) + 84,
-            },
-          ]}
-          onPress={() => handleOpenAddTx()}
-          activeOpacity={0.92}
-        >
-          <View style={[styles.fabButton, { backgroundColor: theme.primary }]}>
-            <Ionicons name="add" size={24} color="#FFFFFF" />
-          </View>
-        </TouchableOpacity>
-      )}
 
       {/* Modern Floating Island Bottom Navigation Bar - hidden during splash */}
       {!showSplash && (
@@ -232,7 +223,7 @@ const MainApp: React.FC = () => {
         account={selectedAccountForDetails}
         visible={!!selectedAccountForDetails}
         onClose={() => setSelectedAccountIdForDetails(null)}
-        onAddTransaction={(accId) => handleOpenAddTx(accId)}
+        onAddTransaction={handleOpenAddTx}
       />
 
       {/* Brand Splash Screen on Initial App Startup */}
@@ -297,19 +288,6 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
   },
-  fabContainer: {
-    position: 'absolute',
-    right: 18,
-    zIndex: 100,
-    elevation: 15,
-  },
-  fabButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   floatingBarWrapper: {
     position: 'absolute',
     bottom: 0,
@@ -355,5 +333,12 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     marginTop: 2,
     letterSpacing: 0.2,
+  },
+  offlineBannerContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 999,
   },
 });

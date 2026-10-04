@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Transaction } from '../types/ledger';
 import { useTheme } from '../context/ThemeContext';
@@ -209,7 +209,23 @@ const TransactionItemComponent: React.FC<TransactionItemProps> = ({ transaction,
   );
 };
 
-export const TransactionItem = React.memo(TransactionItemComponent);
+export const TransactionItem = React.memo(TransactionItemComponent, (prev, next) => {
+  return (
+    prev.transaction.id === next.transaction.id &&
+    prev.transaction.amount === next.transaction.amount &&
+    prev.transaction.syncStatus === next.transaction.syncStatus &&
+    prev.transaction.date === next.transaction.date &&
+    prev.transaction.runningBalance === next.transaction.runningBalance &&
+    prev.transaction.profit === next.transaction.profit &&
+    prev.transaction.margin === next.transaction.margin &&
+    prev.transaction.cost === next.transaction.cost &&
+    prev.transaction.type === next.transaction.type &&
+    prev.transaction.note === next.transaction.note &&
+    prev.transaction.accountNumber === next.transaction.accountNumber &&
+    prev.transaction.recipientNumber === next.transaction.recipientNumber &&
+    prev.transaction.senderNumber === next.transaction.senderNumber
+  );
+});
 
 const styles = StyleSheet.create({
   container: {
