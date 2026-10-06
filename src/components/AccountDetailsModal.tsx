@@ -9,6 +9,7 @@ import { ConfirmationModal } from './ConfirmationModal';
 import { EditTransactionModal } from './EditTransactionModal';
 import { ActionSheetModal } from './ActionSheetModal';
 import { formatCurrency } from '../utils';
+import { notifyUser } from '../store/useToastStore';
 
 interface AccountDetailsModalProps {
   account: Account | null;
@@ -39,7 +40,7 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
       { label: 'All', value: 'all' },
       { label: 'Send Money', value: 'send' },
       { label: 'Receive Money', value: 'receive' },
-      { label: 'Cash Out', value: 'cash_out' },
+      // { label: 'Cash Out', value: 'cash_out' },
       { label: 'Adjustment', value: 'adjustment' },
     ],
     []
@@ -194,8 +195,9 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
   const handleToggleStatus = async () => {
     try {
       await updateAccount(account.id, { isActive: !account.isActive });
+      notifyUser(`SIM ${account.isActive ? 'disabled' : 'activated'} successfully.`, 'success');
     } catch {
-      Alert.alert('Error', 'Failed to update SIM status.');
+      notifyUser('Failed to update SIM status. Please try again.', 'error');
     }
   };
 
@@ -278,17 +280,31 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
             </View>
 
             {/* Limits Card (Full Width) */}
-            <View style={[styles.bentoCard, styles.fullWidthCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View
+              style={[
+                styles.bentoCard,
+                styles.fullWidthCard,
+                {
+                  backgroundColor: theme.card,
+                  borderColor: usagePercentage >= 90 ? theme.dangerLight : theme.border,
+                },
+              ]}
+            >
+              {usagePercentage >= 90 && (
+                <View style={[styles.leftIndicator, { backgroundColor: theme.danger }]} />
+              )}
               <View style={styles.bentoCardInner}>
                 <View style={styles.limitRow}>
-                  <Text style={[styles.bentoLabel, { color: theme.textSecondary }]}>Limit</Text>
+                  <Text style={[styles.bentoLabel, { color: usagePercentage >= 90 ? theme.danger : theme.textSecondary }]}>
+                    Limit {usagePercentage >= 90 ? `(Critical ${usagePercentage}%)` : `(${usagePercentage}%)`}
+                  </Text>
                   <Text style={[styles.limitValue, { color: theme.text }]}>
                     {formatCurrency(monthlyLimit)}
                   </Text>
                 </View>
 
                 {/* Limit Progress Bar */}
-                <View style={[styles.limitTrack, { backgroundColor: theme.progressBarBg }]}>
+                <View style={[styles.limitTrack, { backgroundColor: usagePercentage >= 90 ? theme.dangerLight : theme.progressBarBg }]}>
                   <View
                     style={[
                       styles.limitFill,
@@ -301,8 +317,8 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
                 </View>
 
                 <View style={styles.limitRow}>
-                  <Text style={[styles.bentoLabel, { color: theme.textSecondary }]}>Remaining</Text>
-                  <Text style={[styles.limitValue, { color: theme.text }]}>
+                  <Text style={[styles.bentoLabel, { color: usagePercentage >= 90 ? theme.danger : theme.textSecondary }]}>Remaining</Text>
+                  <Text style={[styles.limitValue, { color: usagePercentage >= 90 ? theme.danger : theme.text, fontWeight: usagePercentage >= 90 ? '700' : '600' }]}>
                     {formatCurrency(remainingLimit)}
                   </Text>
                 </View>

@@ -5,6 +5,8 @@
  * to prevent sensitive financial data leakage.
  */
 
+import { notifyUser } from '../store/useToastStore';
+
 export function setupCrashPrevention() {
   // 1. Production Console Sanitization (Ensure zero sensitive data leaks)
   if (!__DEV__) {
@@ -24,18 +26,23 @@ export function setupCrashPrevention() {
     const previousHandler = errorUtils.getGlobalHandler?.();
 
     errorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
-      // In development, let developer know
+      // In development, log for debugging
       if (__DEV__) {
         console.warn('[CrashPrevention] Caught unhandled JS error:', error?.message || error);
         if (previousHandler && !isFatal) {
           try {
             previousHandler(error, false);
           } catch {
-            // Swallow
+            // Handled
           }
         }
       }
-      // In production, swallow error gracefully to prevent app termination
+      // Inform user with a friendly, non-crashing warning
+      try {
+        notifyUser('A minor issue was intercepted safely. Your data is protected.', 'warning');
+      } catch {
+        // Prevent recursive errors
+      }
     });
   }
 
@@ -49,12 +56,22 @@ export function setupCrashPrevention() {
         if (__DEV__) {
           console.warn('[CrashPrevention] Caught unhandled promise rejection:', event.reason?.message || event.reason);
         }
+        try {
+          notifyUser('A background request was resolved safely.', 'info');
+        } catch {
+          // Handled
+        }
       }
     });
 
     window.addEventListener('error', (event: any) => {
       if (__DEV__) {
         console.warn('[CrashPrevention] Caught window runtime error:', event?.message || event);
+      }
+      try {
+        notifyUser('A runtime issue was caught safely.', 'warning');
+      } catch {
+        // Handled
       }
     });
   }

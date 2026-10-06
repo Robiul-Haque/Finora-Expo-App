@@ -21,6 +21,7 @@ import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../utils';
 import { TransactionTypeSelector } from './TransactionTypeSelector';
 import { CustomCalendarModal } from './CustomCalendarModal';
+import { notifyUser } from '../store/useToastStore';
 
 interface EditTransactionModalProps {
   visible: boolean;
@@ -168,20 +169,20 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
     if (!transaction) return;
     const parsedAmount = parseFloat(amount.replace(/,/g, ''));
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0.');
+      notifyUser('Please enter a valid amount greater than 0.', 'warning');
       return;
     }
 
-    const parsedCost = parseFloat(cost) || 0;
-    const parsedProfit = parseFloat(profit) || 0;
+    const parsedCost = txType === 'send' ? (parseFloat(cost) || 0) : 0;
+    const parsedProfit = txType === 'receive' ? (parseFloat(profit) || 0) : 0;
 
-    if ((txType === 'send' || txType === 'cash_out') && !counterpartyNumber.trim()) {
-      Alert.alert('Recipient Required', 'Please enter a recipient or counterparty number.');
+    if (txType === 'send' && !counterpartyNumber.trim()) {
+      notifyUser('Please enter a recipient or counterparty number.', 'warning');
       return;
     }
 
     // Balance check for outflow edits
-    if (selectedAccount && (txType === 'send' || txType === 'cash_out')) {
+    if (selectedAccount && txType === 'send') {
       const isOldOutflow =
         transaction.type === 'sm' ||
         transaction.type === 'co' ||
@@ -197,9 +198,9 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
 
       const totalNeeded = parsedAmount + parsedCost;
       if (totalNeeded > restoredBalance) {
-        Alert.alert(
-          'Insufficient Balance',
-          `The selected account has ৳${restoredBalance.toLocaleString('en-US')} available, but ৳${totalNeeded.toLocaleString('en-US')} is needed.`
+        notifyUser(
+          `Insufficient Balance. Available: ৳${restoredBalance.toLocaleString('en-US')}, Needed: ৳${totalNeeded.toLocaleString('en-US')}.`,
+          'warning'
         );
         return;
       }
@@ -209,7 +210,7 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
     let finalType: TransactionType = 'send_money';
     if (txType === 'send') finalType = 'sm';
     else if (txType === 'receive') finalType = 'recev';
-    else if (txType === 'cash_out') finalType = 'co';
+    // else if (txType === 'cash_out') finalType = 'co';
     else if (txType === 'adjustment') finalType = 'adjustment';
 
     setIsSubmitting(true);
@@ -222,15 +223,16 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
         cost: parsedCost,
         profit: parsedProfit,
         margin: parsedProfit,
-        recipientNumber: txType === 'send' || txType === 'cash_out' ? counterpartyNumber : undefined,
+        recipientNumber: txType === 'send' ? counterpartyNumber : undefined,
         senderNumber: txType === 'receive' ? counterpartyNumber : undefined,
         counterparty: counterpartyNumber || undefined,
         note: note.trim() || undefined,
         date: selectedDate.toISOString(),
       });
+      notifyUser('Transaction updated successfully.', 'success');
       handleClose();
     } catch {
-      Alert.alert('Error', 'Failed to update transaction. Please try again.');
+      notifyUser('Failed to update transaction. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -413,7 +415,17 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
               <View style={styles.inputGroup}>
                 <TransactionTypeSelector
                   selectedType={txType}
-                  onSelectType={(newType) => setTxType(newType)}
+                  onSelectType={(newType) => {
+                    setTxType(newType);
+                    if (newType === 'send') {
+                      setProfit('0');
+                    } else if (newType === 'receive') {
+                      setCost('0');
+                    } else {
+                      setCost('0');
+                      setProfit('0');
+                    }
+                  }}
                   label="TRANSACTION TYPE"
                 />
               </View>
@@ -436,28 +448,30 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
               </View>
 
               {/* Counterparty Number */}
-              <View style={styles.inputGroup}>
-                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
-                  {txType === 'send' || txType === 'cash_out' ? 'RECIPIENT NUMBER' : 'SENDER / CUSTOMER NUMBER'}
-                </Text>
-                <TextInput
-                  ref={counterpartyRef}
-                  style={[
-                    styles.textInput,
-                    { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text },
-                  ]}
-                  placeholder="017XXXXXXXX"
-                  placeholderTextColor={theme.textMuted}
-                  value={counterpartyNumber}
-                  onChangeText={setCounterpartyNumber}
-                  keyboardType="phone-pad"
-                />
-              </View>
+              {txType !== 'adjustment' && (
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+                    {txType === 'send' ? 'RECIPIENT NUMBER' : 'SENDER / CUSTOMER NUMBER'}
+                  </Text>
+                  <TextInput
+                    ref={counterpartyRef}
+                    style={[
+                      styles.textInput,
+                      { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text },
+                    ]}
+                    placeholder="017XXXXXXXX"
+                    placeholderTextColor={theme.textMuted}
+                    value={counterpartyNumber}
+                    onChangeText={setCounterpartyNumber}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+              )}
 
-              {/* Cost & Profit Row */}
-              <View style={styles.rowInputs}>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>COST (৳)</Text>
+              {/* Send Cost (only for Send Money) */}
+              {txType === 'send' && (
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>SEND COST (৳)</Text>
                   <TextInput
                     ref={costRef}
                     style={[
@@ -471,14 +485,17 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
                     keyboardType="numeric"
                   />
                 </View>
+              )}
 
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>PROFIT / MARGIN (৳)</Text>
+              {/* Profit / Margin (only for Receive Money) */}
+              {txType === 'receive' && (
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.fieldLabel, { color: theme.success }]}>PROFIT / MARGIN (৳)</Text>
                   <TextInput
                     ref={profitRef}
                     style={[
                       styles.textInput,
-                      { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text },
+                      { backgroundColor: theme.inputBg, borderColor: theme.success, color: theme.success, fontWeight: '700' },
                     ]}
                     placeholder="0"
                     placeholderTextColor={theme.textMuted}
@@ -487,7 +504,7 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
                     keyboardType="numeric"
                   />
                 </View>
-              </View>
+              )}
 
               {/* Transaction Date Selector */}
               <View style={styles.inputGroup}>

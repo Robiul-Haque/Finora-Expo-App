@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
 import { validateAccount, normalizePhoneNumber } from '../utils/validation';
+import { notifyUser } from '../store/useToastStore';
 
 interface AddAccountModalProps {
   visible: boolean;
@@ -110,20 +111,17 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
     });
 
     if (!phoneNumber.trim()) {
-      Alert.alert('Phone Number Required', 'Please enter a valid phone number.');
+      notifyUser('Please enter a valid phone number.', 'warning');
       return;
     }
 
     if (validation.errors.accountNumber) {
-      Alert.alert(
-        'Duplicate Number',
-        validation.errors.accountNumber,
-        [{ text: 'OK' }]
-      );
+      notifyUser(validation.errors.accountNumber, 'warning');
       return;
     }
 
     if (!validation.isValid) {
+      notifyUser('Please correct form errors before saving.', 'warning');
       return;
     }
 
@@ -145,6 +143,7 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
         isActive: true,
       });
 
+      notifyUser('SIM account added successfully.', 'success');
       // Reset
       setPhoneNumber('');
       setDailyLimit('');
@@ -152,7 +151,7 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
       setAccountLabel('');
       handleClose();
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to add account.');
+      notifyUser(err?.message || 'Failed to add account. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
     }

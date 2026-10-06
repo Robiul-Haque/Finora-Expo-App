@@ -29,7 +29,7 @@ const LimitProgressBarComponent: React.FC<LimitProgressBarProps> = ({ usedAmount
 
   // Determine color based on threshold
   const barColor = React.useMemo(() => {
-    if (percentage > 85) return theme.danger;
+    if (percentage >= 90) return theme.danger;
     if (percentage > 60) return theme.warning;
     return theme.primary;
   }, [percentage, theme.danger, theme.warning, theme.primary]);

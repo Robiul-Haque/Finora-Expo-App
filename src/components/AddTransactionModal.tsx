@@ -22,6 +22,7 @@ import { validateTransaction } from '../utils/validation';
 import { formatCurrency } from '../utils';
 import { TransactionTypeSelector } from './TransactionTypeSelector';
 import { CustomCalendarModal } from './CustomCalendarModal';
+import { notifyUser } from '../store/useToastStore';
 
 interface AddTransactionModalProps {
   visible: boolean;
@@ -176,21 +177,18 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
 
   const handleAmountChange = (val: string) => {
     setAmount(val);
-    const { cost: newCost, profit: newProfit } = calculateDefaultFees(val, txType);
-    setCost(newCost);
-    setProfit(newProfit);
   };
 
   const mappedTransactionType: TransactionType = useMemo(() => {
     if (txType === 'send') return 'sm';
     if (txType === 'receive') return 'recev';
-    if (txType === 'cash_out') return 'co';
+    // if (txType === 'cash_out') return 'co';
     return 'adjustment';
   }, [txType]);
 
   const numAmount = parseFloat(amount.trim().replace(/[^0-9.]/g, '')) || 0;
-  const numCost = parseFloat(cost.trim().replace(/[^0-9.]/g, '')) || 0;
-  const numProfit = parseFloat(profit.trim().replace(/[^0-9.]/g, '')) || 0;
+  const numCost = txType === 'send' ? (parseFloat(cost.trim().replace(/[^0-9.]/g, '')) || 0) : 0;
+  const numProfit = txType === 'receive' ? (parseFloat(profit.trim().replace(/[^0-9.]/g, '')) || 0) : 0;
 
   const validation = useMemo(() => {
     return validateTransaction(selectedAccount, mappedTransactionType, amount, recipientNumber, cost, profit);
@@ -201,7 +199,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
     const current = selectedAccount.balance || 0;
     if (txType === 'receive') {
       return current + numAmount;
-    } else if (txType === 'send' || txType === 'cash_out') {
+    } else if (txType === 'send') {
       return current - (numAmount + numCost);
     } else {
       return current + numAmount;
@@ -215,6 +213,9 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
       return;
     }
 
+    const finalCost = txType === 'send' ? numCost : 0;
+    const finalProfit = txType === 'receive' ? numProfit : 0;
+
     setIsSubmitting(true);
     try {
       await addTransaction({
@@ -223,11 +224,11 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
         accountName: selectedAccount.name,
         type: mappedTransactionType,
         amount: numAmount,
-        cost: numCost,
-        profit: numProfit,
-        margin: numProfit,
-        counterparty: recipientNumber.trim() || (txType === 'cash_out' ? 'Cash Out' : selectedAccount.accountNumber),
-        recipientNumber: txType === 'send' || txType === 'cash_out' ? recipientNumber.trim() : undefined,
+        cost: finalCost,
+        profit: finalProfit,
+        margin: finalProfit,
+        counterparty: recipientNumber.trim() || selectedAccount.accountNumber,
+        recipientNumber: txType === 'send' ? recipientNumber.trim() : undefined,
         senderNumber: txType === 'receive' ? recipientNumber.trim() : undefined,
         runningBalance: previewNewBalance,
         note: note.trim() || undefined,
@@ -243,8 +244,8 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
       setSelectedDate(new Date());
       setTouched({});
       handleClose();
-    } catch {
-      Alert.alert('Error', 'Could not save transaction. Please try again.');
+    } catch (err: any) {
+      notifyUser(err?.message || 'Could not save transaction. Please check inputs and try again.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -409,9 +410,14 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                 selectedType={txType}
                 onSelectType={(newType) => {
                   setTxType(newType);
-                  const { cost: newCost, profit: newProfit } = calculateDefaultFees(amount, newType);
-                  setCost(newCost);
-                  setProfit(newProfit);
+                  if (newType === 'send') {
+                    setProfit('0');
+                  } else if (newType === 'receive') {
+                    setCost('0');
+                  } else {
+                    setCost('0');
+                    setProfit('0');
+                  }
                 }}
               />
             </View>
@@ -447,14 +453,12 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
               )}
             </View>
 
-            {/* Recipient / Counterparty Number (for Send, Receive or Cash Out) */}
+            {/* Recipient / Counterparty Number (for Send or Receive) */}
             {txType !== 'adjustment' && (
               <View style={styles.inputGroup}>
                 <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
                   {txType === 'send'
                     ? 'RECIPIENT NUMBER'
-                    : txType === 'cash_out'
-                    ? 'AGENT / CASH OUT NUMBER'
                     : 'SENDER / CUSTOMER NUMBER'}
                 </Text>
                 <TouchableOpacity
@@ -485,9 +489,9 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
               </View>
             )}
 
-            {/* 2-Column: Send Cost & Profit */}
-            <View style={styles.rowInputs}>
-              <View style={[styles.inputGroup, styles.halfCol]}>
+            {/* Send Money: Send Cost Input */}
+            {txType === 'send' && (
+              <View style={styles.inputGroup}>
                 <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>SEND COST</Text>
                 <TouchableOpacity
                   activeOpacity={1}
@@ -506,8 +510,11 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                   />
                 </TouchableOpacity>
               </View>
+            )}
 
-              <View style={[styles.inputGroup, styles.halfCol]}>
+            {/* Receive Money: Profit Input */}
+            {txType === 'receive' && (
+              <View style={styles.inputGroup}>
                 <Text style={[styles.fieldLabel, { color: theme.success }]}>PROFIT (MARGIN)</Text>
                 <TouchableOpacity
                   activeOpacity={1}
@@ -532,7 +539,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
                   />
                 </TouchableOpacity>
               </View>
-            </View>
+            )}
 
             {/* Date Selector with Quick Chips & Manual Picker */}
             <View style={styles.inputGroup}>

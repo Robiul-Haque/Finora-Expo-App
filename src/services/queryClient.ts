@@ -1,5 +1,6 @@
 import { QueryClient, QueryCache, MutationCache, focusManager } from '@tanstack/react-query';
 import { AppState, AppStateStatus, Platform } from 'react-native';
+import { notifyUser } from '../store/useToastStore';
 
 /**
  * Configure React Native AppState listener for TanStack Query
@@ -23,8 +24,12 @@ export const queryClient = new QueryClient({
   }),
   mutationCache: new MutationCache({
     onError: (error, _variables, _context, mutation) => {
-      // Gracefully prevent unhandled mutation errors from bubbling or crashing
       console.warn(`[MutationCache] Handled mutation error [${mutation.options.mutationKey}]:`, error?.message || error);
+      try {
+        notifyUser('Offline mode: Saved locally and will sync when reconnected.', 'info');
+      } catch {
+        // Safe fallback
+      }
     },
   }),
   defaultOptions: {

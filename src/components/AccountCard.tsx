@@ -5,22 +5,59 @@ import { Account } from '../types/ledger';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../utils';
 
+/**
+ * AccountCard Component
+ * --------------------
+ * Represents an individual SIM / Ledger Account card on the Accounts screen.
+ * 
+ * Features & Business Logic:
+ * 1. Financial Performance Metrics:
+ *    - Dynamically calculates Profit, Cost, and Net Profit based on timeFilter ('daily' or 'monthly').
+ *    - Formula: Net Profit = Profit - Cost
+ * 2. 90% Critical Threshold Warning:
+ *    - When either daily usage or monthly limit usage reaches >= 90%, the card highlights
+ *      with theme.danger (indicator bar, border, and progress bar).
+ * 3. Compact Layout:
+ *    - Redundant send/remaining rows are omitted to keep cards slim. Full breakdown
+ *      is accessible via AccountDetailsModal when tapping the card.
+ */
+export interface AccountFinancialMetrics {
+  profit: number;
+  cost: number;
+  netProfit: number;
+}
+
 interface AccountCardProps {
   account: Account;
   onPress: (account: Account) => void;
   onAddTransactionPress?: (accountId: string) => void;
+  timeFilter?: 'daily' | 'monthly';
+  metrics?: AccountFinancialMetrics;
 }
 
-const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress }) => {
+const AccountCardComponent: React.FC<AccountCardProps> = ({
+  account,
+  onPress,
+  timeFilter = 'daily',
+  metrics = {
+    profit: account.todayProfit || 0,
+    cost: 0,
+    netProfit: account.todayProfit || 0,
+  },
+}) => {
   const { theme } = useTheme();
 
+  // Limit and usage calculation
   const monthlyLimit = account.monthlyLimit || 300000;
   const monthlyLimitUsed = account.monthlyLimitUsed !== undefined ? account.monthlyLimitUsed : account.todaySend;
   const remainingLimit = account.remainingLimit !== undefined ? account.remainingLimit : Math.max(0, monthlyLimit - monthlyLimitUsed);
-  const totalMargin = account.totalMargin !== undefined ? account.totalMargin : account.todayProfit;
 
+  // Critical threshold check: triggers red warning when >= 90% is used on either limit
   const usageRatio = monthlyLimit > 0 ? monthlyLimitUsed / monthlyLimit : 0;
-  const usagePercentage = Math.min(100, Math.round(usageRatio * 100));
+  const dailyLimit = account.dailyLimit || 300000;
+  const dailyRatio = dailyLimit > 0 ? (account.todaySend || 0) / dailyLimit : 0;
+  const effectiveRatio = Math.max(usageRatio, dailyRatio);
+  const usagePercentage = Math.min(100, Math.round(effectiveRatio * 100));
   const isCritical = usagePercentage >= 90;
 
   const indicatorColor = isCritical ? theme.danger : account.isActive ? theme.primary : theme.textMuted;
@@ -44,7 +81,7 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress }) 
         <View style={[styles.leftIndicator, { backgroundColor: indicatorColor }]} />
 
         <View style={styles.contentContainer}>
-          {/* Top Row: Monospace Phone Number & Status / Profit Badge */}
+          {/* Top Row: Phone Number & Clean Status Pill */}
           <View style={styles.topRow}>
             <View style={styles.phoneGroup}>
               <Text style={[styles.phoneNumber, { color: account.isActive ? theme.text : theme.textMuted }]} numberOfLines={1}>
@@ -57,39 +94,24 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress }) 
               )}
             </View>
 
-            {account.isActive && totalMargin > 0 ? (
-              <View
+            {/* Clean Status Pill (Active / Disabled) */}
+            <View
+              style={[
+                styles.statusPill,
+                {
+                  backgroundColor: account.isActive ? theme.primaryLight : theme.cardSecondary,
+                },
+              ]}
+            >
+              <Text
                 style={[
-                  styles.profitBadge,
-                  {
-                    backgroundColor: theme.successLight,
-                  },
+                  styles.statusPillText,
+                  { color: account.isActive ? theme.primary : theme.textMuted },
                 ]}
               >
-                <Ionicons name="trending-up" size={13} color={theme.success} style={styles.profitIcon} />
-                <Text style={[styles.profitText, { color: theme.success }]}>
-                  +{formatCurrency(totalMargin)}
-                </Text>
-              </View>
-            ) : (
-              <View
-                style={[
-                  styles.statusPill,
-                  {
-                    backgroundColor: account.isActive ? theme.primaryLight : theme.cardSecondary,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusPillText,
-                    { color: account.isActive ? theme.primary : theme.textMuted },
-                  ]}
-                >
-                  {account.isActive ? 'Active' : 'Disabled'}
-                </Text>
-              </View>
-            )}
+                {account.isActive ? 'Active' : 'Disabled'}
+              </Text>
+            </View>
           </View>
 
           {/* Current Balance */}
@@ -105,7 +127,77 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress }) 
             </Text>
           </View>
 
-          {/* 2-Column Info Grid (Today Send & Remaining Limit) */}
+          {/* 3-Column Performance Metrics (Profit | Cost | Net Profit) */}
+          <View
+            style={[
+              styles.metricsGrid,
+              {
+                backgroundColor: theme.cardSecondary,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <View style={styles.metricsCol}>
+              <Text style={[styles.metricsLabel, { color: theme.textMuted }]} numberOfLines={1}>
+                {timeFilter === 'daily' ? 'DAILY PROFIT' : 'M. PROFIT'}
+              </Text>
+              <Text
+                style={[
+                  styles.metricsValue,
+                  { color: metrics.profit > 0 ? theme.success : theme.textMuted },
+                ]}
+                numberOfLines={1}
+              >
+                {metrics.profit > 0 ? `+${formatCurrency(metrics.profit)}` : formatCurrency(0)}
+              </Text>
+            </View>
+
+            <View style={[styles.metricsDivider, { backgroundColor: theme.border }]} />
+
+            <View style={styles.metricsCol}>
+              <Text style={[styles.metricsLabel, { color: theme.textMuted }]} numberOfLines={1}>
+                {timeFilter === 'daily' ? 'DAILY COST' : 'M. COST'}
+              </Text>
+              <Text
+                style={[
+                  styles.metricsValue,
+                  { color: metrics.cost > 0 ? theme.danger : theme.textMuted },
+                ]}
+                numberOfLines={1}
+              >
+                {metrics.cost > 0 ? `-${formatCurrency(metrics.cost)}` : formatCurrency(0)}
+              </Text>
+            </View>
+
+            <View style={[styles.metricsDivider, { backgroundColor: theme.border }]} />
+
+            <View style={styles.metricsCol}>
+              <Text style={[styles.metricsLabel, { color: theme.textMuted }]} numberOfLines={1}>
+                NET PROFIT
+              </Text>
+              <Text
+                style={[
+                  styles.metricsValue,
+                  {
+                    color:
+                      metrics.netProfit > 0
+                        ? theme.success
+                        : metrics.netProfit < 0
+                        ? theme.danger
+                        : theme.textMuted,
+                    fontWeight: '700',
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {metrics.netProfit > 0
+                  ? `+${formatCurrency(metrics.netProfit)}`
+                  : formatCurrency(metrics.netProfit)}
+              </Text>
+            </View>
+          </View>
+
+          {/* 2-Column Info Grid (Today Send & Remaining Limit) - Commented out to keep cards compact
           <View
             style={[
               styles.infoGrid,
@@ -156,6 +248,7 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({ account, onPress }) 
               </Text>
             </View>
           </View>
+          */}
 
           {/* Limit Usage Bar Section */}
           <View style={styles.limitSection}>
@@ -357,5 +450,34 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 3,
     fontWeight: '500',
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    marginTop: 2,
+  },
+  metricsCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  metricsDivider: {
+    width: 1,
+    height: 22,
+    marginHorizontal: 3,
+  },
+  metricsLabel: {
+    fontSize: 8.5,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  metricsValue: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

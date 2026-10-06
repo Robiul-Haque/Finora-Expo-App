@@ -81,15 +81,24 @@ const ExcelTableRow = React.memo<ExcelTableRowProps>(({
   onSelectAccount,
   onAddTransaction,
 }) => {
+  // =========================================================================
+  // MFS LEDGER CALCULATIONS & THRESHOLDS:
+  // - used: Amount sent out through this SIM (monthlyLimitUsed or todaySend)
+  // - totalLimit: Monthly limit ceiling (defaults to 300,000)
+  // - remaining: Remaining headroom (totalLimit - used)
+  // - 90% Critical Threshold: If either daily or monthly usage reaches >= 90%,
+  //   both 'Limit Used' and 'Remaining' numbers highlight in dangerColor (Red).
+  // =========================================================================
   const used = account.monthlyLimitUsed !== undefined ? account.monthlyLimitUsed : account.todaySend;
   const totalLimit = account.monthlyLimit || 300000;
   const remaining =
     account.remainingLimit !== undefined ? account.remainingLimit : Math.max(0, totalLimit - used);
-  const isLowLimit = remaining <= 30000;
   const dailyLimitVal = account.dailyLimit !== undefined ? account.dailyLimit : 300000;
   const isLowBalance = account.balance < 5000;
-  const usedRatio = dailyLimitVal > 0 ? used / dailyLimitVal : 0;
-  const isHighUsed = usedRatio >= 0.85;
+  const monthlyUsedRatio = totalLimit > 0 ? used / totalLimit : 0;
+  const dailyUsedRatio = dailyLimitVal > 0 ? (account.todaySend || 0) / dailyLimitVal : 0;
+  const isHighUsed = monthlyUsedRatio >= 0.90 || dailyUsedRatio >= 0.90;
+  const isLowLimit = remaining <= Math.max(30000, totalLimit * 0.10) || isHighUsed;
 
   const rowBg = index % 2 === 1 ? altRowBgColor : 'transparent';
 

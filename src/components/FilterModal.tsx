@@ -10,7 +10,7 @@ import {
   Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { DateFilter, SortFilter } from '../types/ledger';
+import { DateFilter } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -26,7 +26,6 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
   const [selectedAccountId, setSelectedAccountId] = useState(filters.accountId);
   const [selectedType, setSelectedType] = useState(filters.type);
   const [selectedDate, setSelectedDate] = useState<DateFilter>(filters.dateRange);
-  const [selectedSort, setSelectedSort] = useState<SortFilter>(filters.sortBy);
   const [showAccountPicker, setShowAccountPicker] = useState(false);
 
   const isClosing = useRef(false);
@@ -41,7 +40,6 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
       setSelectedAccountId(filters.accountId);
       setSelectedType(filters.type);
       setSelectedDate(filters.dateRange);
-      setSelectedSort(filters.sortBy);
       setShowAccountPicker(false);
 
       Animated.parallel([
@@ -88,7 +86,7 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
       accountId: selectedAccountId,
       type: selectedType,
       dateRange: selectedDate,
-      sortBy: selectedSort,
+      sortBy: 'newest',
     });
     handleClose();
   };
@@ -97,7 +95,6 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
     setSelectedAccountId('all');
     setSelectedType('all');
     setSelectedDate('all');
-    setSelectedSort('newest');
     resetFilters();
     handleClose();
   };
@@ -110,23 +107,14 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
 
   const dateOptions: { label: string; value: DateFilter }[] = [
     { label: 'Today', value: 'today' },
-    { label: 'Yesterday', value: 'yesterday' },
-    { label: 'This Week', value: 'this_week' },
     { label: 'This Month', value: 'this_month' },
   ];
 
   const typeOptions: { label: string; value: string }[] = [
     { label: 'Send Money', value: 'sm' },
     { label: 'Receive Money', value: 'recev' },
-    { label: 'Cash Out', value: 'co' },
+    // { label: 'Cash Out', value: 'co' },
     { label: 'Adjustment', value: 'adjustment' },
-  ];
-
-  const sortOptions: { label: string; value: SortFilter }[] = [
-    { label: 'Newest', value: 'newest' },
-    { label: 'Oldest', value: 'oldest' },
-    { label: 'Amount High/Low', value: 'amount_high' },
-    { label: 'Profit High', value: 'profit_high' },
   ];
 
   return (
@@ -326,48 +314,6 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
                               styles.typeCardText,
                               { color: isSelected ? theme.primary : theme.text },
                               isSelected && styles.typeCardTextSelected,
-                            ]}
-                          >
-                            {opt.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                {/* Section 4: Sort By */}
-                <View style={styles.section}>
-                  <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>SORT BY</Text>
-                  <View style={styles.sortCardList}>
-                    {sortOptions.map((opt) => {
-                      const isSelected = selectedSort === opt.value;
-                      return (
-                        <TouchableOpacity
-                          key={opt.value}
-                          style={[
-                            styles.sortCard,
-                            {
-                              backgroundColor: isSelected
-                                ? (isDarkMode ? 'rgba(26, 115, 232, 0.08)' : '#F8FAFC')
-                                : theme.card,
-                              borderColor: isSelected ? theme.primary : theme.border,
-                            },
-                          ]}
-                          onPress={() => setSelectedSort(opt.value)}
-                          activeOpacity={0.75}
-                        >
-                          <Ionicons
-                            name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-                            size={18}
-                            color={isSelected ? theme.primary : theme.textMuted}
-                            style={styles.radioIcon}
-                          />
-                          <Text
-                            style={[
-                              styles.sortCardText,
-                              { color: isSelected ? theme.primary : theme.text },
-                              isSelected && styles.sortCardTextSelected,
                             ]}
                           >
                             {opt.label}

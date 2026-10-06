@@ -88,7 +88,8 @@ const TransactionTypeSelectorComponent: React.FC<TransactionTypeSelectorProps> =
           </Text>
         </TouchableOpacity>
 
-        {/* 3. Cash Out */}
+        {/* 3. Cash Out - Feature commented out */}
+        {/*
         <TouchableOpacity
           style={[
             styles.card,
@@ -120,6 +121,7 @@ const TransactionTypeSelectorComponent: React.FC<TransactionTypeSelectorProps> =
             Cash Out
           </Text>
         </TouchableOpacity>
+        */}
 
         {/* 4. Adjustment */}
         <TouchableOpacity

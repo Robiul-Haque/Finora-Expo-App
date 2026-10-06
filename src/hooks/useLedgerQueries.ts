@@ -1,3 +1,25 @@
+/**
+ * ============================================================================
+ * FINORA LEDGER QUERIES & MUTATIONS (TanStack Query Architecture)
+ * ============================================================================
+ * 
+ * 1. SERVER STATE & CACHING:
+ *    - In-Memory Caching via TanStack Query (keys: 'accounts', 'transactions').
+ *    - Persistent Storage fallback via AsyncStorage in `ledgerApi.ts`.
+ *    - Stale Time: 15s (prevents redundant HTTP requests during quick navigations).
+ * 
+ * 2. BATTERY & PERFORMANCE OPTIMIZATION:
+ *    - Automatic polling uses `AppState.currentState === 'active'` check.
+ *    - If the user switches apps or locks their screen, polling is paused (0 battery drain).
+ *    - When the app is foregrounded, it resumes and queries fresh backend data.
+ * 
+ * 3. OPTIMISTIC MUTATIONS:
+ *    - Mutations immediately update the query cache (0ms perceived latency for the user).
+ *    - If a network error occurs, the previous state is restored gracefully without crashing.
+ *    - On settlement, queries are invalidated to sync server truth.
+ * ============================================================================
+ */
+import { AppState } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ledgerApi } from '../services/api/ledgerApi';
 import { Account, Transaction } from '../types/ledger';
@@ -13,24 +35,30 @@ export const ledgerKeys = {
 };
 
 /**
- * Hook to fetch accounts
+ * Hook to fetch accounts with battery-friendly foreground polling
  */
 export const useAccountsQuery = () => {
   return useQuery({
     queryKey: ledgerKeys.accounts(),
     queryFn: () => ledgerApi.getAccounts(),
-    staleTime: 1000 * 60 * 5, // 5 mins fresh cache
+    staleTime: 1000 * 15, // 15s fresh cache
+    refetchInterval: () => (AppState.currentState === 'active' ? 12000 : false),
+    refetchIntervalInBackground: false,
+    refetchOnReconnect: true,
   });
 };
 
 /**
- * Hook to fetch transactions
+ * Hook to fetch transactions with battery-friendly foreground polling
  */
 export const useTransactionsQuery = () => {
   return useQuery({
     queryKey: ledgerKeys.transactions(),
     queryFn: () => ledgerApi.getTransactions(),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 15,
+    refetchInterval: () => (AppState.currentState === 'active' ? 12000 : false),
+    refetchIntervalInBackground: false,
+    refetchOnReconnect: true,
   });
 };
 

@@ -8,7 +8,7 @@ import { queryClient } from './src/services/queryClient';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { LedgerProvider, useLedger } from './src/context/LedgerContext';
 import { HomeScreen, TransactionsScreen, AccountsScreen } from './src/screens';
-import { AddTransactionModal, AddAccountModal, AccountDetailsModal, ErrorBoundary, SplashScreen, OfflineBanner } from './src/components';
+import { AddTransactionModal, AddAccountModal, AccountDetailsModal, ErrorBoundary, SplashScreen, OfflineBanner, UserFriendlyToast } from './src/components';
 import { Account } from './src/types';
 import { initializeThemeSync } from './src/store/useThemeStore';
 import { setupCrashPrevention } from './src/utils/crashPrevention';
@@ -128,6 +128,9 @@ const MainApp: React.FC = () => {
       <View style={[styles.offlineBannerContainer, { top: insets.top + 2 }]} pointerEvents="none">
         <OfflineBanner />
       </View>
+
+      {/* Global User-Friendly Warning & Toast Notifications */}
+      <UserFriendlyToast />
 
       {/* Main Content Area: Instant Zero-Lag Lazy-Preserved Tab Views */}
       <View style={styles.screenContainer}>

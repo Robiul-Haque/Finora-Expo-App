@@ -65,7 +65,6 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = () => {
     if (filters.accountId && filters.accountId !== 'all') count++;
     if (filters.type && filters.type !== 'all') count++;
     if (filters.dateRange && filters.dateRange !== 'all') count++;
-    if (filters.sortBy && filters.sortBy !== 'newest') count++;
     return count;
   }, [filters]);
 
@@ -73,8 +72,6 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = () => {
   const filteredTransactions = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const startOfYesterday = startOfToday - 86400000;
-    const startOfWeek = startOfToday - 7 * 86400000;
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
     const q = deferredSearchQuery.toLowerCase().trim();
@@ -108,12 +105,10 @@ const TransactionsScreenComponent: React.FC<TransactionsScreenProps> = () => {
         if (filters.type === 'adjustment' && !isAdjustment) return false;
       }
 
-      // 3. Date Range Filter
+      // 3. Date Range Filter (Today, This Month)
       if (filters.dateRange && filters.dateRange !== 'all') {
         const tTime = getTxTime(t);
         if (filters.dateRange === 'today' && tTime < startOfToday) return false;
-        if (filters.dateRange === 'yesterday' && (tTime < startOfYesterday || tTime >= startOfToday)) return false;
-        if (filters.dateRange === 'this_week' && tTime < startOfWeek) return false;
         if (filters.dateRange === 'this_month' && tTime < startOfMonth) return false;
       }
 

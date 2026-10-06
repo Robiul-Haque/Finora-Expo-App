@@ -1,3 +1,16 @@
+/**
+ * ============================================================================
+ * FINORA CORE LEDGER CONTEXT
+ * ============================================================================
+ * 
+ * Central hub for state management across the entire application:
+ * 1. Server State: In-memory cache + API sync via TanStack Query hooks.
+ * 2. Client State: Filter and search criteria via Zustand (`useFilterStore`).
+ * 3. Optimistic Mutations: Instant state updates with background synchronization.
+ * 4. Derived Ledger Metrics: Real-time calculation of Total Balance, Today's Inflow,
+ *    Today's Outflow, and Margins/Profits.
+ * ============================================================================
+ */
 import React, { createContext, useContext, useMemo, useCallback } from 'react';
 import { Account, Transaction, FilterOptions, LedgerMetrics } from '../types/ledger';
 import {
