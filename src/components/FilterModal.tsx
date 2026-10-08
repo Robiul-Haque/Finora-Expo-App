@@ -30,13 +30,13 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
 
   const isClosing = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(140)).current;
+  const slideAnim = useRef(new Animated.Value(300)).current;
 
   useEffect(() => {
     if (visible) {
       isClosing.current = false;
       fadeAnim.setValue(0);
-      slideAnim.setValue(140);
+      slideAnim.setValue(300);
       setSelectedAccountId(filters.accountId);
       setSelectedType(filters.type);
       setSelectedDate(filters.dateRange);
@@ -71,7 +71,7 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 140,
+        toValue: 300,
         duration: 130,
         easing: Easing.in(Easing.quad),
         useNativeDriver: true,
@@ -117,8 +117,10 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
     { label: 'Adjustment', value: 'adjustment' },
   ];
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} animationType="none" transparent onRequestClose={handleClose}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={handleClose}>
       <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
@@ -131,6 +133,7 @@ const FilterModalComponent: React.FC<FilterModalProps> = ({ visible, onClose }) 
             {
               backgroundColor: theme.card,
               borderColor: theme.border,
+              opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
             },
           ]}

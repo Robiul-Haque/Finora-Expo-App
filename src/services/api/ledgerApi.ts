@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { Account, Transaction, DailyProfitRecord, LedgerMetrics } from '../../types/ledger';
-import { initialAccounts, initialTransactions, initialDailyProfitRecords } from '../../constants/mockData';
 import syncServiceInstance, { syncService as namedSyncService } from '../sync/syncService';
 const syncService = syncServiceInstance || namedSyncService;
 import { parseDate, isSameDay, isSameMonth } from '../../utils/formatters';
@@ -20,13 +19,15 @@ const TRANSACTIONS_STORAGE_KEY = '@finora_transactions_v4';
 const DAILY_PROFITS_STORAGE_KEY = '@finora_daily_profits_v4';
 
 const sanitizeTransactions = (txList: Transaction[]): Transaction[] => {
-  return txList.map((t) => {
-    const d = parseDate(t.date);
-    return {
-      ...t,
-      date: isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString(),
-    };
-  });
+  return txList
+    .filter((t) => t.type !== 'co' && t.type !== 'cash_out')
+    .map((t) => {
+      const d = parseDate(t.date);
+      return {
+        ...t,
+        date: isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString(),
+      };
+    });
 };
 
 /**
@@ -40,7 +41,7 @@ const getDefaultBaseUrl = () => {
 export const API_CONFIG = {
   BASE_URL: getDefaultBaseUrl(),
   USE_MOCK_STORAGE: false, // Connects to live backend with instant offline fallback
-  TIMEOUT_MS: 8000,
+  TIMEOUT_MS: 4500,
 };
 
 let currentAuthToken: string | null = null;
@@ -136,10 +137,9 @@ export const ledgerApi = {
       if (data) {
         return JSON.parse(data);
       }
-      await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(initialAccounts));
-      return initialAccounts;
+      return [];
     } catch {
-      return initialAccounts;
+      return [];
     }
   },
 
@@ -181,13 +181,15 @@ export const ledgerApi = {
       const data = await AsyncStorage.getItem(TRANSACTIONS_STORAGE_KEY);
       if (data) {
         const parsed = JSON.parse(data);
-        return sanitizeTransactions(parsed);
+        const sanitized = sanitizeTransactions(parsed);
+        if (sanitized.length !== parsed.length) {
+          await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(sanitized));
+        }
+        return sanitized;
       }
-      const sanitizedInitial = sanitizeTransactions(initialTransactions);
-      await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(sanitizedInitial));
-      return sanitizedInitial;
+      return [];
     } catch {
-      return sanitizeTransactions(initialTransactions);
+      return [];
     }
   },
 
@@ -198,10 +200,9 @@ export const ledgerApi = {
     try {
       const data = await AsyncStorage.getItem(DAILY_PROFITS_STORAGE_KEY);
       if (data) return JSON.parse(data);
-      await AsyncStorage.setItem(DAILY_PROFITS_STORAGE_KEY, JSON.stringify(initialDailyProfitRecords));
-      return initialDailyProfitRecords;
+      return [];
     } catch {
-      return initialDailyProfitRecords;
+      return [];
     }
   },
 
@@ -238,6 +239,8 @@ export const ledgerApi = {
       ...txData,
       id: clientTxId,
       clientTxId,
+      accountName: txData.accountName || targetAccount?.name || 'Account',
+      accountNumber: txData.accountNumber || targetAccount?.accountNumber || '',
       margin: marginAmount,
       profit: marginAmount,
       runningBalance: txData.runningBalance !== undefined ? txData.runningBalance : finalBalance,
@@ -796,12 +799,12 @@ export const ledgerApi = {
   },
 
   /**
-   * Reset database back to seed state
+   * Reset local database cache to force fresh pull from live server
    */
   async resetDatabase(): Promise<void> {
-    await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(initialAccounts));
-    await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(initialTransactions));
-    await AsyncStorage.setItem(DAILY_PROFITS_STORAGE_KEY, JSON.stringify(initialDailyProfitRecords));
+    await AsyncStorage.removeItem(ACCOUNTS_STORAGE_KEY);
+    await AsyncStorage.removeItem(TRANSACTIONS_STORAGE_KEY);
+    await AsyncStorage.removeItem(DAILY_PROFITS_STORAGE_KEY);
   },
 };
 

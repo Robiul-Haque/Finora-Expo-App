@@ -9,7 +9,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
   Animated,
   Easing,
@@ -57,7 +56,7 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
 
   const isClosing = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(140)).current;
+  const slideAnim = useRef(new Animated.Value(350)).current;
   const dropdownAnim = useRef(new Animated.Value(0)).current;
 
   const toggleAccountDropdown = () => {
@@ -96,7 +95,7 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
     if (visible && transaction) {
       isClosing.current = false;
       fadeAnim.setValue(0);
-      slideAnim.setValue(140);
+      slideAnim.setValue(350);
       setShowAccountDropdown(false);
       dropdownAnim.setValue(0);
 
@@ -151,7 +150,7 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 140,
+        toValue: 350,
         duration: 130,
         easing: Easing.in(Easing.quad),
         useNativeDriver: true,
@@ -263,10 +262,10 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
     return dStr;
   }, [selectedDate]);
 
-  if (!transaction) return null;
+  if (!visible || !transaction) return null;
 
   return (
-    <Modal visible={visible} animationType="none" transparent statusBarTranslucent onRequestClose={handleClose}>
+    <Modal visible={visible} animationType="fade" transparent statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
@@ -284,6 +283,7 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
               {
                 backgroundColor: theme.card,
                 borderColor: theme.border,
+                opacity: fadeAnim,
                 transform: [{ translateY: slideAnim }],
               },
             ]}

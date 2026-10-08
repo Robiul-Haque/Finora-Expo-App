@@ -9,7 +9,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
   Animated,
   Easing,
@@ -59,7 +58,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
 
   const isClosing = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(140)).current;
+  const slideAnim = useRef(new Animated.Value(350)).current;
   const dropdownAnim = useRef(new Animated.Value(0)).current;
 
   const toggleAccountDropdown = () => {
@@ -104,7 +103,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
       }
       isClosing.current = false;
       fadeAnim.setValue(0);
-      slideAnim.setValue(140);
+      slideAnim.setValue(350);
       setShowAccountDropdown(false);
       dropdownAnim.setValue(0);
       setAmount('');
@@ -144,7 +143,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 140,
+        toValue: 350,
         duration: 130,
         easing: Easing.in(Easing.quad),
         useNativeDriver: true,
@@ -163,17 +162,6 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
   }, [preselectedAccountId, accounts]);
 
   const selectedAccount = accounts.find((a) => a.id === accountId) || accounts[0];
-
-  // Cost and margin calculator aligned with Google Sheet MFS ledger
-  const calculateDefaultFees = (val: string, targetType: 'send' | 'receive' | 'cash_out' | 'adjustment') => {
-    const num = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
-    if (num <= 0 || targetType === 'adjustment') {
-      return { cost: '0', profit: '0' };
-    }
-    // In MFS agent ledger, balance is only debited by transaction amount (cost = 0)
-    // Margin/profit is earned income, not a cost deduction
-    return { cost: '0', profit: '0' };
-  };
 
   const handleAmountChange = (val: string) => {
     setAmount(val);
@@ -276,8 +264,10 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
     return dStr;
   }, [selectedDate]);
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} animationType="none" transparent statusBarTranslucent onRequestClose={handleClose}>
+    <Modal visible={visible} animationType="fade" transparent statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
@@ -285,7 +275,7 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
           onPress={handleClose}
         />
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }} pointerEvents="box-none">
-          <Animated.View style={[styles.modalSheet, { backgroundColor: theme.card, borderColor: theme.border, transform: [{ translateY: slideAnim }] }]}>
+          <Animated.View style={[styles.modalSheet, { backgroundColor: theme.card, borderColor: theme.border, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             {/* Top Header */}
             <View style={[styles.header, { borderBottomColor: theme.divider }]}>
               <TouchableOpacity

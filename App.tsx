@@ -3,8 +3,10 @@ import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-nativ
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Font from 'expo-font';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './src/services/queryClient';
+import { ledgerKeys } from './src/hooks/useLedgerQueries';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { LedgerProvider, useLedger } from './src/context/LedgerContext';
 import { HomeScreen, TransactionsScreen, AccountsScreen } from './src/screens';
@@ -85,6 +87,21 @@ const MainApp: React.FC = () => {
     transactions: false,
     accounts: false,
   });
+
+  // Pre-warm secondary tabs smoothly only AFTER splash screen has finished,
+  // completely freeing the JS thread so splash animations never freeze
+  useEffect(() => {
+    if (!showSplash) {
+      const idleTimer = setTimeout(() => {
+        setVisitedTabs({
+          home: true,
+          transactions: true,
+          accounts: true,
+        });
+      }, 250);
+      return () => clearTimeout(idleTimer);
+    }
+  }, [showSplash]);
 
   const switchTab = React.useCallback((tab: TabType) => {
     setActiveTab(tab);
@@ -251,14 +268,34 @@ export default function App() {
   useEffect(() => {
     async function prepareApp() {
       try {
-        await Promise.all([
+        const [, , cachedAccRaw, cachedTxRaw] = await Promise.all([
           initializeThemeSync(),
           Font.loadAsync({
             ...Ionicons.font,
             Ionicons: require('./assets/fonts/Ionicons.ttf'),
             ionicons: require('./assets/fonts/Ionicons.ttf'),
           }),
+          AsyncStorage.getItem('@finora_accounts_v4').catch(() => null),
+          AsyncStorage.getItem('@finora_transactions_v4').catch(() => null),
         ]);
+
+        if (cachedAccRaw) {
+          try {
+            const accs = JSON.parse(cachedAccRaw);
+            if (Array.isArray(accs) && accs.length > 0) {
+              queryClient.setQueryData(ledgerKeys.accounts(), accs);
+            }
+          } catch {}
+        }
+
+        if (cachedTxRaw) {
+          try {
+            const txs = JSON.parse(cachedTxRaw);
+            if (Array.isArray(txs) && txs.length > 0) {
+              queryClient.setQueryData(ledgerKeys.transactions(), txs);
+            }
+          } catch {}
+        }
       } catch (e) {
         console.warn('App preparation error:', e);
       } finally {

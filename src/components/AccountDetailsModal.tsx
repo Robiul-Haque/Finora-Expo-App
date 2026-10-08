@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Alert, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Account, Transaction } from '../types/ledger';
 import { useLedger } from '../context/LedgerContext';
@@ -53,7 +53,7 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
 
   const isClosing = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(40)).current;
+  const slideAnim = useRef(new Animated.Value(250)).current;
 
   const filterDropdownFade = useRef(new Animated.Value(0)).current;
   const filterDropdownScale = useRef(new Animated.Value(0.94)).current;
@@ -62,7 +62,7 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
     if (visible) {
       isClosing.current = false;
       fadeAnim.setValue(0);
-      slideAnim.setValue(40);
+      slideAnim.setValue(250);
       setShowOptionsMenu(false);
       setShowDeleteConfirm(false);
       setShowHistoryFilterModal(false);
@@ -117,7 +117,7 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 40,
+        toValue: 250,
         duration: 130,
         easing: Easing.in(Easing.quad),
         useNativeDriver: true,
@@ -201,8 +201,10 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
     }
   };
 
+  if (!visible || !account) return null;
+
   return (
-    <Modal visible={visible} animationType="none" transparent onRequestClose={handleClose}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={handleClose}>
       <Animated.View style={[styles.container, { backgroundColor: theme.background, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
         {/* Top App Bar Header */}
         <View style={[styles.topHeader, { backgroundColor: theme.card, borderBottomColor: theme.divider }]}>

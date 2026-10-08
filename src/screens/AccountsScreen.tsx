@@ -14,7 +14,7 @@ import { useLedger } from '../context/LedgerContext';
 import { useTheme } from '../context/ThemeContext';
 import { AccountCard, AccountCardSkeleton, ConfirmationModal, SearchBar, AppHeader } from '../components';
 import { Account } from '../types';
-import { isSameDay, isSameMonth } from '../utils';
+import { isSameDay, isSameMonth, formatCurrency } from '../utils';
 
 interface AccountsScreenProps {
   onOpenAccountDetails: (account: Account) => void;
@@ -27,7 +27,7 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
   onOpenAddAccount,
   onOpenAddTransaction,
 }) => {
-  const { theme } = useTheme();
+  const { theme, isDarkMode } = useTheme();
   const { accounts, transactions, isLoading, deleteAccount, refetch } = useLedger();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,6 +74,7 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
    */
   const accountMetricsMap = useMemo(() => {
     const map: Record<string, { profit: number; cost: number; netProfit: number }> = {};
+    const hasTxMap: Record<string, boolean> = {};
     const now = new Date();
 
     // Initialize all accounts with zero
@@ -83,23 +84,28 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
 
     // Accumulate from transactions
     for (const tx of transactions) {
-      if (!tx.accountId) continue;
+      if (!tx.accountId && !tx.accountNumber) continue;
       const isMatch = timeFilter === 'daily' ? isSameDay(tx.date, now) : isSameMonth(tx.date, now);
       if (isMatch) {
-        if (!map[tx.accountId]) {
-          map[tx.accountId] = { profit: 0, cost: 0, netProfit: 0 };
+        const matchedAcc = accounts.find(
+          (a) => a.id === tx.accountId || a.accountNumber === tx.accountId || a.accountNumber === tx.accountNumber
+        );
+        const targetId = matchedAcc ? matchedAcc.id : tx.accountId;
+        if (!map[targetId]) {
+          map[targetId] = { profit: 0, cost: 0, netProfit: 0 };
         }
+        hasTxMap[targetId] = true;
         const profit = Number(tx.profit ?? tx.margin ?? 0);
         const cost = Number(tx.cost ?? 0);
-        map[tx.accountId].profit += profit;
-        map[tx.accountId].cost += cost;
+        map[targetId].profit += profit;
+        map[targetId].cost += cost;
       }
     }
 
-    // Fallback for summarized stats when raw transaction items aren't loaded
+    // Fallback for summarized stats ONLY when raw transaction items aren't present
     for (const acc of accounts) {
       const current = map[acc.id] || { profit: 0, cost: 0, netProfit: 0 };
-      if (current.profit === 0) {
+      if (!hasTxMap[acc.id]) {
         if (timeFilter === 'daily' && (acc.todayProfit || 0) > 0) {
           current.profit = acc.todayProfit || 0;
         } else if (timeFilter === 'monthly' && (acc.totalMargin || 0) > 0) {
@@ -112,6 +118,34 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
 
     return map;
   }, [accounts, transactions, timeFilter]);
+
+  /**
+   * TOTAL FINANCIAL METRICS AGGREGATOR
+   * ----------------------------------
+   * Aggregates Profit, Cost, and Net Profit across all active/filtered accounts
+   * for the selected time filter ('daily' | 'monthly').
+   */
+  const totalMetrics = useMemo(() => {
+    let profit = 0;
+    let cost = 0;
+
+    const listToSum = searchQuery.trim() ? filteredAccounts : accounts;
+    for (const acc of listToSum) {
+      const metric = accountMetricsMap[acc.id];
+      if (metric) {
+        profit += metric.profit;
+        cost += metric.cost;
+      }
+    }
+
+    const netProfit = profit - cost;
+
+    return {
+      profit,
+      cost,
+      netProfit,
+    };
+  }, [accounts, filteredAccounts, accountMetricsMap, searchQuery]);
 
   const handleConfirmDelete = () => {
     if (accountToDelete) {
@@ -185,6 +219,133 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
                 <Ionicons name="add" size={16} color="#FFFFFF" />
                 <Text style={styles.addAccountBtnText}>Add SIM</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* TOTAL FINANCIAL SUMMARY CARDS (Clean Minimal 3-Pillar Row) */}
+          <View style={styles.summaryMetricsRow}>
+            {/* Total Profit */}
+            <View
+              style={[
+                styles.summaryMetricItem,
+                {
+                  backgroundColor: theme.card,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <View style={styles.metricItemHeader}>
+                <Ionicons name="arrow-up-circle" size={13} color={theme.success} />
+                <Text style={[styles.summaryMetricLabel, { color: theme.textMuted }]} numberOfLines={1}>
+                  {timeFilter === 'daily' ? 'DAY PROFIT' : 'M. PROFIT'}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.summaryMetricValue,
+                  { color: totalMetrics.profit > 0 ? theme.success : theme.text },
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
+              >
+                {totalMetrics.profit > 0 ? `+${formatCurrency(totalMetrics.profit)}` : formatCurrency(0)}
+              </Text>
+            </View>
+
+            {/* Total Cost */}
+            <View
+              style={[
+                styles.summaryMetricItem,
+                {
+                  backgroundColor: theme.card,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <View style={styles.metricItemHeader}>
+                <Ionicons name="arrow-down-circle" size={13} color={theme.danger} />
+                <Text style={[styles.summaryMetricLabel, { color: theme.textMuted }]} numberOfLines={1}>
+                  {timeFilter === 'daily' ? 'DAY COST' : 'M. COST'}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.summaryMetricValue,
+                  { color: totalMetrics.cost > 0 ? theme.danger : theme.textMuted },
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
+              >
+                {totalMetrics.cost > 0 ? `-${formatCurrency(totalMetrics.cost)}` : formatCurrency(0)}
+              </Text>
+            </View>
+
+            {/* Net Profit */}
+            <View
+              style={[
+                styles.summaryMetricItem,
+                {
+                  backgroundColor:
+                    totalMetrics.netProfit >= 0
+                      ? isDarkMode
+                        ? 'rgba(0, 200, 83, 0.12)'
+                        : '#EAF7EE'
+                      : isDarkMode
+                      ? 'rgba(255, 82, 82, 0.12)'
+                      : '#FDECEA',
+                  borderColor:
+                    totalMetrics.netProfit >= 0
+                      ? isDarkMode
+                        ? 'rgba(0, 200, 83, 0.3)'
+                        : '#A3E3B5'
+                      : isDarkMode
+                      ? 'rgba(255, 82, 82, 0.3)'
+                      : '#F8B4B4',
+                },
+              ]}
+            >
+              <View style={styles.metricItemHeader}>
+                <Ionicons
+                  name={totalMetrics.netProfit >= 0 ? 'sparkles' : 'alert-circle'}
+                  size={13}
+                  color={totalMetrics.netProfit >= 0 ? theme.success : theme.danger}
+                />
+                <Text
+                  style={[
+                    styles.summaryMetricLabel,
+                    {
+                      color: totalMetrics.netProfit >= 0 ? theme.success : theme.danger,
+                      fontWeight: '700',
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  NET PROFIT
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.summaryMetricValue,
+                  {
+                    color:
+                      totalMetrics.netProfit > 0
+                        ? theme.success
+                        : totalMetrics.netProfit < 0
+                        ? theme.danger
+                        : theme.text,
+                    fontWeight: '800',
+                  },
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
+              >
+                {totalMetrics.netProfit > 0
+                  ? `+${formatCurrency(totalMetrics.netProfit)}`
+                  : formatCurrency(totalMetrics.netProfit)}
+              </Text>
             </View>
           </View>
 
@@ -407,6 +568,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     padding: 0,
+  },
+  summaryMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 8,
+    marginTop: 0,
+  },
+  summaryMetricItem: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  metricItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  summaryMetricLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  summaryMetricValue: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
   accountsGrid: {
     gap: 12,

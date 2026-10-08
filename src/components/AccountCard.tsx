@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Account } from '../types/ledger';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../utils';
@@ -50,7 +49,6 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
   // Limit and usage calculation
   const monthlyLimit = account.monthlyLimit || 300000;
   const monthlyLimitUsed = account.monthlyLimitUsed !== undefined ? account.monthlyLimitUsed : account.todaySend;
-  const remainingLimit = account.remainingLimit !== undefined ? account.remainingLimit : Math.max(0, monthlyLimit - monthlyLimitUsed);
 
   // Critical threshold check: triggers red warning when >= 90% is used on either limit
   const usageRatio = monthlyLimit > 0 ? monthlyLimitUsed / monthlyLimit : 0;

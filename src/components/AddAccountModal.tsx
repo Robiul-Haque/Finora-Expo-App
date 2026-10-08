@@ -9,7 +9,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Animated,
   Easing,
 } from 'react-native';
@@ -43,13 +42,13 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
 
   const isClosing = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(140)).current;
+  const slideAnim = useRef(new Animated.Value(350)).current;
 
   useEffect(() => {
     if (visible) {
       isClosing.current = false;
       fadeAnim.setValue(0);
-      slideAnim.setValue(140);
+      slideAnim.setValue(350);
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -79,7 +78,7 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 140,
+        toValue: 350,
         duration: 130,
         easing: Easing.in(Easing.quad),
         useNativeDriver: true,
@@ -157,8 +156,10 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
     }
   };
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} animationType="none" transparent statusBarTranslucent onRequestClose={handleClose}>
+    <Modal visible={visible} animationType="fade" transparent statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
@@ -176,6 +177,7 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
               {
                 backgroundColor: theme.card,
                 borderColor: theme.border,
+                opacity: fadeAnim,
                 transform: [{ translateY: slideAnim }],
               },
             ]}

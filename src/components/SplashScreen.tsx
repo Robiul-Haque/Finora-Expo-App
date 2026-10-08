@@ -13,10 +13,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const exitFadeAnim = useRef(new Animated.Value(1)).current;
   const logoScaleAnim = useRef(new Animated.Value(0.86)).current;
 
-  // 3 Animated values for the loading dots wave
-  const dot1Anim = useRef(new Animated.Value(0.3)).current;
-  const dot2Anim = useRef(new Animated.Value(0.3)).current;
-  const dot3Anim = useRef(new Animated.Value(0.3)).current;
+  // Single continuous native loop driver (never stalls or desynchronizes on Android/iOS)
+  const dotPhase = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // 1. Entrance animation (fade + smooth logo pop-in)
@@ -35,55 +33,34 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       }),
     ]).start();
 
-    // 2. Continuous smooth, gentle wave animation for loading dots
-    const createDotAnimation = (anim: Animated.Value, delay: number) => {
-      return Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(anim, {
-            toValue: 1,
-            duration: 380,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(anim, {
-            toValue: 0.35,
-            duration: 380,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.delay(Math.max(0, 560 - delay)),
-        ])
-      );
-    };
+    // 2. Continuous 60fps native driver loop for dots
+    const waveAnimation = Animated.loop(
+      Animated.timing(dotPhase, {
+        toValue: 1,
+        duration: 850,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    waveAnimation.start();
 
-    const anim1 = createDotAnimation(dot1Anim, 0);
-    const anim2 = createDotAnimation(dot2Anim, 180);
-    const anim3 = createDotAnimation(dot3Anim, 360);
-
-    anim1.start();
-    anim2.start();
-    anim3.start();
-
-    // 3. Smooth exit after 2000ms duration (extended by 250ms)
+    // 3. Smooth exit after 1150ms duration (increased by another 200ms as requested)
     const timer = setTimeout(() => {
       Animated.timing(exitFadeAnim, {
         toValue: 0,
-        duration: 200,
+        duration: 220,
         easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }).start(() => {
         onFinish();
       });
-    }, 2000);
+    }, 1150);
 
     return () => {
       clearTimeout(timer);
-      anim1.stop();
-      anim2.stop();
-      anim3.stop();
+      waveAnimation.stop();
     };
-  }, [fadeAnim, exitFadeAnim, logoScaleAnim, dot1Anim, dot2Anim, dot3Anim, onFinish]);
+  }, [fadeAnim, exitFadeAnim, logoScaleAnim, dotPhase, onFinish]);
 
   return (
     <Animated.View
@@ -138,12 +115,15 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
               styles.dot,
               {
                 backgroundColor: theme.primary,
-                opacity: dot1Anim,
+                opacity: dotPhase.interpolate({
+                  inputRange: [0, 0.25, 0.5, 1],
+                  outputRange: [0.3, 1, 0.3, 0.3],
+                }),
                 transform: [
                   {
-                    scale: dot1Anim.interpolate({
-                      inputRange: [0.3, 1],
-                      outputRange: [0.8, 1.25],
+                    scale: dotPhase.interpolate({
+                      inputRange: [0, 0.25, 0.5, 1],
+                      outputRange: [0.85, 1.25, 0.85, 0.85],
                     }),
                   },
                 ],
@@ -155,12 +135,15 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
               styles.dot,
               {
                 backgroundColor: theme.primary,
-                opacity: dot2Anim,
+                opacity: dotPhase.interpolate({
+                  inputRange: [0, 0.25, 0.5, 0.75, 1],
+                  outputRange: [0.3, 0.3, 1, 0.3, 0.3],
+                }),
                 transform: [
                   {
-                    scale: dot2Anim.interpolate({
-                      inputRange: [0.3, 1],
-                      outputRange: [0.8, 1.25],
+                    scale: dotPhase.interpolate({
+                      inputRange: [0, 0.25, 0.5, 0.75, 1],
+                      outputRange: [0.85, 0.85, 1.25, 0.85, 0.85],
                     }),
                   },
                 ],
@@ -172,12 +155,15 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
               styles.dot,
               {
                 backgroundColor: theme.primary,
-                opacity: dot3Anim,
+                opacity: dotPhase.interpolate({
+                  inputRange: [0, 0.5, 0.75, 1],
+                  outputRange: [0.3, 0.3, 1, 0.3],
+                }),
                 transform: [
                   {
-                    scale: dot3Anim.interpolate({
-                      inputRange: [0.3, 1],
-                      outputRange: [0.8, 1.25],
+                    scale: dotPhase.interpolate({
+                      inputRange: [0, 0.5, 0.75, 1],
+                      outputRange: [0.85, 0.85, 1.25, 0.85],
                     }),
                   },
                 ],

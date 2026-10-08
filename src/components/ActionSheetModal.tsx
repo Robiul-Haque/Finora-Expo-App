@@ -48,13 +48,13 @@ const ActionSheetModalComponent: React.FC<ActionSheetModalProps> = ({
 
   const isClosing = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(140)).current;
+  const slideAnim = useRef(new Animated.Value(300)).current;
 
   useEffect(() => {
     if (visible) {
       isClosing.current = false;
       fadeAnim.setValue(0);
-      slideAnim.setValue(140);
+      slideAnim.setValue(300);
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -84,7 +84,7 @@ const ActionSheetModalComponent: React.FC<ActionSheetModalProps> = ({
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 140,
+        toValue: 300,
         duration: 130,
         easing: Easing.in(Easing.quad),
         useNativeDriver: true,
@@ -101,11 +101,13 @@ const ActionSheetModalComponent: React.FC<ActionSheetModalProps> = ({
     }, 130);
   };
 
+  if (!visible) return null;
+
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="none"
+      animationType="fade"
       onRequestClose={handleClose}
     >
       <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
@@ -120,6 +122,7 @@ const ActionSheetModalComponent: React.FC<ActionSheetModalProps> = ({
             {
               backgroundColor: theme.card,
               borderColor: theme.border,
+              opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
             },
           ]}

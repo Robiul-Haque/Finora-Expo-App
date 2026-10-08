@@ -19,7 +19,6 @@
  *    - On settlement, queries are invalidated to sync server truth.
  * ============================================================================
  */
-import { AppState } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ledgerApi } from '../services/api/ledgerApi';
 import { Account, Transaction } from '../types/ledger';
@@ -41,8 +40,8 @@ export const useAccountsQuery = () => {
   return useQuery({
     queryKey: ledgerKeys.accounts(),
     queryFn: () => ledgerApi.getAccounts(),
-    staleTime: 1000 * 15, // 15s fresh cache
-    refetchInterval: () => (AppState.currentState === 'active' ? 12000 : false),
+    staleTime: 1000 * 60, // 60s fresh cache
+    refetchInterval: false, // Prevents battery and memory drain on low-end devices
     refetchIntervalInBackground: false,
     refetchOnReconnect: true,
   });
@@ -55,8 +54,8 @@ export const useTransactionsQuery = () => {
   return useQuery({
     queryKey: ledgerKeys.transactions(),
     queryFn: () => ledgerApi.getTransactions(),
-    staleTime: 1000 * 15,
-    refetchInterval: () => (AppState.currentState === 'active' ? 12000 : false),
+    staleTime: 1000 * 60, // 60s fresh cache
+    refetchInterval: false,
     refetchIntervalInBackground: false,
     refetchOnReconnect: true,
   });
@@ -361,6 +360,16 @@ export const useUpdateTransactionMutation = () => {
       queryClient.setQueryData<Account[]>(ledgerKeys.accounts(), updatedAccounts);
 
       return { prevTxs, prevAccounts };
+    },
+    onSuccess: (data) => {
+      if (data?.transaction) {
+        queryClient.setQueryData<Transaction[]>(ledgerKeys.transactions(), (old = []) =>
+          old.map((t) => (t.id === data.transaction.id ? data.transaction : t))
+        );
+      }
+      if (data?.updatedAccounts) {
+        queryClient.setQueryData<Account[]>(ledgerKeys.accounts(), data.updatedAccounts);
+      }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ledgerKeys.transactions() });
