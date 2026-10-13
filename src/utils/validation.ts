@@ -1,4 +1,5 @@
 import { Account, TransactionType } from '../types/ledger';
+import { isSameDay, isSameMonth } from './formatters';
 
 /**
  * Normalizes a Bangladeshi mobile number or string
@@ -52,7 +53,8 @@ export const validateTransaction = (
   amountStr: string,
   targetNumber: string,
   costStr: string,
-  marginStr: string
+  marginStr: string,
+  txDate?: Date | string
 ): TransactionValidationResult => {
   const errors: TransactionValidationResult['errors'] = {};
   const warnings: TransactionValidationResult['warnings'] = {};
@@ -92,14 +94,35 @@ export const validateTransaction = (
           : `Insufficient balance! Available: ৳${account.balance.toLocaleString('en-US')}`;
     }
 
-    // Limit check for Send Money (Sm)
-    if ((type === 'sm' || type === 'send_money') && numAmount > 0) {
-      const remainingLimit =
-        account.remainingLimit !== undefined
-          ? account.remainingLimit
-          : Math.max(0, (account.monthlyLimit || 300000) - (account.monthlyLimitUsed || account.todaySend || 0));
-      if (numAmount > remainingLimit) {
-        warnings.amount = `Amount exceeds remaining monthly limit (৳${remainingLimit.toLocaleString('en-US')})`;
+    // Limit check for Send Money (Sm / send / send_money)
+    if ((type === 'sm' || type === 'send_money' || type === 'send') && numAmount > 0) {
+      const isTodayTx = txDate ? isSameDay(txDate) : true;
+      const isThisMonthTx = txDate ? isSameMonth(txDate) : true;
+
+      const dailyLimit = account.dailyLimit !== undefined ? account.dailyLimit : 50000;
+      if (isTodayTx) {
+        const todaySend = account.todaySend || 0;
+        const remainingDailyLimit = Math.max(0, dailyLimit - todaySend);
+        if (numAmount > remainingDailyLimit) {
+          errors.amount = `Amount exceeds remaining daily limit (৳${remainingDailyLimit.toLocaleString('en-US')}). Daily limit is max ৳${dailyLimit.toLocaleString('en-US')}`;
+        }
+      } else if (numAmount > dailyLimit) {
+        errors.amount = `Amount exceeds maximum daily send limit of ৳${dailyLimit.toLocaleString('en-US')}`;
+      }
+
+      const monthlyLimit = account.monthlyLimit || 300000;
+      if (isThisMonthTx) {
+        const monthlyUsed = account.monthlyLimitUsed !== undefined ? account.monthlyLimitUsed : (account.todaySend || 0);
+        const remainingMonthlyLimit =
+          account.remainingLimit !== undefined
+            ? account.remainingLimit
+            : Math.max(0, monthlyLimit - monthlyUsed);
+
+        if (numAmount > remainingMonthlyLimit) {
+          errors.amount = `Amount exceeds remaining monthly limit (৳${remainingMonthlyLimit.toLocaleString('en-US')}). Monthly limit is max ৳${monthlyLimit.toLocaleString('en-US')}`;
+        }
+      } else if (numAmount > monthlyLimit) {
+        errors.amount = `Amount exceeds maximum monthly send limit of ৳${monthlyLimit.toLocaleString('en-US')}`;
       }
     }
   }
@@ -145,9 +168,10 @@ export const validateAccount = (
   name: string,
   accountNumber: string,
   initialBalanceStr: string,
-  monthlyLimitStr: string,
+  dailyLimitStr: string,
   existingAccounts: Account[],
-  currentAccountId?: string
+  currentAccountId?: string,
+  monthlyLimitStr?: string
 ): AccountValidationResult => {
   const errors: AccountValidationResult['errors'] = {};
 
@@ -184,11 +208,23 @@ export const validateAccount = (
     if (isNaN(numBalance) || numBalance < 0) errors.initialBalance = 'Initial balance must be ৳0 or more';
   }
 
-  // 4. Monthly limit validation
-  if (monthlyLimitStr.trim()) {
+  // 4. Daily limit validation (bKash standard: max ৳50,000)
+  if (dailyLimitStr && dailyLimitStr.trim()) {
+    const numDailyLimit = parseFloat(dailyLimitStr.replace(/[^0-9.]/g, ''));
+    if (isNaN(numDailyLimit) || numDailyLimit <= 0) {
+      errors.dailyLimit = 'Daily limit must be greater than ৳0';
+    } else if (numDailyLimit > 50000) {
+      errors.dailyLimit = 'Daily limit cannot exceed ৳50,000 for bKash';
+    }
+  }
+
+  // 5. Monthly limit validation (bKash standard: max ৳300,000)
+  if (monthlyLimitStr && monthlyLimitStr.trim()) {
     const numLimit = parseFloat(monthlyLimitStr.replace(/[^0-9.]/g, ''));
     if (isNaN(numLimit) || numLimit <= 0) {
       errors.monthlyLimit = 'Monthly limit must be greater than ৳0';
+    } else if (numLimit > 300000) {
+      errors.monthlyLimit = 'Monthly limit cannot exceed ৳300,000 for bKash';
     }
   }
 

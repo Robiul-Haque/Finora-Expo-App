@@ -93,7 +93,7 @@ const ExcelTableRow = React.memo<ExcelTableRowProps>(({
   const totalLimit = account.monthlyLimit || 300000;
   const remaining =
     account.remainingLimit !== undefined ? account.remainingLimit : Math.max(0, totalLimit - used);
-  const dailyLimitVal = account.dailyLimit !== undefined ? account.dailyLimit : 300000;
+  const dailyLimitVal = account.dailyLimit !== undefined ? account.dailyLimit : 50000;
   const isLowBalance = account.balance < 5000;
   const monthlyUsedRatio = totalLimit > 0 ? used / totalLimit : 0;
   const dailyUsedRatio = dailyLimitVal > 0 ? (account.todaySend || 0) / dailyLimitVal : 0;
@@ -254,8 +254,8 @@ export const ExcelTableView: React.FC<ExcelTableViewProps> = ({
       } else if (sortColumn === 'balance') {
         comparison = (a.balance || 0) - (b.balance || 0);
       } else if (sortColumn === 'dailyLimit') {
-        const limitA = a.dailyLimit !== undefined ? a.dailyLimit : 300000;
-        const limitB = b.dailyLimit !== undefined ? b.dailyLimit : 300000;
+        const limitA = a.dailyLimit !== undefined ? a.dailyLimit : 50000;
+        const limitB = b.dailyLimit !== undefined ? b.dailyLimit : 50000;
         comparison = limitA - limitB;
       } else if (sortColumn === 'used') {
         const usedA = a.monthlyLimitUsed !== undefined ? a.monthlyLimitUsed : a.todaySend;
@@ -281,7 +281,7 @@ export const ExcelTableView: React.FC<ExcelTableViewProps> = ({
     return accounts.reduce(
       (acc, curr) => {
         acc.balance += curr.balance || 0;
-        acc.dailyLimit += curr.dailyLimit !== undefined ? curr.dailyLimit : 300000;
+        acc.dailyLimit += curr.dailyLimit !== undefined ? curr.dailyLimit : 50000;
         acc.used += curr.monthlyLimitUsed !== undefined ? curr.monthlyLimitUsed : (curr.todaySend || 0);
         const rem =
           curr.remainingLimit !== undefined

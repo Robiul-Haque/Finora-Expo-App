@@ -52,7 +52,7 @@ const AccountCardComponent: React.FC<AccountCardProps> = ({
 
   // Critical threshold check: triggers red warning when >= 90% is used on either limit
   const usageRatio = monthlyLimit > 0 ? monthlyLimitUsed / monthlyLimit : 0;
-  const dailyLimit = account.dailyLimit || 300000;
+  const dailyLimit = account.dailyLimit || 50000;
   const dailyRatio = dailyLimit > 0 ? (account.todaySend || 0) / dailyLimit : 0;
   const effectiveRatio = Math.max(usageRatio, dailyRatio);
   const usagePercentage = Math.min(100, Math.round(effectiveRatio * 100));

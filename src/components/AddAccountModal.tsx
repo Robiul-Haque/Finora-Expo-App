@@ -28,7 +28,8 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
   const { accounts, addAccount } = useLedger();
 
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [dailyLimit, setDailyLimit] = useState('');
+  const [dailyLimit, setDailyLimit] = useState('50000');
+  const [monthlyLimit, setMonthlyLimit] = useState('300000');
   const [openingBalance, setOpeningBalance] = useState('');
   const [accountLabel, setAccountLabel] = useState('');
   const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
@@ -37,6 +38,7 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
 
   const phoneRef = useRef<TextInput>(null);
   const dailyLimitRef = useRef<TextInput>(null);
+  const monthlyLimitRef = useRef<TextInput>(null);
   const openingBalanceRef = useRef<TextInput>(null);
   const accountLabelRef = useRef<TextInput>(null);
 
@@ -46,6 +48,8 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
 
   useEffect(() => {
     if (visible) {
+      setDailyLimit('50000');
+      setMonthlyLimit('300000');
       isClosing.current = false;
       fadeAnim.setValue(0);
       slideAnim.setValue(350);
@@ -85,7 +89,8 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
       }),
     ]).start(() => {
       setPhoneNumber('');
-      setDailyLimit('');
+      setDailyLimit('50000');
+      setMonthlyLimit('300000');
       setOpeningBalance('');
       setAccountLabel('');
       setTouched({});
@@ -95,8 +100,8 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
 
   // Real-time validation computation
   const validation = useMemo(() => {
-    return validateAccount(accountLabel || phoneNumber, phoneNumber, openingBalance, dailyLimit, accounts);
-  }, [accountLabel, phoneNumber, openingBalance, dailyLimit, accounts]);
+    return validateAccount(accountLabel || phoneNumber, phoneNumber, openingBalance, dailyLimit, accounts, undefined, monthlyLimit);
+  }, [accountLabel, phoneNumber, openingBalance, dailyLimit, monthlyLimit, accounts]);
 
   const handleBlur = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -106,6 +111,7 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
     setTouched({
       phoneNumber: true,
       dailyLimit: true,
+      monthlyLimit: true,
       openingBalance: true,
     });
 
@@ -125,7 +131,12 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
     }
 
     const numBalance = parseFloat(openingBalance.trim().replace(/[^0-9.]/g, '')) || 0;
-    const numLimit = parseFloat(dailyLimit.trim().replace(/[^0-9.]/g, '')) || 300000;
+    const numDailyLimit = dailyLimit.trim()
+      ? Math.min(parseFloat(dailyLimit.trim().replace(/[^0-9.]/g, '')) || 50000, 50000)
+      : 50000;
+    const numMonthlyLimit = monthlyLimit.trim()
+      ? Math.min(parseFloat(monthlyLimit.trim().replace(/[^0-9.]/g, '')) || 300000, 300000)
+      : 300000;
     const cleanNumber = normalizePhoneNumber(phoneNumber.trim());
 
     setIsSubmitting(true);
@@ -135,17 +146,18 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
         type: 'agent',
         accountNumber: cleanNumber,
         balance: numBalance,
-        monthlyLimit: numLimit,
+        monthlyLimit: numMonthlyLimit,
         monthlyLimitUsed: 0,
-        remainingLimit: numLimit,
-        dailyLimit: numLimit,
+        remainingLimit: numMonthlyLimit,
+        dailyLimit: numDailyLimit,
         isActive: true,
       });
 
       notifyUser('SIM account added successfully.', 'success');
       // Reset
       setPhoneNumber('');
-      setDailyLimit('');
+      setDailyLimit('50000');
+      setMonthlyLimit('300000');
       setOpeningBalance('');
       setAccountLabel('');
       handleClose();
@@ -248,26 +260,83 @@ const AddAccountModalComponent: React.FC<AddAccountModalProps> = ({ visible, onC
               )}
             </View>
 
-            {/* Field 2: Daily Send Limit */}
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Daily Send Limit</Text>
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={() => dailyLimitRef.current?.focus()}
-                style={[styles.inputBox, { backgroundColor: theme.inputBg, borderColor: theme.border }]}
-              >
-                <Text style={[styles.currencyPrefix, { color: theme.textSecondary }]}>৳</Text>
-                <TextInput
-                  ref={dailyLimitRef}
-                  style={[styles.inputFieldRight, { color: theme.text }]}
-                  placeholder="300,000"
-                  placeholderTextColor={theme.textMuted}
-                  keyboardType="numeric"
-                  value={dailyLimit}
-                  onChangeText={setDailyLimit}
-                  onBlur={() => handleBlur('dailyLimit')}
-                />
-              </TouchableOpacity>
+            {/* Inline Limits Row (Daily & Monthly Side-by-Side) */}
+            <View style={styles.inlineRow}>
+              {/* Field: Daily Send Limit */}
+              <View style={[styles.fieldGroup, styles.inlineCol]}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]} numberOfLines={1}>
+                  Daily Limit (Max ৳50k)
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={1}
+                  onPress={() => dailyLimitRef.current?.focus()}
+                  style={[
+                    styles.inputBox,
+                    {
+                      backgroundColor: theme.inputBg,
+                      borderColor: touched.dailyLimit && validation.errors.dailyLimit ? theme.danger : theme.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.currencyPrefix, { color: theme.textSecondary }]}>৳</Text>
+                  <TextInput
+                    ref={dailyLimitRef}
+                    style={[styles.inputFieldRight, { color: theme.text }]}
+                    placeholder="50,000"
+                    placeholderTextColor={theme.textMuted}
+                    keyboardType="numeric"
+                    value={dailyLimit}
+                    onChangeText={setDailyLimit}
+                    onBlur={() => handleBlur('dailyLimit')}
+                  />
+                </TouchableOpacity>
+                {touched.dailyLimit && validation.errors.dailyLimit && (
+                  <View style={styles.warningContainer}>
+                    <Ionicons name="alert-circle" size={13} color={theme.danger} />
+                    <Text style={[styles.inlineWarning, { color: theme.danger }]} numberOfLines={2}>
+                      {validation.errors.dailyLimit}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Field: Monthly Send Limit */}
+              <View style={[styles.fieldGroup, styles.inlineCol]}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]} numberOfLines={1}>
+                  Monthly Limit (Max ৳300k)
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={1}
+                  onPress={() => monthlyLimitRef.current?.focus()}
+                  style={[
+                    styles.inputBox,
+                    {
+                      backgroundColor: theme.inputBg,
+                      borderColor: touched.monthlyLimit && validation.errors.monthlyLimit ? theme.danger : theme.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.currencyPrefix, { color: theme.textSecondary }]}>৳</Text>
+                  <TextInput
+                    ref={monthlyLimitRef}
+                    style={[styles.inputFieldRight, { color: theme.text }]}
+                    placeholder="300,000"
+                    placeholderTextColor={theme.textMuted}
+                    keyboardType="numeric"
+                    value={monthlyLimit}
+                    onChangeText={setMonthlyLimit}
+                    onBlur={() => handleBlur('monthlyLimit')}
+                  />
+                </TouchableOpacity>
+                {touched.monthlyLimit && validation.errors.monthlyLimit && (
+                  <View style={styles.warningContainer}>
+                    <Ionicons name="alert-circle" size={13} color={theme.danger} />
+                    <Text style={[styles.inlineWarning, { color: theme.danger }]} numberOfLines={2}>
+                      {validation.errors.monthlyLimit}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
 
             {/* Field 3: Opening Balance */}
@@ -398,6 +467,13 @@ const styles = StyleSheet.create({
   },
   fieldGroup: {
     gap: 6,
+  },
+  inlineRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  inlineCol: {
+    flex: 1,
   },
   fieldLabel: {
     fontSize: 12.5,

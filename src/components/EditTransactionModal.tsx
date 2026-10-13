@@ -203,6 +203,34 @@ const EditTransactionModalComponent: React.FC<EditTransactionModalProps> = ({
         );
         return;
       }
+
+      // Daily Limit check (max ৳50,000)
+      const dailyLimit = selectedAccount.dailyLimit || 50000;
+      const oldTodaySend = (transaction.accountId === selectedAccount.id && isOldOutflow)
+        ? Math.max(0, (selectedAccount.todaySend || 0) - transaction.amount)
+        : (selectedAccount.todaySend || 0);
+      const remainingDaily = Math.max(0, dailyLimit - oldTodaySend);
+      if (parsedAmount > remainingDaily) {
+        notifyUser(
+          `Amount exceeds remaining daily limit (৳${remainingDaily.toLocaleString('en-US')}). Daily limit max is ৳${dailyLimit.toLocaleString('en-US')}.`,
+          'warning'
+        );
+        return;
+      }
+
+      // Monthly Limit check (max ৳300,000)
+      const monthlyLimit = selectedAccount.monthlyLimit || 300000;
+      const oldMonthlyUsed = (transaction.accountId === selectedAccount.id && isOldOutflow)
+        ? Math.max(0, (selectedAccount.monthlyLimitUsed || 0) - transaction.amount)
+        : (selectedAccount.monthlyLimitUsed || 0);
+      const remainingMonthly = Math.max(0, monthlyLimit - oldMonthlyUsed);
+      if (parsedAmount > remainingMonthly) {
+        notifyUser(
+          `Amount exceeds remaining monthly limit (৳${remainingMonthly.toLocaleString('en-US')}). Monthly limit max is ৳${monthlyLimit.toLocaleString('en-US')}.`,
+          'warning'
+        );
+        return;
+      }
     }
 
     // Convert UI type to ledger format

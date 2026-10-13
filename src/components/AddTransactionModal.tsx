@@ -179,8 +179,8 @@ const AddTransactionModalComponent: React.FC<AddTransactionModalProps> = ({
   const numProfit = txType === 'receive' ? (parseFloat(profit.trim().replace(/[^0-9.]/g, '')) || 0) : 0;
 
   const validation = useMemo(() => {
-    return validateTransaction(selectedAccount, mappedTransactionType, amount, recipientNumber, cost, profit);
-  }, [selectedAccount, mappedTransactionType, amount, recipientNumber, cost, profit]);
+    return validateTransaction(selectedAccount, mappedTransactionType, amount, recipientNumber, cost, profit, selectedDate);
+  }, [selectedAccount, mappedTransactionType, amount, recipientNumber, cost, profit, selectedDate]);
 
   const previewNewBalance = useMemo(() => {
     if (!selectedAccount) return 0;

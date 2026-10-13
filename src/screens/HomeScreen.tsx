@@ -128,9 +128,11 @@ const HomeScreenComponent: React.FC<HomeScreenProps> = ({
             <ExcelTableSkeleton />
           ) : filteredAccounts.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <Ionicons name="search-outline" size={32} color={theme.textMuted} />
+              <Ionicons name="card-outline" size={36} color={theme.textMuted} />
               <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
-                No SIM accounts matching "{searchQuery}"
+                {searchQuery
+                  ? `No SIM accounts matching "${searchQuery}"`
+                  : 'No SIM accounts added yet.\nGo to Accounts tab to add your first SIM.'}
               </Text>
             </View>
           ) : (

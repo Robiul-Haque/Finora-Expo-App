@@ -14,9 +14,9 @@ const checkIsOnline = async (): Promise<boolean> => {
   }
 };
 
-const ACCOUNTS_STORAGE_KEY = '@finora_accounts_v4';
-const TRANSACTIONS_STORAGE_KEY = '@finora_transactions_v4';
-const DAILY_PROFITS_STORAGE_KEY = '@finora_daily_profits_v4';
+const ACCOUNTS_STORAGE_KEY = '@finora_accounts_v5';
+const TRANSACTIONS_STORAGE_KEY = '@finora_transactions_v5';
+const DAILY_PROFITS_STORAGE_KEY = '@finora_daily_profits_v5';
 
 const sanitizeTransactions = (txList: Transaction[]): Transaction[] => {
   return txList
@@ -122,7 +122,7 @@ export const ledgerApi = {
     if (!API_CONFIG.USE_MOCK_STORAGE) {
       try {
         const accounts = await httpRequest<Account[]>('/accounts');
-        if (Array.isArray(accounts) && accounts.length > 0) {
+        if (Array.isArray(accounts)) {
           await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
           return accounts;
         }
@@ -135,7 +135,12 @@ export const ledgerApi = {
     try {
       const data = await AsyncStorage.getItem(ACCOUNTS_STORAGE_KEY);
       if (data) {
-        return JSON.parse(data);
+        const cached: Account[] = JSON.parse(data);
+        return cached.map((acc) => ({
+          ...acc,
+          dailyLimit: typeof acc.dailyLimit === 'number' ? Math.min(acc.dailyLimit, 50000) : 50000,
+          monthlyLimit: typeof acc.monthlyLimit === 'number' ? Math.min(acc.monthlyLimit, 300000) : 300000,
+        }));
       }
       return [];
     } catch {
@@ -151,7 +156,7 @@ export const ledgerApi = {
       try {
         const queryParams = options ? `?page=${options.page || 1}&limit=${options.limit || 50}` : '';
         const rawTxs = await httpRequest<Transaction[]>(`/transactions${queryParams}`);
-        if (Array.isArray(rawTxs) && rawTxs.length > 0) {
+        if (Array.isArray(rawTxs)) {
           const serverTxs = sanitizeTransactions(rawTxs);
           const localData = await AsyncStorage.getItem(TRANSACTIONS_STORAGE_KEY);
           let mergedTxs = serverTxs;
@@ -290,7 +295,7 @@ export const ledgerApi = {
         } else if (isOutflow) {
           newBalance -= txData.amount + (txData.cost || 0);
           if (isTxToday) newTodaySend += txData.amount;
-          if (isTxThisMonth && (txData.type === 'sm' || txData.type === 'send_money')) {
+          if (isTxThisMonth && (txData.type === 'sm' || txData.type === 'send_money' || txData.type === 'send')) {
             newMonthlyLimitUsed += txData.amount;
           }
         } else if (txData.type === 'adjustment') {
@@ -389,7 +394,7 @@ export const ledgerApi = {
         if (oldOutflow) {
           balance += oldTx.amount + (oldTx.cost || 0);
           if (isOldToday) todaySend = Math.max(0, todaySend - oldTx.amount);
-          if (isOldThisMonth && (oldTx.type === 'sm' || oldTx.type === 'send_money')) {
+          if (isOldThisMonth && (oldTx.type === 'sm' || oldTx.type === 'send_money' || oldTx.type === 'send')) {
             monthlyLimitUsed = Math.max(0, monthlyLimitUsed - oldTx.amount);
           }
         } else if (oldInflow) {
@@ -407,7 +412,7 @@ export const ledgerApi = {
         if (newOutflow) {
           balance -= updatedTx.amount + (updatedTx.cost || 0);
           if (isNewToday) todaySend += updatedTx.amount;
-          if (isNewThisMonth && (updatedTx.type === 'sm' || updatedTx.type === 'send_money')) {
+          if (isNewThisMonth && (updatedTx.type === 'sm' || updatedTx.type === 'send_money' || updatedTx.type === 'send')) {
             monthlyLimitUsed += updatedTx.amount;
           }
         } else if (newInflow) {
@@ -488,7 +493,7 @@ export const ledgerApi = {
         if (isOutflow) {
           newBalance += txToDelete.amount + (txToDelete.cost || 0);
           if (isTxToday) newTodaySend = Math.max(0, newTodaySend - txToDelete.amount);
-          if (isTxThisMonth && (txToDelete.type === 'sm' || txToDelete.type === 'send_money')) {
+          if (isTxThisMonth && (txToDelete.type === 'sm' || txToDelete.type === 'send_money' || txToDelete.type === 'send')) {
             newMonthlyLimitUsed = Math.max(0, newMonthlyLimitUsed - txToDelete.amount);
           }
         } else if (isInflow) {
@@ -541,13 +546,15 @@ export const ledgerApi = {
       throw new Error('This phone number already exists in your accounts.');
     }
 
-    const monthlyLimit = accData.monthlyLimit || 300000;
+    const dailyLimit = Math.min(accData.dailyLimit || 50000, 50000);
+    const monthlyLimit = Math.min(accData.monthlyLimit || 300000, 300000);
     const monthlyLimitUsed = accData.monthlyLimitUsed || 0;
     const remainingLimit = Math.max(0, monthlyLimit - monthlyLimitUsed);
 
     let newAccount: Account = {
       ...accData,
       id: 'acc_' + Date.now(),
+      dailyLimit,
       monthlyLimit,
       monthlyLimitUsed,
       remainingLimit,
@@ -605,6 +612,12 @@ export const ledgerApi = {
     const updated = currentAccounts.map((a) => {
       if (a.id === id) {
         const merged = { ...a, ...updates };
+        if (merged.dailyLimit !== undefined) {
+          merged.dailyLimit = Math.min(merged.dailyLimit, 50000);
+        }
+        if (merged.monthlyLimit !== undefined) {
+          merged.monthlyLimit = Math.min(merged.monthlyLimit, 300000);
+        }
         const monthlyLimit = merged.monthlyLimit || 300000;
         const monthlyLimitUsed = merged.monthlyLimitUsed || 0;
         merged.remainingLimit = Math.max(0, monthlyLimit - monthlyLimitUsed);
@@ -802,9 +815,19 @@ export const ledgerApi = {
    * Reset local database cache to force fresh pull from live server
    */
   async resetDatabase(): Promise<void> {
-    await AsyncStorage.removeItem(ACCOUNTS_STORAGE_KEY);
-    await AsyncStorage.removeItem(TRANSACTIONS_STORAGE_KEY);
-    await AsyncStorage.removeItem(DAILY_PROFITS_STORAGE_KEY);
+    try {
+      await AsyncStorage.multiRemove([
+        '@finora_accounts_v4',
+        '@finora_transactions_v4',
+        '@finora_daily_profits_v4',
+        '@finora_accounts_v5',
+        '@finora_transactions_v5',
+        '@finora_daily_profits_v5',
+        '@finora_sync_queue_v1',
+      ]);
+    } catch {
+      // Ignore
+    }
   },
 };
 

@@ -77,9 +77,12 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
     const hasTxMap: Record<string, boolean> = {};
     const now = new Date();
 
-    // Initialize all accounts with zero
+    // Build O(1) lookup map for accounts by id and accountNumber
+    const accLookup = new Map<string, string>();
     for (const acc of accounts) {
       map[acc.id] = { profit: 0, cost: 0, netProfit: 0 };
+      accLookup.set(acc.id, acc.id);
+      if (acc.accountNumber) accLookup.set(acc.accountNumber, acc.id);
     }
 
     // Accumulate from transactions
@@ -87,10 +90,10 @@ const AccountsScreenComponent: React.FC<AccountsScreenProps> = ({
       if (!tx.accountId && !tx.accountNumber) continue;
       const isMatch = timeFilter === 'daily' ? isSameDay(tx.date, now) : isSameMonth(tx.date, now);
       if (isMatch) {
-        const matchedAcc = accounts.find(
-          (a) => a.id === tx.accountId || a.accountNumber === tx.accountId || a.accountNumber === tx.accountNumber
-        );
-        const targetId = matchedAcc ? matchedAcc.id : tx.accountId;
+        const targetId =
+          (tx.accountId && accLookup.get(tx.accountId)) ||
+          (tx.accountNumber && accLookup.get(tx.accountNumber)) ||
+          tx.accountId;
         if (!map[targetId]) {
           map[targetId] = { profit: 0, cost: 0, netProfit: 0 };
         }

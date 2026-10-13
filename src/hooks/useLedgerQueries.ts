@@ -118,7 +118,7 @@ export const useAddTransactionMutation = () => {
           if (isOutflow) {
             newBalance -= newTxData.amount + (newTxData.cost || 0);
             if (isTxToday) newTodaySend += newTxData.amount;
-            if (isTxThisMonth && (newTxData.type === 'sm' || newTxData.type === 'send_money')) {
+            if (isTxThisMonth && (newTxData.type === 'sm' || newTxData.type === 'send_money' || newTxData.type === 'send')) {
               newMonthlyLimitUsed += newTxData.amount;
             }
           } else if (isInflow) {
@@ -211,7 +211,7 @@ export const useDeleteTransactionMutation = () => {
             if (isOutflow) {
               newBalance += txToDelete.amount + (txToDelete.cost || 0);
               if (isTxToday) newTodaySend = Math.max(0, newTodaySend - txToDelete.amount);
-              if (isTxThisMonth && (txToDelete.type === 'sm' || txToDelete.type === 'send_money')) {
+              if (isTxThisMonth && (txToDelete.type === 'sm' || txToDelete.type === 'send_money' || txToDelete.type === 'send')) {
                 newMonthlyLimitUsed = Math.max(0, newMonthlyLimitUsed - txToDelete.amount);
               }
             } else if (isInflow) {
@@ -309,7 +309,7 @@ export const useUpdateTransactionMutation = () => {
           if (oldOutflow) {
             balance += oldTx.amount + (oldTx.cost || 0);
             if (isOldToday) todaySend = Math.max(0, todaySend - oldTx.amount);
-            if (isOldThisMonth && (oldTx.type === 'sm' || oldTx.type === 'send_money')) {
+            if (isOldThisMonth && (oldTx.type === 'sm' || oldTx.type === 'send_money' || oldTx.type === 'send')) {
               monthlyLimitUsed = Math.max(0, monthlyLimitUsed - oldTx.amount);
             }
           } else if (oldInflow) {
@@ -327,7 +327,7 @@ export const useUpdateTransactionMutation = () => {
           if (newOutflow) {
             balance -= updatedTx.amount + (updatedTx.cost || 0);
             if (isNewToday) todaySend += updatedTx.amount;
-            if (isNewThisMonth && (updatedTx.type === 'sm' || updatedTx.type === 'send_money')) {
+            if (isNewThisMonth && (updatedTx.type === 'sm' || updatedTx.type === 'send_money' || updatedTx.type === 'send')) {
               monthlyLimitUsed += updatedTx.amount;
             }
           } else if (newInflow) {
@@ -393,9 +393,10 @@ export const useAddAccountMutation = () => {
       const optimisticAcc: Account = {
         ...newAcc,
         id: 'acc_opt_' + Date.now(),
-        monthlyLimit: newAcc.monthlyLimit || 300000,
+        dailyLimit: Math.min(newAcc.dailyLimit || 50000, 50000),
+        monthlyLimit: Math.min(newAcc.monthlyLimit || 300000, 300000),
         monthlyLimitUsed: 0,
-        remainingLimit: newAcc.monthlyLimit || 300000,
+        remainingLimit: Math.min(newAcc.monthlyLimit || 300000, 300000),
         todaySend: 0,
         todayReceive: 0,
         todayProfit: 0,
@@ -424,7 +425,15 @@ export const useUpdateAccountMutation = () => {
       const prevAccounts = queryClient.getQueryData<Account[]>(ledgerKeys.accounts()) || [];
       queryClient.setQueryData<Account[]>(
         ledgerKeys.accounts(),
-        prevAccounts.map((a) => (a.id === id ? { ...a, ...updates } : a))
+        prevAccounts.map((a) => {
+          if (a.id === id) {
+            const merged = { ...a, ...updates };
+            if (merged.dailyLimit !== undefined) merged.dailyLimit = Math.min(merged.dailyLimit, 50000);
+            if (merged.monthlyLimit !== undefined) merged.monthlyLimit = Math.min(merged.monthlyLimit, 300000);
+            return merged;
+          }
+          return a;
+        })
       );
       return { prevAccounts };
     },

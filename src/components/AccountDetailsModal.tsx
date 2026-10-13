@@ -181,10 +181,15 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
   const monthlyLimit = account.monthlyLimit || 300000;
   const monthlyLimitUsed = account.monthlyLimitUsed !== undefined ? account.monthlyLimitUsed : account.todaySend;
   const remainingLimit = account.remainingLimit !== undefined ? account.remainingLimit : Math.max(0, monthlyLimit - monthlyLimitUsed);
+  const dailyLimit = account.dailyLimit || 50000;
+  const todaySend = account.todaySend || 0;
+  const remainingDaily = Math.max(0, dailyLimit - todaySend);
   const todayProfit = account.todayProfit || account.totalMargin || 0;
 
   const usageRatio = monthlyLimit > 0 ? monthlyLimitUsed / monthlyLimit : 0;
-  const usagePercentage = Math.min(100, Math.round(usageRatio * 100));
+  const dailyRatio = dailyLimit > 0 ? todaySend / dailyLimit : 0;
+  const effectiveRatio = Math.max(usageRatio, dailyRatio);
+  const usagePercentage = Math.min(100, Math.round(effectiveRatio * 100));
 
   const handleConfirmDelete = async () => {
     setShowDeleteConfirm(false);
@@ -298,7 +303,7 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
               <View style={styles.bentoCardInner}>
                 <View style={styles.limitRow}>
                   <Text style={[styles.bentoLabel, { color: usagePercentage >= 90 ? theme.danger : theme.textSecondary }]}>
-                    Limit {usagePercentage >= 90 ? `(Critical ${usagePercentage}%)` : `(${usagePercentage}%)`}
+                    Monthly Limit {usagePercentage >= 90 ? `(Critical ${usagePercentage}%)` : `(${usagePercentage}%)`}
                   </Text>
                   <Text style={[styles.limitValue, { color: theme.text }]}>
                     {formatCurrency(monthlyLimit)}
@@ -319,9 +324,23 @@ const AccountDetailsModalComponent: React.FC<AccountDetailsModalProps> = ({
                 </View>
 
                 <View style={styles.limitRow}>
-                  <Text style={[styles.bentoLabel, { color: usagePercentage >= 90 ? theme.danger : theme.textSecondary }]}>Remaining</Text>
+                  <Text style={[styles.bentoLabel, { color: usagePercentage >= 90 ? theme.danger : theme.textSecondary }]}>Monthly Remaining</Text>
                   <Text style={[styles.limitValue, { color: usagePercentage >= 90 ? theme.danger : theme.text, fontWeight: usagePercentage >= 90 ? '700' : '600' }]}>
                     {formatCurrency(remainingLimit)}
+                  </Text>
+                </View>
+
+                <View style={[styles.limitRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.divider }]}>
+                  <Text style={[styles.bentoLabel, { color: theme.textSecondary }]}>Daily Send Limit (Max ৳50,000)</Text>
+                  <Text style={[styles.limitValue, { color: theme.text }]}>
+                    {formatCurrency(dailyLimit)}
+                  </Text>
+                </View>
+
+                <View style={styles.limitRow}>
+                  <Text style={[styles.bentoLabel, { color: remainingDaily <= 5000 ? theme.danger : theme.textSecondary }]}>Daily Remaining (Today)</Text>
+                  <Text style={[styles.limitValue, { color: remainingDaily <= 5000 ? theme.danger : theme.text, fontWeight: '600' }]}>
+                    {formatCurrency(remainingDaily)}
                   </Text>
                 </View>
               </View>

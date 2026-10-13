@@ -268,6 +268,14 @@ export default function App() {
   useEffect(() => {
     async function prepareApp() {
       try {
+        // 1. Purge legacy dummy mock caches from device storage
+        await AsyncStorage.multiRemove([
+          '@finora_accounts_v4',
+          '@finora_transactions_v4',
+          '@finora_daily_profits_v4',
+          '@finora_sync_queue_v1',
+        ]).catch(() => null);
+
         const [, , cachedAccRaw, cachedTxRaw] = await Promise.all([
           initializeThemeSync(),
           Font.loadAsync({
@@ -275,14 +283,14 @@ export default function App() {
             Ionicons: require('./assets/fonts/Ionicons.ttf'),
             ionicons: require('./assets/fonts/Ionicons.ttf'),
           }),
-          AsyncStorage.getItem('@finora_accounts_v4').catch(() => null),
-          AsyncStorage.getItem('@finora_transactions_v4').catch(() => null),
+          AsyncStorage.getItem('@finora_accounts_v5').catch(() => null),
+          AsyncStorage.getItem('@finora_transactions_v5').catch(() => null),
         ]);
 
         if (cachedAccRaw) {
           try {
             const accs = JSON.parse(cachedAccRaw);
-            if (Array.isArray(accs) && accs.length > 0) {
+            if (Array.isArray(accs)) {
               queryClient.setQueryData(ledgerKeys.accounts(), accs);
             }
           } catch {}
@@ -291,7 +299,7 @@ export default function App() {
         if (cachedTxRaw) {
           try {
             const txs = JSON.parse(cachedTxRaw);
-            if (Array.isArray(txs) && txs.length > 0) {
+            if (Array.isArray(txs)) {
               queryClient.setQueryData(ledgerKeys.transactions(), txs);
             }
           } catch {}
